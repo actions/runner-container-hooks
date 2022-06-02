@@ -1,0 +1,57 @@
+name: CD - Release new version
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: npm install
+        name: Install dependencies
+      - run: npm run bootstrap
+        name: Bootstrap the packages
+      - run: npm run build-all
+        name: Build packages
+      - uses: actions/github-script@v6
+        id: releaseNotes
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const hookVersion = require('./package.json').version
+            var releaseNotes = fs.readFileSync('${{ github.workspace }}/releaseNotes.md', 'utf8').replace(/<HOOK_VERSION>/g, hookVersion)
+            console.log(releaseNotes)
+            core.setOutput('version', hookVersion);
+            core.setOutput('note', releaseNotes);
+      - name: Zip up releases
+        run: |
+          zip -r -j actions-runner-hooks-docker-${{ steps.releaseNotes.outputs.version }}.zip packages/docker/dist
+          zip -r -j actions-runner-hooks-k8s-${{ steps.releaseNotes.outputs.version }}.zip packages/k8s/dist
+      - uses: actions/create-release@v1
+        id: createRelease
+        name: Create ${{ steps.releaseNotes.outputs.version }} Hook Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: "v${{ steps.releaseNotes.outputs.version }}"
+          release_name: "v${{ steps.releaseNotes.outputs.version }}"
+          body: |
+            ${{ steps.releaseNotes.outputs.note }}
+      - name: Upload K8s hooks
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.createRelease.outputs.upload_url }}
+          asset_path: ${{ github.workspace }}/actions-runner-hooks-k8s-${{ steps.releaseNotes.outputs.version }}.zip
+          asset_name: actions-runner-hooks-k8s-${{ steps.releaseNotes.outputs.version }}.zip
+          asset_content_type: application/octet-stream
+      - name: Upload docker hooks
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.createRelease.outputs.upload_url }}
+          asset_path: ${{ github.workspace }}/actions-runner-hooks-docker-${{ steps.releaseNotes.outputs.version }}.zip
+          asset_name: actions-runner-hooks-docker-${{ steps.releaseNotes.outputs.version }}.zip
+          asset_content_type: application/octet-stream

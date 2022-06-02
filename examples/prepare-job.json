@@ -1,0 +1,96 @@
+{
+  "command": "prepare_job",
+  "responseFile": "/users/thboop/runner/_work/{guid}.json",
+  "state": {},
+  "args": {
+    "container": {
+      "image": "node:14.16",
+      "workingDirectory": "/__w/thboop-test2/thboop-test2",
+      "createOptions": "--cpus 1",
+      "environmentVariables": {
+        "NODE_ENV": "development"
+      },
+      "userMountVolumes": [
+        {
+          "sourceVolumePath": "my_docker_volume",
+          "targetVolumePath": "/volume_mount",
+          "readOnly": false
+        }
+      ],
+      "systemMountVolumes": [
+        {
+          "sourceVolumePath": "/var/run/docker.sock",
+          "targetVolumePath": "/var/run/docker.sock",
+          "readOnly": false
+        },
+        {
+          "sourceVolumePath": "//Users/thomas/git/runner/_layout/_work",
+          "targetVolumePath": "/__w",
+          "readOnly": false
+        },
+        {
+          "sourceVolumePath": "//Users/thomas/git/runner/_layout/externals",
+          "targetVolumePath": "/__e",
+          "readOnly": true
+        },
+        {
+          "sourceVolumePath": "//Users/thomas/git/runner/_layout/_work/_temp",
+          "targetVolumePath": "/__w/_temp",
+          "readOnly": false
+        },
+        {
+          "sourceVolumePath": "//Users/thomas/git/runner/_layout/_work/_actions",
+          "targetVolumePath": "/__w/_actions",
+          "readOnly": false
+        },
+        {
+          "sourceVolumePath": "//Users/thomas/git/runner/_layout/_work/_tool",
+          "targetVolumePath": "/__w/_tool",
+          "readOnly": false
+        },
+        {
+          "sourceVolumePath": "//Users/thomas/git/runner/_layout/_work/_temp/_github_home",
+          "targetVolumePath": "/github/home",
+          "readOnly": false
+        },
+        {
+          "sourceVolumePath": "//Users/thomas/git/runner/_layout/_work/_temp/_github_workflow",
+          "targetVolumePath": "/github/workflow",
+          "readOnly": false
+        }
+      ],
+      "registry": {
+        "username": "foo",
+        "password": "bar",
+        "serverUrl": "https://index.docker.io/v1"
+      },
+      "portMappings": [
+        "80:8080"
+      ]
+    },
+    "services": [
+      {
+        "contextName": "redis",
+        "image": "redis",
+        "createOptions": "--cpus 1",
+        "environmentVariables": {},
+        "userMountVolumes": [
+          {
+            "sourceVolumePath": "/var/run/docker.sock",
+            "targetVolumePath": "/var/run/docker.sock",
+            "readOnly": false
+          }
+        ],
+        "portMappings": [
+          "8080:80",
+          "8088:8080"
+        ],
+        "registry": {
+          "username": "foo",
+          "password": "bar",
+          "serverUrl": "https://index.docker.io/v1"
+        }
+      }
+    ]
+  }
+}

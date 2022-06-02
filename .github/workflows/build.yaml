@@ -1,0 +1,26 @@
+name: CI - Build & Test
+on:
+  pull_request:
+    branches:
+    - '*'
+    paths-ignore:
+    - '**.md'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: npm install
+        name: Install dependencies
+      - run: npm run bootstrap
+        name: Bootstrap the packages
+      - run: npm run build-all
+        name: Build packages
+      - run: npm run format-check
+      - name: Check linter
+        run: |
+          npm run lint
+          git diff --exit-code
+      - name: Run tests
+        run: npm run test
