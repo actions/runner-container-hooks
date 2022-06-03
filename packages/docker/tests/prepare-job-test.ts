@@ -24,6 +24,8 @@ describe('prepare job', () => {
       testSetup.systemMountVolumes
     prepareJobData.args.container.workingDirectory =
       testSetup.containerWorkingDirectory
+    prepareJobData.args.container.registry = null
+    prepareJobData.args.services.forEach(s => (s.registry = null))
 
     prepareJobOutputPath = `${
       testSetup.testDir

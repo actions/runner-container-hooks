@@ -34,6 +34,8 @@ describe('cleanup job', () => {
       testSetup.systemMountVolumes
     prepareJobDefinition.args.container.workingDirectory =
       testSetup.containerWorkingDirectory
+    prepareJobDefinition.args.container.registry = null
+    prepareJobDefinition.args.services.forEach(s => (s.registry = null))
 
     await prepareJob(prepareJobDefinition.args, prepareJobOutputPath)
   })

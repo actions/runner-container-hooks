@@ -19,8 +19,6 @@ const containerStepJson = fs.readFileSync(
   'utf8'
 )
 
-const tmpOutputDir = `${__dirname}/_temp/${uuidv4()}`
-
 let prepareJobDefinition: any
 let scriptStepDefinition: any
 let runContainerStepDefinition: any
@@ -30,14 +28,6 @@ let prepareJobOutputFilePath: string
 let testSetup: TestSetup
 
 describe('e2e', () => {
-  beforeAll(() => {
-    fs.mkdirSync(tmpOutputDir, { recursive: true })
-  })
-
-  afterAll(() => {
-    fs.rmSync(tmpOutputDir, { recursive: true })
-  })
-
   beforeEach(() => {
     // init dirs
     testSetup = new TestSetup()
@@ -50,6 +40,8 @@ describe('e2e', () => {
       testSetup.systemMountVolumes
     prepareJobDefinition.args.container.workingDirectory =
       testSetup.containerWorkingDirectory
+    prepareJobDefinition.args.container.registry = null
+    prepareJobDefinition.args.services.forEach(s => (s.registry = null))
 
     const scriptStepJson = fs.readFileSync(
       path.resolve(__dirname + '/../../../examples/run-script-step.json'),
@@ -58,6 +50,7 @@ describe('e2e', () => {
     scriptStepDefinition = JSON.parse(scriptStepJson)
     scriptStepDefinition.args.workingDirectory =
       testSetup.containerWorkingDirectory
+    scriptStepDefinition.args.registry = null
 
     runContainerStepDefinition = JSON.parse(containerStepJson)
     runContainerStepDefinition.args.workingDirectory =
@@ -65,14 +58,15 @@ describe('e2e', () => {
     runContainerStepDefinition.args.userMountVolumes =
       testSetup.userMountVolumes
     runContainerStepDefinition.args.systemMountVolumes =
-      testSetup.systemMountVolumes
+      runContainerStepDefinition.args.registry = null
 
-    prepareJobOutputFilePath = `${tmpOutputDir}/prepare-job-output-${uuidv4()}.json`
+    prepareJobOutputFilePath = `${
+      testSetup.testDir
+    }/prepare-job-output-${uuidv4()}.json`
     fs.writeFileSync(prepareJobOutputFilePath, '')
   })
 
   afterEach(() => {
-    fs.rmSync(prepareJobOutputFilePath, { force: true })
     testSetup.teardown()
   })
 
@@ -101,7 +95,7 @@ describe('e2e', () => {
       runScriptStep(scriptStepDefinition.args, resp.state)
     ).resolves.not.toThrow()
 
-    const dockerfilePath = `${tmpOutputDir}/Dockerfile`
+    const dockerfilePath = `${testSetup.testDir}/Dockerfile`
     fs.writeFileSync(
       dockerfilePath,
       `FROM ubuntu:latest
@@ -112,10 +106,8 @@ ENTRYPOINT [ "tail", "-f", "/dev/null" ]
     const containerStepDataCopy = JSON.parse(
       JSON.stringify(runContainerStepDefinition)
     )
-    process.env.GITHUB_WORKSPACE = tmpOutputDir
     containerStepDataCopy.args.dockerfile = 'Dockerfile'
     containerStepDataCopy.args.context = '.'
-    console.log(containerStepDataCopy.args)
     await expect(
       runContainerStep(containerStepDataCopy.args, resp.state)
     ).resolves.not.toThrow()
