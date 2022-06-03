@@ -146,7 +146,7 @@ export async function containerBuild(
   tag: string
 ): Promise<void> {
   if (!args.dockerfile) {
-    throw new Error('Container build expets args.dockerfile to be set')
+    throw new Error('Container build expects 'args.dockerfile' to be set')
   }
 
   const dockerArgs: string[] = ['build']
