@@ -175,8 +175,13 @@ function createPodSpec(
     args: container.entryPointArgs,
     ports: containerPorts(container)
   } as k8s.V1Container
+
   if (container.workingDirectory) {
     podContainer.workingDir = container.workingDirectory
+  }
+
+  if (container.createOptions) {
+    podContainer.resources = getResourceRequirements(container.createOptions)
   }
 
   podContainer.env = []
@@ -194,4 +199,63 @@ function createPodSpec(
   )
 
   return podContainer
+}
+
+function getResourceRequirements(
+  createOptions: string
+): k8s.V1ResourceRequirements {
+  const rr = new k8s.V1ResourceRequirements()
+  rr.limits = {}
+  rr.requests = {}
+
+  const options = parseOptions(createOptions)
+  for (const [key, value] of Object.entries(options)) {
+    switch (key) {
+      case '--cpus':
+        rr.requests.cpu = value
+        break
+      case '--memory':
+      case '-m':
+        rr.limits.memory = value
+        break
+      default:
+        core.warning(
+          `Container option ${key} is not supported. Supported options are ['--cpus', '--memory', '-m']`
+        )
+    }
+  }
+
+  return rr
+}
+
+function parseOptions(options: string): { [option: string]: string } {
+  const rv: { [option: string]: string } = {}
+
+  const spaceSplit = options.split(' ')
+  for (let i = 0; i < spaceSplit.length; i++) {
+    if (!spaceSplit[i].startsWith('-')) {
+      throw new Error(`Options specified in wrong format: ${options}`)
+    }
+
+    const optSplit = spaceSplit[i].split('=')
+    const optName = optSplit[0]
+    let optValue = ''
+    switch (optSplit.length) {
+      case 1:
+        if (spaceSplit.length <= i + 1) {
+          throw new Error(`Option ${optName} must have a value`)
+        }
+        optValue = spaceSplit[++i]
+        break
+      case 2:
+        optValue = optSplit[1]
+        break
+      default:
+        throw new Error(`failed to parse option ${spaceSplit[i]}`)
+    }
+
+    rv[optName] = optValue
+  }
+
+  return rv
 }
