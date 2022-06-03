@@ -171,6 +171,17 @@ export async function containerNetworkRemove(network: string): Promise<void> {
   await runDockerCommand(dockerArgs)
 }
 
+export async function containerNetworkPrune(): Promise<void> {
+  const dockerArgs = [
+    'network',
+    'prune',
+    '--filter',
+    `label=${getRunnerLabel()}`
+  ]
+
+  await runDockerCommand(dockerArgs)
+}
+
 export async function containerPrune(): Promise<void> {
   const dockerPSArgs: string[] = [
     'ps',
