@@ -7,7 +7,6 @@ import {
   ServiceContainerInfo,
   StepContainerInfo
 } from 'hooklib/lib'
-import path from 'path'
 import { env } from 'process'
 import { v4 as uuidv4 } from 'uuid'
 import { runDockerCommand, RunDockerCommandOptions } from '../utils'
@@ -146,15 +145,41 @@ export async function containerBuild(
   args: RunContainerStepArgs,
   tag: string
 ): Promise<void> {
-  const context = path.dirname(`${env.GITHUB_WORKSPACE}/${args.dockerfile}`)
+  if (!args.dockerfile) {
+    throw new Error('Container build expets args.dockerfile to be set')
+  }
+
   const dockerArgs: string[] = ['build']
   dockerArgs.push('-t', tag)
-  dockerArgs.push('-f', `${env.GITHUB_WORKSPACE}/${args.dockerfile}`)
-  dockerArgs.push(context)
+  dockerArgs.push('-f', args.dockerfile)
+  dockerArgs.push(getBuildContext(args.dockerfile))
   // TODO: figure out build working directory
   await runDockerCommand(dockerArgs, {
-    workingDir: args['buildWorkingDirectory']
+    workingDir: getWorkingDir(args.dockerfile)
   })
+}
+
+function getBuildContext(dockerfilePath: string): string {
+  const pathSplit = dockerfilePath.split('/')
+  pathSplit.splice(pathSplit.length - 1)
+  return pathSplit.join('/')
+}
+
+function getWorkingDir(dockerfilePath: string): string {
+  const workspace = env.GITHUB_WORKSPACE as string
+  let workingDir = workspace
+  if (!dockerfilePath?.includes(workspace)) {
+    // This is container action
+    const pathSplit = dockerfilePath.split('/')
+    const actionIndex = pathSplit?.findIndex(d => d === '_actions')
+    if (actionIndex) {
+      const actionSubdirectoryDepth = 3 // handle + repo + [branch | tag]
+      pathSplit.splice(actionIndex + actionSubdirectoryDepth + 1)
+      workingDir = pathSplit.join('/')
+    }
+  }
+
+  return workingDir
 }
 
 export async function containerLogs(id: string): Promise<void> {
@@ -330,7 +355,7 @@ export async function containerExecStep(
 export async function containerRun(
   args: RunContainerStepArgs,
   name: string,
-  network: string
+  network?: string
 ): Promise<void> {
   if (!args.image) {
     throw new Error('expected image to be set')
@@ -340,7 +365,9 @@ export async function containerRun(
   dockerArgs.push('--name', name)
   dockerArgs.push(`--workdir=${args.workingDirectory}`)
   dockerArgs.push(`--label=${getRunnerLabel()}`)
-  dockerArgs.push(`--network=${network}`)
+  if (network) {
+    dockerArgs.push(`--network=${network}`)
+  }
 
   if (args.createOptions) {
     dockerArgs.push(...args.createOptions.split(' '))

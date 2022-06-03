@@ -1,12 +1,12 @@
-import {
-  prepareJob,
-  cleanupJob,
-  runScriptStep,
-  runContainerStep
-} from '../src/hooks'
 import * as fs from 'fs'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
+import {
+  cleanupJob,
+  prepareJob,
+  runContainerStep,
+  runScriptStep
+} from '../src/hooks'
 import TestSetup from './test-setup'
 
 const prepareJobJson = fs.readFileSync(
@@ -21,10 +21,9 @@ const containerStepJson = fs.readFileSync(
 
 const tmpOutputDir = `${__dirname}/_temp/${uuidv4()}`
 
-let prepareJobData: any
-let scriptStepJson: any
-let scriptStepData: any
-let containerStepData: any
+let prepareJobDefinition: any
+let scriptStepDefinition: any
+let runContainerStepDefinition: any
 
 let prepareJobOutputFilePath: string
 
@@ -44,23 +43,29 @@ describe('e2e', () => {
     testSetup = new TestSetup()
     testSetup.initialize()
 
-    prepareJobData = JSON.parse(prepareJobJson)
-    prepareJobData.args.container.userMountVolumes = testSetup.userMountVolumes
-    prepareJobData.args.container.systemMountVolumes =
+    prepareJobDefinition = JSON.parse(prepareJobJson)
+    prepareJobDefinition.args.container.userMountVolumes =
+      testSetup.userMountVolumes
+    prepareJobDefinition.args.container.systemMountVolumes =
       testSetup.systemMountVolumes
-    prepareJobData.args.container.workingDirectory = testSetup.workingDirectory
+    prepareJobDefinition.args.container.workingDirectory =
+      testSetup.containerWorkingDirectory
 
-    scriptStepJson = fs.readFileSync(
+    const scriptStepJson = fs.readFileSync(
       path.resolve(__dirname + '/../../../examples/run-script-step.json'),
       'utf8'
     )
-    scriptStepData = JSON.parse(scriptStepJson)
-    scriptStepData.args.workingDirectory = testSetup.workingDirectory
+    scriptStepDefinition = JSON.parse(scriptStepJson)
+    scriptStepDefinition.args.workingDirectory =
+      testSetup.containerWorkingDirectory
 
-    containerStepData = JSON.parse(containerStepJson)
-    containerStepData.args.workingDirectory = testSetup.workingDirectory
-    containerStepData.args.userMountVolumes = testSetup.userMountVolumes
-    containerStepData.args.systemMountVolumes = testSetup.systemMountVolumes
+    runContainerStepDefinition = JSON.parse(containerStepJson)
+    runContainerStepDefinition.args.workingDirectory =
+      testSetup.containerWorkingDirectory
+    runContainerStepDefinition.args.userMountVolumes =
+      testSetup.userMountVolumes
+    runContainerStepDefinition.args.systemMountVolumes =
+      testSetup.systemMountVolumes
 
     prepareJobOutputFilePath = `${tmpOutputDir}/prepare-job-output-${uuidv4()}.json`
     fs.writeFileSync(prepareJobOutputFilePath, '')
@@ -73,27 +78,27 @@ describe('e2e', () => {
 
   it('should prepare job, then run script step, then run container step then cleanup', async () => {
     await expect(
-      prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+      prepareJob(prepareJobDefinition.args, prepareJobOutputFilePath)
     ).resolves.not.toThrow()
     let rawState = fs.readFileSync(prepareJobOutputFilePath, 'utf-8')
     let resp = JSON.parse(rawState)
     await expect(
-      runScriptStep(scriptStepData.args, resp.state)
+      runScriptStep(scriptStepDefinition.args, resp.state)
     ).resolves.not.toThrow()
     await expect(
-      runContainerStep(containerStepData.args, resp.state)
+      runContainerStep(runContainerStepDefinition.args, resp.state)
     ).resolves.not.toThrow()
     await expect(cleanupJob(resp, resp.state, null)).resolves.not.toThrow()
   })
 
   it('should prepare job, then run script step, then run container step with Dockerfile then cleanup', async () => {
     await expect(
-      prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+      prepareJob(prepareJobDefinition.args, prepareJobOutputFilePath)
     ).resolves.not.toThrow()
     let rawState = fs.readFileSync(prepareJobOutputFilePath, 'utf-8')
     let resp = JSON.parse(rawState)
     await expect(
-      runScriptStep(scriptStepData.args, resp.state)
+      runScriptStep(scriptStepDefinition.args, resp.state)
     ).resolves.not.toThrow()
 
     const dockerfilePath = `${tmpOutputDir}/Dockerfile`
@@ -104,7 +109,9 @@ ENV TEST=test
 ENTRYPOINT [ "tail", "-f", "/dev/null" ]
     `
     )
-    const containerStepDataCopy = JSON.parse(JSON.stringify(containerStepData))
+    const containerStepDataCopy = JSON.parse(
+      JSON.stringify(runContainerStepDefinition)
+    )
     process.env.GITHUB_WORKSPACE = tmpOutputDir
     containerStepDataCopy.args.dockerfile = 'Dockerfile'
     containerStepDataCopy.args.context = '.'

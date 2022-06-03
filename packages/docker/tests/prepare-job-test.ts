@@ -7,20 +7,11 @@ jest.useRealTimers()
 
 let prepareJobOutputPath: string
 let prepareJobData: any
-const tmpOutputDir = `${__dirname}/_temp/${uuidv4()}`
 const prepareJobInputPath = `${__dirname}/../../../examples/prepare-job.json`
 
 let testSetup: TestSetup
 
 describe('prepare job', () => {
-  beforeAll(() => {
-    fs.mkdirSync(tmpOutputDir, { recursive: true })
-  })
-
-  afterAll(() => {
-    fs.rmSync(tmpOutputDir, { recursive: true })
-  })
-
   beforeEach(async () => {
     testSetup = new TestSetup()
     testSetup.initialize()
@@ -31,9 +22,12 @@ describe('prepare job', () => {
     prepareJobData.args.container.userMountVolumes = testSetup.userMountVolumes
     prepareJobData.args.container.systemMountVolumes =
       testSetup.systemMountVolumes
-    prepareJobData.args.container.workingDirectory = testSetup.workingDirectory
+    prepareJobData.args.container.workingDirectory =
+      testSetup.containerWorkingDirectory
 
-    prepareJobOutputPath = `${tmpOutputDir}/prepare-job-output-${uuidv4()}.json`
+    prepareJobOutputPath = `${
+      testSetup.testDir
+    }/prepare-job-output-${uuidv4()}.json`
     fs.writeFileSync(prepareJobOutputPath, '')
   })
 
