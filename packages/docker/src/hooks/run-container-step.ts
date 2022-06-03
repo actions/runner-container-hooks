@@ -15,7 +15,7 @@ export async function runContainerStep(
 ): Promise<void> {
   const tag = generateBuildTag() // for docker build
   if (args.image) {
-    const configLocation = await registryLogin(args)
+    const configLocation = await registryLogin(args.registry)
     try {
       await containerPull(args.image, configLocation)
     } finally {

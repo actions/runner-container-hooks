@@ -3,6 +3,7 @@ import * as fs from 'fs'
 import {
   ContainerInfo,
   JobContainerInfo,
+  Registry,
   RunContainerStepArgs,
   ServiceContainerInfo,
   StepContainerInfo
@@ -266,19 +267,19 @@ export async function containerPorts(id: string): Promise<string[]> {
   return portMappings.split('\n')
 }
 
-export async function registryLogin(args): Promise<string> {
-  if (!args.registry) {
+export async function registryLogin(registry?: Registry): Promise<string> {
+  if (!registry) {
     return ''
   }
   const credentials = {
-    username: args.registry.username,
-    password: args.registry.password
+    username: registry.username,
+    password: registry.password
   }
 
   const configLocation = `${env.RUNNER_TEMP}/.docker_${uuidv4()}`
   fs.mkdirSync(configLocation)
   try {
-    await dockerLogin(configLocation, args.registry.serverUrl, credentials)
+    await dockerLogin(configLocation, registry.serverUrl, credentials)
   } catch (error) {
     fs.rmdirSync(configLocation, { recursive: true })
     throw error
@@ -296,7 +297,7 @@ export async function registryLogout(configLocation: string): Promise<void> {
 async function dockerLogin(
   configLocation: string,
   registry: string,
-  credentials: { username: string; password: string }
+  credentials: { username?: string; password?: string }
 ): Promise<void> {
   const credentialsArgs =
     credentials.username && credentials.password
