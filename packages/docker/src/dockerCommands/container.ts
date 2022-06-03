@@ -7,6 +7,7 @@ import {
   ServiceContainerInfo,
   StepContainerInfo
 } from 'hooklib/lib'
+import * as path from 'path'
 import { env } from 'process'
 import { v4 as uuidv4 } from 'uuid'
 import { runDockerCommand, RunDockerCommandOptions } from '../utils'
@@ -146,7 +147,7 @@ export async function containerBuild(
   tag: string
 ): Promise<void> {
   if (!args.dockerfile) {
-    throw new Error('Container build expects 'args.dockerfile' to be set')
+    throw new Error("Container build expects 'args.dockerfile' to be set")
   }
 
   const dockerArgs: string[] = ['build']
@@ -160,9 +161,7 @@ export async function containerBuild(
 }
 
 function getBuildContext(dockerfilePath: string): string {
-  const pathSplit = dockerfilePath.split('/')
-  pathSplit.splice(pathSplit.length - 1)
-  return pathSplit.join('/')
+  return path.dirname(dockerfilePath)
 }
 
 function getWorkingDir(dockerfilePath: string): string {
