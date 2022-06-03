@@ -16,7 +16,8 @@ import {
   namespace,
   podPrune,
   requiredPermissions,
-  waitForPodPhases
+  waitForPodPhases,
+  writeEntryPointScript
 } from '../k8s'
 import {
   containerVolumes,
@@ -161,13 +162,24 @@ function createPodSpec(
   jobContainer = false
 ): k8s.V1Container {
   core.info(JSON.stringify(container))
-  if (!container.entryPointArgs) {
-    container.entryPointArgs = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
-  }
-  container.entryPointArgs = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
   if (!container.entryPoint) {
     container.entryPoint = DEFAULT_CONTAINER_ENTRY_POINT
+    if (!container.entryPointArgs) {
+      container.entryPointArgs = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
+    }
+  } else {
+    container.entryPoint = 'sh'
+    container.entryPointArgs = [
+      '-l',
+      writeEntryPointScript(
+        container.workingDirectory,
+        '/__w/_temp',
+        container.entryPoint,
+        container.entryPointArgs
+      )
+    ]
   }
+
   const podContainer = {
     name,
     image: container.image,

@@ -1,4 +1,5 @@
 import * as k8s from '@kubernetes/client-node'
+import * as fs from 'fs'
 import { ContainerInfo, PodPhase, Registry } from 'hooklib'
 import * as stream from 'stream'
 import { v4 as uuidv4 } from 'uuid'
@@ -521,4 +522,19 @@ export function containerPorts(
     ports.push(port)
   }
   return ports
+}
+
+export function writeEntryPointScript(
+  workingDirectory: string,
+  runnerTemp: string,
+  entryPoint: string,
+  entryPointArgs?: string[]
+): string {
+  const content = `#!/bin/sh -l
+cd ${workingDirectory}
+exec ${entryPoint} ${entryPointArgs?.length ? entryPointArgs.join(' ') : ''}
+`
+  const entryPointPath = `${runnerTemp}/${uuidv4()}.sh`
+  fs.writeFileSync(entryPointPath, content)
+  return entryPointPath
 }
