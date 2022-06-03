@@ -175,6 +175,7 @@ export async function containerNetworkPrune(): Promise<void> {
   const dockerArgs = [
     'network',
     'prune',
+    '--force',
     '--filter',
     `label=${getRunnerLabel()}`
   ]

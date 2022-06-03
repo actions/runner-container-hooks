@@ -4,7 +4,7 @@ jest.useRealTimers()
 
 describe('container pull', () => {
   it('should fail', async () => {
-    const arg = { image: 'doesNotExist' }
+    const arg = { image: 'does-not-exist' }
     await expect(containerPull(arg.image, '')).rejects.toThrow()
   })
   it('should succeed', async () => {
