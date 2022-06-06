@@ -1,7 +1,7 @@
-import { prepareJob, cleanupJob } from '../src/hooks'
-import { v4 as uuidv4 } from 'uuid'
 import * as fs from 'fs'
 import * as path from 'path'
+import { v4 as uuidv4 } from 'uuid'
+import { cleanupJob, prepareJob } from '../src/hooks'
 import TestSetup from './test-setup'
 
 const prepareJobInputPath = path.resolve(
@@ -50,13 +50,6 @@ describe('cleanup job', () => {
   })
 
   it('should cleanup successfully', async () => {
-    const prepareJobOutputContent = fs.readFileSync(
-      prepareJobOutputPath,
-      'utf-8'
-    )
-    const parsedPrepareJobOutput = JSON.parse(prepareJobOutputContent)
-    await expect(
-      cleanupJob(prepareJobData.args, parsedPrepareJobOutput.state, null)
-    ).resolves.not.toThrow()
+    await expect(cleanupJob()).resolves.not.toThrow()
   })
 })

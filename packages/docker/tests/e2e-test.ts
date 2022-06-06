@@ -1,12 +1,12 @@
-import {
-  prepareJob,
-  cleanupJob,
-  runScriptStep,
-  runContainerStep
-} from '../src/hooks'
 import * as fs from 'fs'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
+import {
+  cleanupJob,
+  prepareJob,
+  runContainerStep,
+  runScriptStep
+} from '../src/hooks'
 import TestSetup from './test-setup'
 
 const prepareJobJson = fs.readFileSync(
@@ -83,7 +83,7 @@ describe('e2e', () => {
     await expect(
       runContainerStep(containerStepData.args, resp.state)
     ).resolves.not.toThrow()
-    await expect(cleanupJob(resp, resp.state, null)).resolves.not.toThrow()
+    await expect(cleanupJob()).resolves.not.toThrow()
   })
 
   it('should prepare job, then run script step, then run container step with Dockerfile then cleanup', async () => {
@@ -112,6 +112,6 @@ ENTRYPOINT [ "tail", "-f", "/dev/null" ]
     await expect(
       runContainerStep(containerStepDataCopy.args, resp.state)
     ).resolves.not.toThrow()
-    await expect(cleanupJob(resp, resp.state, null)).resolves.not.toThrow()
+    await expect(cleanupJob()).resolves.not.toThrow()
   })
 })
