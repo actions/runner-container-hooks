@@ -1,7 +1,7 @@
-import { TestHelper } from './test-setup'
+import * as fs from 'fs'
 import * as path from 'path'
 import { runContainerStep } from '../src/hooks'
-import * as fs from 'fs'
+import { TestHelper } from './test-setup'
 
 jest.useRealTimers()
 
@@ -27,5 +27,7 @@ describe('Run container step', () => {
   })
   afterEach(async () => {
     await testHelper.cleanup()
+    // wait for the job cleanup
+    await new Promise(resolve => setTimeout(resolve, 300 * 1000))
   })
 })
