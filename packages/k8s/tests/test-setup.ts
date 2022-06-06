@@ -25,15 +25,10 @@ export class TestHelper {
     process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE'] = 'default'
 
     await this.cleanupK8sResources()
-    try 
-    {
+    try {
       await this.createTestVolume()
       await this.createTestJobPod()
-    }
-    catch
-    {
-      
-    }
+    } catch {}
     fs.mkdirSync(`${this.tempDirPath}/work/repo/repo`, { recursive: true })
     fs.mkdirSync(`${this.tempDirPath}/externals`, { recursive: true })
   }
