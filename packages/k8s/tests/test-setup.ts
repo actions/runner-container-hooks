@@ -25,8 +25,15 @@ export class TestHelper {
     process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE'] = 'default'
 
     await this.cleanupK8sResources()
-    await this.createTestVolume()
-    await this.createTestJobPod()
+    try 
+    {
+      await this.createTestVolume()
+      await this.createTestJobPod()
+    }
+    catch
+    {
+      
+    }
     fs.mkdirSync(`${this.tempDirPath}/work/repo/repo`, { recursive: true })
     fs.mkdirSync(`${this.tempDirPath}/externals`, { recursive: true })
   }
@@ -47,7 +54,7 @@ export class TestHelper {
         0
       )
       .catch(e => {})
-    await k8sApi.deletePersistentVolume('work').catch(e => {})
+    await k8sApi.deletePersistentVolume(`${this.podName}-pv`).catch(e => {})
     await k8sStorageApi.deleteStorageClass('local-storage').catch(e => {})
     await k8sApi
       .deleteNamespacedPod(this.podName, 'default', undefined, undefined, 0)
@@ -104,7 +111,7 @@ export class TestHelper {
 
     var volume: k8s.V1PersistentVolume = {
       metadata: {
-        name: 'work'
+        name: `${this.podName}-pv`
       },
       spec: {
         storageClassName: 'local-storage',
@@ -127,7 +134,7 @@ export class TestHelper {
         accessModes: ['ReadWriteOnce'],
         volumeMode: 'Filesystem',
         storageClassName: 'local-storage',
-        volumeName: 'work',
+        volumeName: `${this.podName}-pv`,
         resources: {
           requests: {
             storage: '1Gi'
