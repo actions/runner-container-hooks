@@ -115,7 +115,7 @@ export class TestHelper {
           storage: '2Gi'
         },
         volumeMode: 'Filesystem',
-        accessModes: ['ReadWriteMany'],
+        accessModes: ['ReadWriteOnce'],
         hostPath: {
           path: this.tempDirPath
         }
@@ -127,7 +127,7 @@ export class TestHelper {
         name: `${this.podName}-work`
       },
       spec: {
-        accessModes: ['ReadWriteMany'],
+        accessModes: ['ReadWriteOnce'],
         volumeMode: 'Filesystem',
         storageClassName: 'local-storage',
         volumeName: 'work',
