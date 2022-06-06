@@ -108,7 +108,6 @@ ENTRYPOINT [ "tail", "-f", "/dev/null" ]
     process.env.GITHUB_WORKSPACE = tmpOutputDir
     containerStepDataCopy.args.dockerfile = 'Dockerfile'
     containerStepDataCopy.args.context = '.'
-    console.log(containerStepDataCopy.args)
     await expect(
       runContainerStep(containerStepDataCopy.args, resp.state)
     ).resolves.not.toThrow()

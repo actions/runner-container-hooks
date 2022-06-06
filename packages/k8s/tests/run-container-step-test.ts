@@ -1,11 +1,11 @@
-import { TestTempOutput } from './test-setup'
+import { TestHelper } from './test-setup'
 import * as path from 'path'
 import { runContainerStep } from '../src/hooks'
 import * as fs from 'fs'
 
 jest.useRealTimers()
 
-let testTempOutput: TestTempOutput
+let testHelper: TestHelper
 
 let runContainerStepJsonPath = path.resolve(
   `${__dirname}/../../../examples/run-container-step.json`
@@ -14,14 +14,18 @@ let runContainerStepJsonPath = path.resolve(
 let runContainerStepData: any
 
 describe('Run container step', () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     const content = fs.readFileSync(runContainerStepJsonPath)
     runContainerStepData = JSON.parse(content.toString())
-    process.env.RUNNER_NAME = 'testjob'
+    testHelper = new TestHelper()
+    await testHelper.initialize()
   })
   it('should not throw', async () => {
     await expect(
       runContainerStep(runContainerStepData.args)
     ).resolves.not.toThrow()
+  })
+  afterEach(async () => {
+    await testHelper.cleanup()
   })
 })

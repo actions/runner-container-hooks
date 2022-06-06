@@ -76,7 +76,7 @@ export enum Protocol {
 export enum PodPhase {
   PENDING = 'Pending',
   RUNNING = 'Running',
-  SUCCEEDED = 'Succeded',
+  SUCCEEDED = 'Succeeded',
   FAILED = 'Failed',
   UNKNOWN = 'Unknown'
 }

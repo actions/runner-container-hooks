@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid'
 import {
   getJobPodName,
   getRunnerPodName,
+  getStepPodName,
   getVolumeClaimName,
   RunnerInstanceLabel
 } from '../hooks/constants'
@@ -119,7 +120,7 @@ export async function createJob(
   job.apiVersion = 'batch/v1'
   job.kind = 'Job'
   job.metadata = new k8s.V1ObjectMeta()
-  job.metadata.name = getJobPodName()
+  job.metadata.name = getStepPodName()
   job.metadata.labels = { 'runner-pod': getRunnerPodName() }
 
   job.spec = new k8s.V1JobSpec()
@@ -173,7 +174,13 @@ export async function getContainerJobPodName(jobName: string): Promise<string> {
 }
 
 export async function deletePod(podName: string): Promise<void> {
-  await k8sApi.deleteNamespacedPod(podName, namespace())
+  await k8sApi.deleteNamespacedPod(
+    podName,
+    namespace(),
+    undefined,
+    undefined,
+    0
+  )
 }
 
 export async function execPodStep(
@@ -273,7 +280,6 @@ export async function waitForPodPhases(
   try {
     while (true) {
       phase = await getPodPhase(podName)
-
       if (awaitingPhases.has(phase)) {
         return
       }

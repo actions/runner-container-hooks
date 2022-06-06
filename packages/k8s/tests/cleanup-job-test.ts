@@ -1,9 +1,9 @@
 import * as path from 'path'
 import * as fs from 'fs'
 import { prepareJob, cleanupJob } from '../src/hooks'
-import { TestTempOutput } from './test-setup'
+import { TestHelper } from './test-setup'
 
-let testTempOutput: TestTempOutput
+let testHelper: TestHelper
 
 const prepareJobJsonPath = path.resolve(
   `${__dirname}/../../../examples/prepare-job.json`
@@ -16,16 +16,15 @@ describe('Cleanup Job', () => {
     const prepareJobJson = fs.readFileSync(prepareJobJsonPath)
     let prepareJobData = JSON.parse(prepareJobJson.toString())
 
-    testTempOutput = new TestTempOutput()
-    testTempOutput.initialize()
-    prepareJobOutputFilePath = testTempOutput.createFile(
-      'prepare-job-output.json'
-    )
+    testHelper = new TestHelper()
+    await testHelper.initialize()
+    prepareJobOutputFilePath = testHelper.createFile('prepare-job-output.json')
     await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
   })
   it('should not throw', async () => {
-    const outputJson = fs.readFileSync(prepareJobOutputFilePath)
-    const outputData = JSON.parse(outputJson.toString())
     await expect(cleanupJob()).resolves.not.toThrow()
+  })
+  afterEach(async () => {
+    await testHelper.cleanup()
   })
 })

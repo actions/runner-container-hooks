@@ -25,12 +25,11 @@ export async function runContainerStep(stepContainer): Promise<number> {
       )} to have correctly set the metadata.name`
     )
   }
-
   const podName = await getContainerJobPodName(job.metadata.name)
   await waitForPodPhases(
     podName,
-    new Set([PodPhase.COMPLETED, PodPhase.RUNNING]),
-    new Set([PodPhase.PENDING])
+    new Set([PodPhase.COMPLETED, PodPhase.RUNNING, PodPhase.SUCCEEDED]),
+    new Set([PodPhase.PENDING, PodPhase.UNKNOWN])
   )
   await getPodLogs(podName, JOB_CONTAINER_NAME)
   await waitForJobToComplete(job.metadata.name)
