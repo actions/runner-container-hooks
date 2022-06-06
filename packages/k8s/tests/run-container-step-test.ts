@@ -27,7 +27,5 @@ describe('Run container step', () => {
   })
   afterEach(async () => {
     await testHelper.cleanup()
-    // wait for the job cleanup
-    await new Promise(resolve => setTimeout(resolve, 300 * 1000))
   })
 })
