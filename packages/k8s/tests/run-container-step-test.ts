@@ -14,7 +14,7 @@ let runContainerStepJsonPath = path.resolve(
 let runContainerStepData: any
 
 describe('Run container step', () => {
-  beforeAll(async () => {
+  beforeEach(async () => {
     const content = fs.readFileSync(runContainerStepJsonPath)
     runContainerStepData = JSON.parse(content.toString())
     testHelper = new TestHelper()

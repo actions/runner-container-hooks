@@ -24,6 +24,9 @@ export class TestHelper {
     process.env['GITHUB_WORKSPACE'] = `${this.tempDirPath}/work/repo/repo`
     process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE'] = 'default'
 
+    try {
+      fs.rmSync(this.tempDirPath, { recursive: true })
+    } catch {}
     await this.cleanupK8sResources()
     await this.createTestVolume()
     await this.createTestJobPod()
@@ -112,7 +115,7 @@ export class TestHelper {
           storage: '2Gi'
         },
         volumeMode: 'Filesystem',
-        accessModes: ['ReadWriteOnce'],
+        accessModes: ['ReadWriteMany'],
         hostPath: {
           path: this.tempDirPath
         }
@@ -124,7 +127,7 @@ export class TestHelper {
         name: `${this.podName}-work`
       },
       spec: {
-        accessModes: ['ReadWriteOnce'],
+        accessModes: ['ReadWriteMany'],
         volumeMode: 'Filesystem',
         storageClassName: 'local-storage',
         volumeName: 'work',

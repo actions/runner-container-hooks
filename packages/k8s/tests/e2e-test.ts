@@ -36,6 +36,7 @@ describe('e2e', () => {
   })
   afterEach(async () => {
     await testHelper.cleanup()
+    await new Promise(resolve => setTimeout(resolve, 300 * 1000)) // wait for cleanup of job
   })
   it('should prepare job, run script step, run container step then cleanup without errors', async () => {
     await expect(
