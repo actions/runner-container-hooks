@@ -55,9 +55,9 @@ describe('e2e', () => {
     const runContainerStepContent = fs.readFileSync(runContainerStepJsonPath)
     const runContainerStepData = JSON.parse(runContainerStepContent.toString())
 
-    // await expect(
-    // runContainerStep(runContainerStepData.args)
-    // ).resolves.not.toThrow()
+    await expect(
+      runContainerStep(runContainerStepData.args)
+    ).resolves.not.toThrow()
 
     await expect(cleanupJob()).resolves.not.toThrow()
   })
