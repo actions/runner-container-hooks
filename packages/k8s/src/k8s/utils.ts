@@ -49,7 +49,7 @@ export function containerVolumes(
     if (path.isAbsolute(userVolume.sourceVolumePath)) {
       if (!userVolume.sourceVolumePath.startsWith(workspacePath)) {
         throw new Error(
-          'absolute path volume mounts outside of the work folder are not supported'
+          'Volume mounts outside of the work folder are not supported'
         )
       }
       sourceVolumePath = userVolume.sourceVolumePath
