@@ -70,25 +70,35 @@ export function writeEntryPointScript(
   workingDirectory: string,
   entryPoint: string,
   entryPointArgs?: string[],
-  prependPath?: string[]
-): string {
+  prependPath?: string[],
+  environmentVariables?: { [key: string]: string }
+): { containerPath: string; runnerPath: string } {
   let exportPath = ''
-  if (prependPath) {
-    const absolutePrependPaths = prependPath?.map(p => {
-      if (path.isAbsolute(p)) {
-        return p
-      }
-      return path.join(process.env.GITHUB_WORKSPACE as string, p)
-    })
-    exportPath = `export PATH=${absolutePrependPaths.join(':')}:$PATH`
+  if (prependPath?.length) {
+    exportPath = `export PATH=${prependPath.join(':')}:$PATH`
   }
+  let environmentPrefix = ''
+
+  if (environmentVariables && Object.entries(environmentVariables).length) {
+    const envBuffer: string[] = []
+    for (const [key, value] of Object.entries(environmentVariables)) {
+      envBuffer.push(`${key}=${value}`)
+    }
+    environmentPrefix = `env ${envBuffer.join(' ')} `
+  }
+
   const content = `#!/bin/sh -l
 ${exportPath}
 cd ${workingDirectory}
-exec ${entryPoint} ${entryPointArgs?.length ? entryPointArgs.join(' ') : ''}
+exec ${environmentPrefix}${entryPoint} ${
+    entryPointArgs?.length ? entryPointArgs.join(' ') : ''
+  }
 `
   const filename = `${uuidv4()}.sh`
   const entryPointPath = `/runner/_work/_temp/${filename}`
   fs.writeFileSync(entryPointPath, content)
-  return `/__w/_temp/${filename}`
+  return {
+    containerPath: `/__w/_temp/${filename}`,
+    runnerPath: entryPointPath
+  }
 }

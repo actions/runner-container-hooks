@@ -169,15 +169,12 @@ function createPodSpec(
   if (jobContainer) {
     const { entryPoint, entryPointArgs } = container
     container.entryPoint = 'sh'
-    container.entryPointArgs = [
-      '-l',
-      writeEntryPointScript(
-        container.workingDirectory,
-        entryPoint || DEFAULT_CONTAINER_ENTRY_POINT,
-        entryPoint ? entryPointArgs || [] : DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
-        container.prependPath
-      )
-    ]
+    const { containerPath } = writeEntryPointScript(
+      container.workingDirectory,
+      entryPoint || DEFAULT_CONTAINER_ENTRY_POINT,
+      entryPoint ? entryPointArgs || [] : DEFAULT_CONTAINER_ENTRY_POINT_ARGS
+    )
+    container.entryPointArgs = ['-l', containerPath]
   } else {
     if (!container.entryPoint) {
       container.entryPoint = DEFAULT_CONTAINER_ENTRY_POINT

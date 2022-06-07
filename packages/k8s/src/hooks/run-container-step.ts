@@ -58,15 +58,13 @@ function createPodSpec(container): k8s.V1Container {
   podContainer.image = container.image
   const { entryPoint, entryPointArgs } = container
   container.entryPoint = 'sh'
-  container.entryPointArgs = [
-    '-l',
-    writeEntryPointScript(
-      container.workingDirectory,
-      entryPoint || DEFAULT_CONTAINER_ENTRY_POINT,
-      entryPoint ? entryPointArgs || [] : DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
-      container.prependPath
-    )
-  ]
+
+  const { containerPath } = writeEntryPointScript(
+    container.workingDirectory,
+    entryPoint || DEFAULT_CONTAINER_ENTRY_POINT,
+    entryPoint ? entryPointArgs || [] : DEFAULT_CONTAINER_ENTRY_POINT_ARGS
+  )
+  container.entryPointArgs = ['-l', containerPath]
   podContainer.command = [container.entryPoint, ...container.entryPointArgs]
 
   podContainer.env = []
