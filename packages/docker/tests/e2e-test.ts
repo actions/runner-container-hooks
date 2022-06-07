@@ -82,7 +82,7 @@ describe('e2e', () => {
     await expect(
       runContainerStep(runContainerStepDefinition.args, resp.state)
     ).resolves.not.toThrow()
-    await expect(cleanupJob(resp, resp.state, null)).resolves.not.toThrow()
+    await expect(cleanupJob()).resolves.not.toThrow()
   })
 
   it('should prepare job, then run script step, then run container step with Dockerfile then cleanup', async () => {
@@ -111,6 +111,6 @@ ENTRYPOINT [ "tail", "-f", "/dev/null" ]
     await expect(
       runContainerStep(containerStepDataCopy.args, resp.state)
     ).resolves.not.toThrow()
-    await expect(cleanupJob(resp, resp.state, null)).resolves.not.toThrow()
+    await expect(cleanupJob()).resolves.not.toThrow()
   })
 })

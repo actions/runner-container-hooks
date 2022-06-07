@@ -46,13 +46,6 @@ describe('cleanup job', () => {
   })
 
   it('should cleanup successfully', async () => {
-    const prepareJobOutputContent = fs.readFileSync(
-      prepareJobOutputPath,
-      'utf-8'
-    )
-    const parsedPrepareJobOutput = JSON.parse(prepareJobOutputContent)
-    await expect(
-      cleanupJob(prepareJobDefinition.args, parsedPrepareJobOutput.state, null)
-    ).resolves.not.toThrow()
+    await expect(cleanupJob()).resolves.not.toThrow()
   })
 })
