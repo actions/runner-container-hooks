@@ -43,15 +43,22 @@ export function containerVolumes(
     return mounts
   }
 
+  const workspacePath = process.env.GITHUB_WORKSPACE as string
   for (const userVolume of userMountVolumes) {
-    const sourceVolumePath = `${
-      path.isAbsolute(userVolume.sourceVolumePath)
-        ? userVolume.sourceVolumePath
-        : path.join(
-            process.env.GITHUB_WORKSPACE as string,
-            userVolume.sourceVolumePath
-          )
-    }`
+    let sourceVolumePath = ''
+    if (path.isAbsolute(userVolume.sourceVolumePath)) {
+      if (!userVolume.sourceVolumePath.startsWith(workspacePath)) {
+        throw new Error(
+          'absolute path volume mounts outside of the work folder are not supported'
+        )
+      }
+      sourceVolumePath = userVolume.sourceVolumePath
+    } else {
+      sourceVolumePath = path.join(
+        process.env.GITHUB_WORKSPACE as string,
+        userVolume.sourceVolumePath
+      )
+    }
 
     mounts.push({
       name: POD_VOLUME_NAME,
