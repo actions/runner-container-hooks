@@ -54,10 +54,7 @@ export function containerVolumes(
       }
       sourceVolumePath = userVolume.sourceVolumePath
     } else {
-      sourceVolumePath = path.join(
-        process.env.GITHUB_WORKSPACE as string,
-        userVolume.sourceVolumePath
-      )
+      sourceVolumePath = path.join(workspacePath, userVolume.sourceVolumePath)
     }
 
     mounts.push({
