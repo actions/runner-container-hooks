@@ -70,3 +70,12 @@ export function containerVolumes(
 
   return mounts
 }
+
+export enum PodPhase {
+  PENDING = 'Pending',
+  RUNNING = 'Running',
+  SUCCEEDED = 'Succeeded',
+  FAILED = 'Failed',
+  UNKNOWN = 'Unknown',
+  COMPLETED = 'Completed'
+}

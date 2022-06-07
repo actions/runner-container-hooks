@@ -74,14 +74,6 @@ export enum Protocol {
   UDP = 'udp'
 }
 
-export enum PodPhase {
-  PENDING = 'Pending',
-  RUNNING = 'Running',
-  SUCCEEDED = 'Succeeded',
-  FAILED = 'Failed',
-  UNKNOWN = 'Unknown'
-}
-
 export interface PrepareJobResponse {
   state?: object
   context?: ContainerContext
