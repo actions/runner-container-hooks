@@ -526,7 +526,6 @@ export function containerPorts(
 
 export function writeEntryPointScript(
   workingDirectory: string,
-  runnerTemp: string,
   entryPoint: string,
   entryPointArgs?: string[]
 ): string {
@@ -534,7 +533,8 @@ export function writeEntryPointScript(
 cd ${workingDirectory}
 exec ${entryPoint} ${entryPointArgs?.length ? entryPointArgs.join(' ') : ''}
 `
-  const entryPointPath = `${runnerTemp}/${uuidv4()}.sh`
+  const filename = `${uuidv4()}.sh`
+  const entryPointPath = `/runner/_work/_temp/${filename}`
   fs.writeFileSync(entryPointPath, content)
-  return entryPointPath
+  return `/__w/_temp/${filename}`
 }

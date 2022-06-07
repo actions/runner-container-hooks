@@ -98,8 +98,13 @@ function generateResponseFile(
   appPod: k8s.V1Pod,
   isAlpine
 ): void {
+  if (!appPod.metadata?.name) {
+    throw new Error('app pod must have metadata.name specified')
+  }
   const response = {
-    state: {},
+    state: {
+      jobPod: appPod.metadata.name
+    },
     context: {},
     isAlpine
   }
@@ -161,23 +166,22 @@ function createPodSpec(
   name: string,
   jobContainer = false
 ): k8s.V1Container {
-  core.info(JSON.stringify(container))
-  if (!container.entryPoint) {
-    container.entryPoint = DEFAULT_CONTAINER_ENTRY_POINT
-    if (!container.entryPointArgs) {
-      container.entryPointArgs = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
-    }
-  } else {
+  if (jobContainer) {
+    const { entryPoint, entryPointArgs } = container
     container.entryPoint = 'sh'
     container.entryPointArgs = [
       '-l',
       writeEntryPointScript(
         container.workingDirectory,
-        '/__w/_temp',
-        container.entryPoint,
-        container.entryPointArgs
+        entryPoint || DEFAULT_CONTAINER_ENTRY_POINT,
+        entryPoint ? entryPointArgs || [] : DEFAULT_CONTAINER_ENTRY_POINT_ARGS
       )
     ]
+  } else {
+    if (!container.entryPoint) {
+      container.entryPoint = DEFAULT_CONTAINER_ENTRY_POINT
+      container.entryPointArgs = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
+    }
   }
 
   const podContainer = {
