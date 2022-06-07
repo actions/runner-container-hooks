@@ -1,5 +1,5 @@
-import * as k8s from '@kubernetes/client-node'
 import * as core from '@actions/core'
+import * as k8s from '@kubernetes/client-node'
 import { PodPhase } from 'hooklib'
 import {
   createJob,
@@ -9,8 +9,13 @@ import {
   waitForJobToComplete,
   waitForPodPhases
 } from '../k8s'
+import {
+  containerVolumes,
+  DEFAULT_CONTAINER_ENTRY_POINT,
+  DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
+  writeEntryPointScript
+} from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
-import { containerVolumes } from '../k8s/utils'
 
 export async function runContainerStep(stepContainer): Promise<number> {
   if (stepContainer.dockerfile) {
@@ -51,9 +56,18 @@ function createPodSpec(container): k8s.V1Container {
   const podContainer = new k8s.V1Container()
   podContainer.name = JOB_CONTAINER_NAME
   podContainer.image = container.image
-  if (container.entryPoint) {
-    podContainer.command = [container.entryPoint, ...container.entryPointArgs]
-  }
+  const { entryPoint, entryPointArgs } = container
+  container.entryPoint = 'sh'
+  container.entryPointArgs = [
+    '-l',
+    writeEntryPointScript(
+      container.workingDirectory,
+      entryPoint || DEFAULT_CONTAINER_ENTRY_POINT,
+      entryPoint ? entryPointArgs || [] : DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
+      container.prependPath
+    )
+  ]
+  podContainer.command = [container.entryPoint, ...container.entryPointArgs]
 
   podContainer.env = []
   for (const [key, value] of Object.entries(

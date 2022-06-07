@@ -1,5 +1,4 @@
 import * as k8s from '@kubernetes/client-node'
-import * as fs from 'fs'
 import { ContainerInfo, PodPhase, Registry } from 'hooklib'
 import * as stream from 'stream'
 import { v4 as uuidv4 } from 'uuid'
@@ -183,10 +182,6 @@ export async function execPodStep(
   containerName: string,
   stdin?: stream.Readable
 ): Promise<void> {
-  // TODO, we need to add the path from `prependPath` to the PATH variable. How can we do that? Maybe another exec before running this one?
-  // Maybe something like, get the current path, if these entries aren't in it, add them, then set the current path to that?
-
-  // TODO: how do we set working directory? There doesn't seem to be an easy way to do it. Should we cd then execute our bash script?
   const exec = new k8s.Exec(kc)
   return new Promise(async function (resolve, reject) {
     try {
@@ -522,19 +517,4 @@ export function containerPorts(
     ports.push(port)
   }
   return ports
-}
-
-export function writeEntryPointScript(
-  workingDirectory: string,
-  entryPoint: string,
-  entryPointArgs?: string[]
-): string {
-  const content = `#!/bin/sh -l
-cd ${workingDirectory}
-exec ${entryPoint} ${entryPointArgs?.length ? entryPointArgs.join(' ') : ''}
-`
-  const filename = `${uuidv4()}.sh`
-  const entryPointPath = `/runner/_work/_temp/${filename}`
-  fs.writeFileSync(entryPointPath, content)
-  return `/__w/_temp/${filename}`
 }

@@ -1,6 +1,8 @@
 import * as k8s from '@kubernetes/client-node'
+import * as fs from 'fs'
 import { Mount } from 'hooklib'
 import * as path from 'path'
+import { v4 as uuidv4 } from 'uuid'
 import { POD_VOLUME_NAME } from './index'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
@@ -62,4 +64,31 @@ export function containerVolumes(
   }
 
   return mounts
+}
+
+export function writeEntryPointScript(
+  workingDirectory: string,
+  entryPoint: string,
+  entryPointArgs?: string[],
+  prependPath?: string[]
+): string {
+  let exportPath = ''
+  if (prependPath) {
+    const absolutePrependPaths = prependPath?.map(p => {
+      if (path.isAbsolute(p)) {
+        return p
+      }
+      return path.join(process.env.GITHUB_WORKSPACE as string, p)
+    })
+    exportPath = `export PATH=${absolutePrependPaths.join(':')}:$PATH`
+  }
+  const content = `#!/bin/sh -l
+${exportPath}
+cd ${workingDirectory}
+exec ${entryPoint} ${entryPointArgs?.length ? entryPointArgs.join(' ') : ''}
+`
+  const filename = `${uuidv4()}.sh`
+  const entryPointPath = `/runner/_work/_temp/${filename}`
+  fs.writeFileSync(entryPointPath, content)
+  return `/__w/_temp/${filename}`
 }
