@@ -285,11 +285,8 @@ export async function createSecretForEnvs(envs: {
   for (const [key, value] of Object.entries(envs)) {
     secret.data[key] = Buffer.from(value).toString('base64')
   }
-  try {
-    await k8sApi.createNamespacedSecret(namespace(), secret)
-  } catch (e) {
-    throw e
-  }
+
+  await k8sApi.createNamespacedSecret(namespace(), secret)
   return secretName
 }
 
