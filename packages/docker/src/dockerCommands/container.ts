@@ -271,7 +271,7 @@ export async function healthCheck({
 export async function containerPorts(id: string): Promise<string[]> {
   const dockerArgs = ['port', id]
   const portMappings = (await runDockerCommand(dockerArgs)).trim()
-  return portMappings.split('\n')
+  return portMappings.split('\n').filter(p => !!p)
 }
 
 export async function registryLogin(registry?: Registry): Promise<string> {
