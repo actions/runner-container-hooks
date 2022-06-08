@@ -344,7 +344,7 @@ export async function containerExecStep(
   }
 
   if (args.prependPath?.length) {
-    dockerArgs.push('-e', `PATH=${args.prependPath.join(':')}:$PATH`)
+    dockerArgs.push('-e', `"PATH=${args.prependPath.join(':')}:$PATH"`)
   }
 
   dockerArgs.push(containerId)
