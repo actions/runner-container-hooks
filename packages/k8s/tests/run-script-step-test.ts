@@ -1,11 +1,11 @@
 import { prepareJob, cleanupJob, runScriptStep } from '../src/hooks'
-import { TestTempOutput } from './test-setup'
+import { TestHelper } from './test-setup'
 import * as path from 'path'
 import * as fs from 'fs'
 
 jest.useRealTimers()
 
-let testTempOutput: TestTempOutput
+let testHelper: TestHelper
 
 const prepareJobJsonPath = path.resolve(
   `${__dirname}/../../../examples/prepare-job.json`
@@ -19,13 +19,10 @@ describe('Run script step', () => {
   beforeEach(async () => {
     const prepareJobJson = fs.readFileSync(prepareJobJsonPath)
     prepareJobData = JSON.parse(prepareJobJson.toString())
-    console.log(prepareJobData)
 
-    testTempOutput = new TestTempOutput()
-    testTempOutput.initialize()
-    prepareJobOutputFilePath = testTempOutput.createFile(
-      'prepare-job-output.json'
-    )
+    testHelper = new TestHelper()
+    await testHelper.initialize()
+    prepareJobOutputFilePath = testHelper.createFile('prepare-job-output.json')
     await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
     const outputContent = fs.readFileSync(prepareJobOutputFilePath)
     prepareJobOutputData = JSON.parse(outputContent.toString())
@@ -33,7 +30,7 @@ describe('Run script step', () => {
 
   afterEach(async () => {
     await cleanupJob()
-    testTempOutput.cleanup()
+    await testHelper.cleanup()
   })
 
   // NOTE: To use this test, do kubectl apply -f podspec.yaml (from podspec examples)
@@ -42,8 +39,8 @@ describe('Run script step', () => {
 
   it('should not throw an exception', async () => {
     const args = {
-      entryPointArgs: ['echo "test"'],
-      entryPoint: '/bin/bash',
+      entryPointArgs: ['-c', 'echo "test"'],
+      entryPoint: 'bash',
       environmentVariables: {
         NODE_ENV: 'development'
       },

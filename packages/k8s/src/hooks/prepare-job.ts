@@ -14,7 +14,7 @@ import {
   isAuthPermissionsOK,
   isPodContainerAlpine,
   namespace,
-  podPrune,
+  prunePods,
   requiredPermissions,
   waitForPodPhases
 } from '../k8s'
@@ -29,7 +29,7 @@ export async function prepareJob(
   args: prepareJobArgs,
   responseFile
 ): Promise<void> {
-  await podPrune()
+  await prunePods()
   if (!(await isAuthPermissionsOK())) {
     throw new Error(
       `The Service account needs the following permissions ${JSON.stringify(
@@ -58,8 +58,8 @@ export async function prepareJob(
   try {
     createdPod = await createPod(container, services, args.registry)
   } catch (err) {
-    await podPrune()
-    throw new Error(`failed to create job pod: ${err}`)
+    await prunePods()
+    throw new Error(`failed to create job pod: ${JSON.stringify(err)}`)
   }
 
   if (!createdPod?.metadata?.name) {
@@ -73,7 +73,7 @@ export async function prepareJob(
       new Set([PodPhase.PENDING])
     )
   } catch (err) {
-    await podPrune()
+    await prunePods()
     throw new Error(`Pod failed to come online with error: ${err}`)
   }
 

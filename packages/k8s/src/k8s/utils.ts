@@ -52,9 +52,9 @@ export function containerVolumes(
           'absolute path volume mounts outside of the work folder are not supported'
         )
       }
-      sourceVolumePath = userVolume.sourceVolumePath
+      sourceVolumePath = userVolume.sourceVolumePath.slice(workspacePath.length)
     } else {
-      sourceVolumePath = path.join(workspacePath, userVolume.sourceVolumePath)
+      sourceVolumePath = userVolume.sourceVolumePath
     }
 
     mounts.push({

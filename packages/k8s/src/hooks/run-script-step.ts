@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { RunScriptStepArgs } from 'hooklib'
 import { execPodStep } from '../k8s'
-import { JOB_CONTAINER_NAME } from './constants'
+import { getJobPodName, JOB_CONTAINER_NAME } from './constants'
 
 export async function runScriptStep(
   args: RunScriptStepArgs,
@@ -13,7 +13,7 @@ export async function runScriptStep(
     args.entryPointArgs,
     args.environmentVariables
   )
-  await execPodStep(cb.command, state.jobPod, JOB_CONTAINER_NAME)
+  await execPodStep(cb.command, getJobPodName(), JOB_CONTAINER_NAME)
 }
 
 class CommandsBuilder {
