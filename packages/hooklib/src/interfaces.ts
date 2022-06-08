@@ -34,6 +34,7 @@ export interface ContainerInfo {
   createOptions?: string
   environmentVariables?: { [key: string]: string }
   userMountVolumes?: Mount[]
+  systemMountVolumes?: Mount[]
   registry?: Registry
   portMappings?: string[]
 }

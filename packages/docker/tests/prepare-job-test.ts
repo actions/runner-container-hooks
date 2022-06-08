@@ -1,36 +1,28 @@
 import * as fs from 'fs'
-import { v4 as uuidv4 } from 'uuid'
 import { prepareJob } from '../src/hooks'
 import TestSetup from './test-setup'
 
 jest.useRealTimers()
 
-let prepareJobOutputPath: string
-let prepareJobData: any
-const prepareJobInputPath = `${__dirname}/../../../examples/prepare-job.json`
+const prepareJobDefinition = JSON.parse(
+  fs.readFileSync(`${__dirname}/../../../examples/prepare-job.json`, 'utf-8')
+)
 
 let testSetup: TestSetup
 
 describe('prepare job', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     testSetup = new TestSetup()
     testSetup.initialize()
 
-    let prepareJobRawData = fs.readFileSync(prepareJobInputPath, 'utf8')
-    prepareJobData = JSON.parse(prepareJobRawData.toString())
-
-    prepareJobData.args.container.userMountVolumes = testSetup.userMountVolumes
-    prepareJobData.args.container.systemMountVolumes =
+    prepareJobDefinition.args.container.systemMountVolumes =
       testSetup.systemMountVolumes
-    prepareJobData.args.container.workingDirectory =
-      testSetup.containerWorkingDirectory
-    prepareJobData.args.container.registry = null
-    prepareJobData.args.services.forEach(s => (s.registry = null))
-
-    prepareJobOutputPath = `${
-      testSetup.testDir
-    }/prepare-job-output-${uuidv4()}.json`
-    fs.writeFileSync(prepareJobOutputPath, '')
+    prepareJobDefinition.args.container.workingDirectory =
+      testSetup.workingDirectory
+    prepareJobDefinition.args.container.registry = null
+    prepareJobDefinition.args.services.forEach(s => {
+      s.registry = null
+    })
   })
 
   afterEach(() => {
@@ -38,38 +30,68 @@ describe('prepare job', () => {
   })
 
   it('should not throw', async () => {
+    const prepareJobOutput = testSetup.createOutputFile(
+      'prepare-job-output.json'
+    )
     await expect(
-      prepareJob(prepareJobData.args, prepareJobOutputPath)
+      prepareJob(prepareJobDefinition.args, prepareJobOutput)
     ).resolves.not.toThrow()
 
-    expect(() => fs.readFileSync(prepareJobOutputPath, 'utf-8')).not.toThrow()
+    expect(() => fs.readFileSync(prepareJobOutput, 'utf-8')).not.toThrow()
   })
 
   it('should have JSON output written to a file', async () => {
-    await prepareJob(prepareJobData.args, prepareJobOutputPath)
-    const prepareJobOutputContent = fs.readFileSync(
-      prepareJobOutputPath,
-      'utf-8'
+    const prepareJobOutput = testSetup.createOutputFile(
+      'prepare-job-output.json'
     )
+    await prepareJob(prepareJobDefinition.args, prepareJobOutput)
+    const prepareJobOutputContent = fs.readFileSync(prepareJobOutput, 'utf-8')
     expect(() => JSON.parse(prepareJobOutputContent)).not.toThrow()
   })
 
   it('should have context written to a file', async () => {
-    await prepareJob(prepareJobData.args, prepareJobOutputPath)
-    const prepareJobOutputContent = fs.readFileSync(
-      prepareJobOutputPath,
-      'utf-8'
+    const prepareJobOutput = testSetup.createOutputFile(
+      'prepare-job-output.json'
     )
-    const parsedPrepareJobOutput = JSON.parse(prepareJobOutputContent)
+    await prepareJob(prepareJobDefinition.args, prepareJobOutput)
+    const parsedPrepareJobOutput = JSON.parse(
+      fs.readFileSync(prepareJobOutput, 'utf-8')
+    )
     expect(parsedPrepareJobOutput.context).toBeDefined()
   })
 
-  it('should have container ids written to file', async () => {
-    await prepareJob(prepareJobData.args, prepareJobOutputPath)
-    const prepareJobOutputContent = fs.readFileSync(
-      prepareJobOutputPath,
-      'utf-8'
+  it('should have isAlpine field set correctly', async () => {
+    let prepareJobOutput = testSetup.createOutputFile(
+      'prepare-job-output-alpine.json'
     )
+    const prepareJobArgsClone = JSON.parse(
+      JSON.stringify(prepareJobDefinition.args)
+    )
+    prepareJobArgsClone.container.image = 'alpine:latest'
+    await prepareJob(prepareJobArgsClone, prepareJobOutput)
+
+    let parsedPrepareJobOutput = JSON.parse(
+      fs.readFileSync(prepareJobOutput, 'utf-8')
+    )
+    expect(parsedPrepareJobOutput.isAlpine).toBe(true)
+
+    prepareJobOutput = testSetup.createOutputFile(
+      'prepare-job-output-ubuntu.json'
+    )
+    prepareJobArgsClone.container.image = 'ubuntu:latest'
+    await prepareJob(prepareJobArgsClone, prepareJobOutput)
+    parsedPrepareJobOutput = JSON.parse(
+      fs.readFileSync(prepareJobOutput, 'utf-8')
+    )
+    expect(parsedPrepareJobOutput.isAlpine).toBe(false)
+  })
+
+  it('should have container ids written to file', async () => {
+    const prepareJobOutput = testSetup.createOutputFile(
+      'prepare-job-output.json'
+    )
+    await prepareJob(prepareJobDefinition.args, prepareJobOutput)
+    const prepareJobOutputContent = fs.readFileSync(prepareJobOutput, 'utf-8')
     const parsedPrepareJobOutput = JSON.parse(prepareJobOutputContent)
 
     expect(parsedPrepareJobOutput.context.container.id).toBeDefined()
@@ -78,11 +100,11 @@ describe('prepare job', () => {
   })
 
   it('should have ports for context written in form [containerPort]:[hostPort]', async () => {
-    await prepareJob(prepareJobData.args, prepareJobOutputPath)
-    const prepareJobOutputContent = fs.readFileSync(
-      prepareJobOutputPath,
-      'utf-8'
+    const prepareJobOutput = testSetup.createOutputFile(
+      'prepare-job-output.json'
     )
+    await prepareJob(prepareJobDefinition.args, prepareJobOutput)
+    const prepareJobOutputContent = fs.readFileSync(prepareJobOutput, 'utf-8')
     const parsedPrepareJobOutput = JSON.parse(prepareJobOutputContent)
 
     const mainContainerPorts = parsedPrepareJobOutput.context.container.ports
