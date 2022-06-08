@@ -2,10 +2,8 @@ import * as core from '@actions/core'
 import * as fs from 'fs'
 import {
   ContainerInfo,
-  JobContainerInfo,
   RunContainerStepArgs,
-  ServiceContainerInfo,
-  StepContainerInfo
+  ServiceContainerInfo
 } from 'hooklib/lib'
 import path from 'path'
 import { env } from 'process'
@@ -55,7 +53,7 @@ export async function createContainer(
 
   const mountVolumes = [
     ...(args.userMountVolumes || []),
-    ...((args as JobContainerInfo | StepContainerInfo).systemMountVolumes || [])
+    ...(args.systemMountVolumes || [])
   ]
   for (const mountVolume of mountVolumes) {
     dockerArgs.push(
@@ -328,8 +326,7 @@ export async function containerExecStep(
     }
   }
 
-  // Todo figure out prepend path and update it here
-  // (we need to pass path in as -e Path={fullpath}) where {fullpath is the prepend path added to the current containers path}
+  dockerArgs.push('-e', `"PATH=${args.prependPath.join(':')}:$PATH"`)
 
   dockerArgs.push(containerId)
   dockerArgs.push(args.entryPoint)
