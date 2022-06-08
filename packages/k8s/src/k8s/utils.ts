@@ -52,7 +52,7 @@ export function containerVolumes(
           'Volume mounts outside of the work folder are not supported'
         )
       }
-      // sourcec volume path should be relative path
+      // source volume path should be relative path
       sourceVolumePath = userVolume.sourceVolumePath.slice(
         workspacePath.length + 1
       )
