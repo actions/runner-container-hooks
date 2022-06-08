@@ -44,7 +44,7 @@ export async function createContainer(
   if (args.environmentVariables) {
     for (const [key] of Object.entries(args.environmentVariables)) {
       dockerArgs.push('-e')
-      dockerArgs.push(`"${key}"`)
+      dockerArgs.push(key)
     }
   }
 
@@ -340,11 +340,11 @@ export async function containerExecStep(
   dockerArgs.push(`--workdir=${args.workingDirectory}`)
   for (const [key] of Object.entries(args['environmentVariables'])) {
     dockerArgs.push('-e')
-    dockerArgs.push(`"${key}"`)
+    dockerArgs.push(key)
   }
 
   if (args.prependPath?.length) {
-    dockerArgs.push('-e', `"PATH=${args.prependPath.join(':')}:$PATH"`)
+    dockerArgs.push('-e', `PATH=${args.prependPath.join(':')}:$PATH`)
   }
 
   dockerArgs.push(containerId)
