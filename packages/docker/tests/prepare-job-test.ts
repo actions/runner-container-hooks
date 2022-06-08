@@ -56,6 +56,32 @@ describe('prepare job', () => {
     expect(parsedPrepareJobOutput.context).toBeDefined()
   })
 
+  it('should have isAlpine field set correctly', async () => {
+    let prepareJobOutput = testSetup.createOutputFile(
+      'prepare-job-output-alpine.json'
+    )
+    const prepareJobArgsClone = JSON.parse(
+      JSON.stringify(prepareJobDefinition.args)
+    )
+    prepareJobArgsClone.container.image = 'alpine:latest'
+    await prepareJob(prepareJobArgsClone, prepareJobOutput)
+
+    let parsedPrepareJobOutput = JSON.parse(
+      fs.readFileSync(prepareJobOutput, 'utf-8')
+    )
+    expect(parsedPrepareJobOutput.isAlpine).toBe(true)
+
+    prepareJobOutput = testSetup.createOutputFile(
+      'prepare-job-output-ubuntu.json'
+    )
+    prepareJobArgsClone.container.image = 'ubuntu:latest'
+    await prepareJob(prepareJobArgsClone, prepareJobOutput)
+    parsedPrepareJobOutput = JSON.parse(
+      fs.readFileSync(prepareJobOutput, 'utf-8')
+    )
+    expect(parsedPrepareJobOutput.isAlpine).toBe(false)
+  })
+
   it('should have container ids written to file', async () => {
     const prepareJobOutput = testSetup.createOutputFile(
       'prepare-job-output.json'
