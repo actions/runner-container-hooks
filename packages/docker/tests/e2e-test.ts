@@ -39,6 +39,10 @@ describe('e2e', () => {
     testSetup.initialize()
     definitions.prepareJob.args.container.systemMountVolumes =
       testSetup.systemMountVolumes
+    definitions.prepareJob.args.container.registry = null
+    definitions.prepareJob.args.services.forEach(s => {
+      s.registry = null
+    })
   })
 
   afterEach(() => {

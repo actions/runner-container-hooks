@@ -34,6 +34,10 @@ describe('run-script-step', () => {
     const prepareJobOutput = testSetup.createOutputFile(
       'prepare-job-output.json'
     )
+    definitions.prepareJob.args.container.registry = null
+    definitions.prepareJob.args.services.forEach(s => {
+      s.registry = null
+    })
     await prepareJob(definitions.prepareJob.args, prepareJobOutput)
 
     prepareJobResponse = JSON.parse(fs.readFileSync(prepareJobOutput, 'utf-8'))

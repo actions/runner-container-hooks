@@ -186,15 +186,15 @@ function transformDockerPortsToContextPorts(
   meta: ContainerMetadata
 ): ContextPorts {
   // ex: '80/tcp -> 0.0.0.0:80'
-  const re = /^(\d+)\/(\w+)? -> (.*):(\d+)$/
+  const re = /^(\d+)(\/\w+)? -> (.*):(\d+)$/
   const contextPorts: ContextPorts = {}
 
-  if (meta.ports) {
+  if (meta.ports?.length) {
     for (const port of meta.ports) {
       const matches = port.match(re)
       if (!matches) {
         throw new Error(
-          'Container ports could not match the regex: "^(\\d+)\\/(\\w+)? -> (.*):(\\d+)$"'
+          'Container ports could not match the regex: "^(\\d+)(\\/\\w+)? -> (.*):(\\d+)$"'
         )
       }
       contextPorts[matches[1]] = matches[matches.length - 1]

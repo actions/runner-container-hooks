@@ -21,6 +21,11 @@ describe('cleanup job', () => {
     const prepareJobOutput = testSetup.createOutputFile(
       'prepare-job-output.json'
     )
+
+    prepareJobDefinition.args.container.registry = null
+    prepareJobDefinition.args.services.forEach(s => {
+      s.registry = null
+    })
     await prepareJob(prepareJobDefinition.args, prepareJobOutput)
   })
 

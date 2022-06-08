@@ -115,4 +115,29 @@ export default class TestSetup {
   public get containerWorkingDirectory(): string {
     return `/__w/${this.projectName}/${this.projectName}`
   }
+
+  public initializeDockerAction(): string {
+    const actionPath = `${this.testdir}/_actions/example-handle/example-repo/example-branch/mock-directory`
+    fs.mkdirSync(actionPath, { recursive: true })
+    this.writeDockerfile(actionPath)
+    this.writeEntrypoint(actionPath)
+    return actionPath
+  }
+
+  private writeDockerfile(actionPath: string) {
+    const content = `FROM alpine:3.10
+COPY entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]`
+    fs.writeFileSync(`${actionPath}/Dockerfile`, content)
+  }
+
+  private writeEntrypoint(actionPath) {
+    const content = `#!/bin/sh -l
+echo "Hello $1"
+time=$(date)
+echo "::set-output name=time::$time"`
+    const entryPointPath = `${actionPath}/entrypoint.sh`
+    fs.writeFileSync(entryPointPath, content)
+    fs.chmodSync(entryPointPath, 0o755)
+  }
 }
