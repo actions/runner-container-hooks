@@ -1,5 +1,6 @@
-import { podPrune } from '../k8s'
+import { pruneSecrets, prunePods } from '../k8s'
 
 export async function cleanupJob(): Promise<void> {
-  await podPrune()
+  await prunePods()
+  await pruneSecrets()
 }

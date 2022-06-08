@@ -1,6 +1,5 @@
 import * as k8s from '@kubernetes/client-node'
 import { Mount } from 'hooklib'
-import * as path from 'path'
 import { POD_VOLUME_NAME } from './index'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
@@ -43,6 +42,9 @@ export function containerVolumes(
     return mounts
   }
 
+  // TODO: we need to ensure this is a local path under the github workspace or fail/skip
+  // subpath only accepts a local path under the runner workspace
+  /*
   for (const userVolume of userMountVolumes) {
     const sourceVolumePath = `${
       path.isAbsolute(userVolume.sourceVolumePath)
@@ -52,7 +54,6 @@ export function containerVolumes(
             userVolume.sourceVolumePath
           )
     }`
-
     mounts.push({
       name: POD_VOLUME_NAME,
       mountPath: userVolume.targetVolumePath,
@@ -60,6 +61,7 @@ export function containerVolumes(
       readOnly: userVolume.readOnly
     })
   }
+  */
 
   return mounts
 }

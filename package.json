@@ -7,7 +7,7 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "npm run test --prefix packages/docker",
+    "test": "npm run test --prefix packages/docker && npm run test --prefix packages/k8s",
     "bootstrap": "npm install --prefix packages/hooklib && npm install --prefix packages/k8s && npm install --prefix packages/docker",
     "format": "prettier --write '**/*.ts'",
     "format-check": "prettier --check '**/*.ts'",
