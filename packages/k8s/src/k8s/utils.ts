@@ -1,5 +1,6 @@
 import * as k8s from '@kubernetes/client-node'
 import { Mount } from 'hooklib'
+import * as path from 'path'
 import { POD_VOLUME_NAME } from './index'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
@@ -42,18 +43,23 @@ export function containerVolumes(
     return mounts
   }
 
-  // TODO: we need to ensure this is a local path under the github workspace or fail/skip
-  // subpath only accepts a local path under the runner workspace
-  /*
+  const workspacePath = process.env.GITHUB_WORKSPACE as string
   for (const userVolume of userMountVolumes) {
-    const sourceVolumePath = `${
-      path.isAbsolute(userVolume.sourceVolumePath)
-        ? userVolume.sourceVolumePath
-        : path.join(
-            process.env.GITHUB_WORKSPACE as string,
-            userVolume.sourceVolumePath
-          )
-    }`
+    let sourceVolumePath = ''
+    if (path.isAbsolute(userVolume.sourceVolumePath)) {
+      if (!userVolume.sourceVolumePath.startsWith(workspacePath)) {
+        throw new Error(
+          'Volume mounts outside of the work folder are not supported'
+        )
+      }
+      // source volume path should be relative path
+      sourceVolumePath = userVolume.sourceVolumePath.slice(
+        workspacePath.length + 1
+      )
+    } else {
+      sourceVolumePath = userVolume.sourceVolumePath
+    }
+
     mounts.push({
       name: POD_VOLUME_NAME,
       mountPath: userVolume.targetVolumePath,
@@ -61,7 +67,6 @@ export function containerVolumes(
       readOnly: userVolume.readOnly
     })
   }
-  */
 
   return mounts
 }
