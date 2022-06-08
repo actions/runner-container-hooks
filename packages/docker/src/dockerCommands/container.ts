@@ -43,13 +43,9 @@ export async function createContainer(
   }
 
   if (args.environmentVariables) {
-    for (const [key, value] of Object.entries(args.environmentVariables)) {
+    for (const [key] of Object.entries(args.environmentVariables)) {
       dockerArgs.push('-e')
-      if (!value) {
-        dockerArgs.push(`"${key}"`)
-      } else {
-        dockerArgs.push(`"${key}=${value}"`)
-      }
+      dockerArgs.push(`"${key}"`)
     }
   }
 
@@ -319,13 +315,9 @@ export async function containerExecStep(
 ): Promise<void> {
   const dockerArgs: string[] = ['exec', '-i']
   dockerArgs.push(`--workdir=${args.workingDirectory}`)
-  for (const [key, value] of Object.entries(args['environmentVariables'])) {
+  for (const [key] of Object.entries(args['environmentVariables'])) {
     dockerArgs.push('-e')
-    if (!value) {
-      dockerArgs.push(`"${key}"`)
-    } else {
-      dockerArgs.push(`"${key}=${value}"`)
-    }
+    dockerArgs.push(`"${key}"`)
   }
 
   // Todo figure out prepend path and update it here
