@@ -1,7 +1,7 @@
-import { prepareJob, cleanupJob, runScriptStep } from '../src/hooks'
-import { TestHelper } from './test-setup'
-import * as path from 'path'
 import * as fs from 'fs'
+import * as path from 'path'
+import { cleanupJob, prepareJob, runScriptStep } from '../src/hooks'
+import { TestHelper } from './test-setup'
 
 jest.useRealTimers()
 
@@ -45,7 +45,7 @@ describe('Run script step', () => {
         NODE_ENV: 'development'
       },
       prependPath: ['/foo/bar', 'bar/foo'],
-      workingDirectory: '/__w/thboop-test2/thboop-test2'
+      workingDirectory: '/__w/repo/repo'
     }
     const state = {
       jobPod: prepareJobOutputData.state.jobPod

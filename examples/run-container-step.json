@@ -16,7 +16,7 @@
       "echo \"hello world2\""
     ],
     "entryPoint": "bash",
-    "workingDirectory": "/__w/thboop-test2/thboop-test2",
+    "workingDirectory": "/__w/repo/repo",
     "createOptions": "--cpus 1",
     "environmentVariables": {
       "NODE_ENV": "development"

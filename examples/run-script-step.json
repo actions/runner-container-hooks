@@ -21,6 +21,6 @@
             "/foo/bar",
             "bar/foo"
         ],
-        "workingDirectory": "/__w/thboop-test2/thboop-test2"
+        "workingDirectory": "/__w/repo/repo"
     }
 }
