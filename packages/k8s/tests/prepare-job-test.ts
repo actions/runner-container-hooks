@@ -40,4 +40,32 @@ describe('Prepare job', () => {
     const content = fs.readFileSync(prepareJobOutputFilePath)
     expect(() => JSON.parse(content.toString())).not.toThrow()
   })
+
+  it('should prepare job with absolute path for userVolumeMount', async () => {
+    prepareJobData.args.container.userMountVolumes.forEach(v => {
+      if (!path.isAbsolute(v.sourceVolumePath)) {
+        v.sourceVolumePath = path.join(
+          process.env.GITHUB_WORKSPACE as string,
+          v.sourceVolumePath
+        )
+      }
+    })
+    await expect(
+      prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+    ).resolves.not.toThrow()
+  })
+
+  it('should throw an exception if the user volume mount is absolute path outside of GITHUB_WORKSPACE', async () => {
+    prepareJobData.args.container.userMountVolumes.forEach(v => {
+      if (!path.isAbsolute(v.sourceVolumePath)) {
+        v.sourceVolumePath = path.join(
+          '/path/outside/of/github-workspace',
+          v.sourceVolumePath
+        )
+      }
+    })
+    await expect(
+      prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+    ).rejects.toThrow()
+  })
 })
