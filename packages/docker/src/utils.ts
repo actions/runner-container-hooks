@@ -61,3 +61,26 @@ function isAlpha(val: string): boolean {
 function isNumeric(val: string): boolean {
   return val.length === 1 && val >= '0' && val <= '9'
 }
+
+export async function runWithEnvironment<T>(
+  cb: () => Promise<T>,
+  containerEnvs?: { [key: string]: string }
+): Promise<T> {
+  let savedPreviousEnvironment: { [key: string]: string } | undefined =
+    undefined
+  if (containerEnvs) {
+    savedPreviousEnvironment = JSON.parse(JSON.stringify(process.env)) as {
+      [key: string]: string
+    }
+    for (const [key, value] of Object.entries(containerEnvs)) {
+      process.env[key] = value
+    }
+  }
+  const ret = await cb()
+  if (savedPreviousEnvironment) {
+    for (const [key, value] of Object.entries(savedPreviousEnvironment)) {
+      process.env[key] = value
+    }
+  }
+  return ret
+}

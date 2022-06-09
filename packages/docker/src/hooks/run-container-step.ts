@@ -8,6 +8,7 @@ import {
   registryLogout
 } from '../dockerCommands'
 import { getRunnerLabel } from '../dockerCommands/constants'
+import { runWithEnvironment } from '../utils'
 
 export async function runContainerStep(
   args: RunContainerStepArgs,
@@ -29,8 +30,17 @@ export async function runContainerStep(
       'run container step should have image or dockerfile fields specified'
     )
   }
-  // container will get pruned at the end of the job based on the label, no need to cleanup here
-  await containerRun(args, tag.split(':')[1], state?.network)
+
+  const runContainerCallback = containerRun.bind(
+    null,
+    args,
+    tag.split(':')[1],
+    state?.network
+  )
+  await runWithEnvironment<void>(
+    runContainerCallback,
+    args.environmentVariables
+  )
 }
 
 function generateBuildTag(): string {
