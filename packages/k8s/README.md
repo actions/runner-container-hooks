@@ -27,3 +27,10 @@ Some things are expected to be set when using these hooks
 - Some actions runner env's are expected to be set. These are set automatically by the runner.
     - `RUNNER_WORKSPACE` is expected to be set to the workspace of the runner
     - `GITHUB_WORKSPACE` is expected to be set to the workspace of the job
+
+
+## Limitations
+- Container actions
+  - Building container actions from a dockerfile is not supported at this time
+  - Container actions will not have access to the services network or job container network
+- Docker [create options](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idcontaineroptions) are not supported

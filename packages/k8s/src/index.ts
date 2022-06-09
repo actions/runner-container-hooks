@@ -1,4 +1,5 @@
 import { Command, getInputFromStdin, prepareJobArgs } from 'hooklib'
+import * as core from '@actions/core'
 import {
   cleanupJob,
   prepareJob,
@@ -34,8 +35,7 @@ async function run(): Promise<void> {
         throw new Error(`Command not recognized: ${command}`)
     }
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.log(error)
+    core.error(JSON.stringify(error))
     exitCode = 1
   }
   process.exitCode = exitCode

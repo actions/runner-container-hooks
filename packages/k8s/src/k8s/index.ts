@@ -1,5 +1,5 @@
 import * as k8s from '@kubernetes/client-node'
-import { ContainerInfo, PodPhase, Registry } from 'hooklib'
+import { ContainerInfo, Registry } from 'hooklib'
 import * as stream from 'stream'
 import {
   getJobPodName,
@@ -9,6 +9,7 @@ import {
   getVolumeClaimName,
   RunnerInstanceLabel
 } from '../hooks/constants'
+import { PodPhase } from './utils'
 
 const kc = new k8s.KubeConfig()
 
@@ -355,7 +356,7 @@ async function getPodPhase(podName: string): Promise<PodPhase> {
   if (!pod.status?.phase || !podPhaseLookup.has(pod.status.phase)) {
     return PodPhase.UNKNOWN
   }
-  return pod.status?.phase
+  return pod.status?.phase as PodPhase
 }
 
 async function isJobSucceeded(jobName: string): Promise<boolean> {

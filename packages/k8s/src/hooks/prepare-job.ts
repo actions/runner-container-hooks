@@ -2,11 +2,12 @@ import * as core from '@actions/core'
 import * as io from '@actions/io'
 import * as k8s from '@kubernetes/client-node'
 import {
-  ContextPorts,
   PodPhase,
-  prepareJobArgs,
-  writeToResponseFile
-} from 'hooklib'
+  containerVolumes,
+  DEFAULT_CONTAINER_ENTRY_POINT,
+  DEFAULT_CONTAINER_ENTRY_POINT_ARGS
+} from '../k8s/utils'
+import { ContextPorts, prepareJobArgs, writeToResponseFile } from 'hooklib'
 import path from 'path'
 import {
   containerPorts,
@@ -18,11 +19,6 @@ import {
   requiredPermissions,
   waitForPodPhases
 } from '../k8s'
-import {
-  containerVolumes,
-  DEFAULT_CONTAINER_ENTRY_POINT,
-  DEFAULT_CONTAINER_ENTRY_POINT_ARGS
-} from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
 
 export async function prepareJob(
@@ -40,14 +36,14 @@ export async function prepareJob(
   await copyExternalsToRoot()
   let container: k8s.V1Container | undefined = undefined
   if (args.container?.image) {
-    core.info(`Using image '${args.container.image}' for job image`)
+    core.debug(`Using image '${args.container.image}' for job image`)
     container = createPodSpec(args.container, JOB_CONTAINER_NAME, true)
   }
 
   let services: k8s.V1Container[] = []
   if (args.services?.length) {
     services = args.services.map(service => {
-      core.info(`Adding service '${service.image}' to pod definition`)
+      core.debug(`Adding service '${service.image}' to pod definition`)
       return createPodSpec(service, service.image.split(':')[0])
     })
   }
@@ -65,6 +61,9 @@ export async function prepareJob(
   if (!createdPod?.metadata?.name) {
     throw new Error('created pod should have metadata.name')
   }
+  core.debug(
+    `Job pod created, waiting for it to come online ${createdPod?.metadata?.name}`
+  )
 
   try {
     await waitForPodPhases(
@@ -77,7 +76,7 @@ export async function prepareJob(
     throw new Error(`Pod failed to come online with error: ${err}`)
   }
 
-  core.info('Pod is ready for traffic')
+  core.debug('Job pod is ready for traffic')
 
   let isAlpine = false
   try {
@@ -88,7 +87,7 @@ export async function prepareJob(
   } catch (err) {
     throw new Error(`Failed to determine if the pod is alpine: ${err}`)
   }
-
+  core.debug(`Setting isAlpine to ${isAlpine}`)
   generateResponseFile(responseFile, createdPod, isAlpine)
 }
 
@@ -160,7 +159,6 @@ function createPodSpec(
   name: string,
   jobContainer = false
 ): k8s.V1Container {
-  core.info(JSON.stringify(container))
   if (!container.entryPointArgs) {
     container.entryPointArgs = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
   }
