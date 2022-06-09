@@ -79,10 +79,15 @@ export async function prepareJob(
       }
 
       setupContainer(service)
-      const response = await createContainer(
+      const createContainerCallback = createContainer.bind(
+        null,
         service,
         generateContainerName(service.image),
         networkName
+      )
+      const response = await runWithEnvironment<ContainerMetadata>(
+        createContainerCallback,
+        service.environmentVariables
       )
       servicesMetadata.push(response)
       await containerStart(response.id)
