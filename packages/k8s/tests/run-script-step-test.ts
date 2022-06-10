@@ -32,7 +32,7 @@ describe('Run script step', () => {
 
   afterEach(async () => {
     await cleanupJob()
-    // await testHelper.cleanup()
+    await testHelper.cleanup()
   })
 
   // NOTE: To use this test, do kubectl apply -f podspec.yaml (from podspec examples)

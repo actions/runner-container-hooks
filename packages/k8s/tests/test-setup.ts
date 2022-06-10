@@ -34,7 +34,10 @@ export class TestHelper {
     try {
       await this.createTestVolume()
       await this.createTestJobPod()
-    } catch {}
+    } catch (e) {
+      console.log(JSON.stringify(e))
+      throw e
+    }
   }
 
   public async cleanup(): Promise<void> {
@@ -120,7 +123,7 @@ export class TestHelper {
         volumeMode: 'Filesystem',
         accessModes: ['ReadWriteOnce'],
         hostPath: {
-          path: this.tempDirPath
+          path: `${this.tempDirPath}/_work`
         }
       }
     }
