@@ -26,6 +26,10 @@ export async function prepareJob(
   args: prepareJobArgs,
   responseFile
 ): Promise<void> {
+  if (!args.container) {
+    throw new Error('Job Container is required.')
+  }
+
   await prunePods()
   if (!(await isAuthPermissionsOK())) {
     throw new Error(

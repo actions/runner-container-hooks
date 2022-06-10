@@ -119,4 +119,14 @@ describe('prepare job', () => {
     expect(redisServicePorts['80']).toBe('8080')
     expect(redisServicePorts['8080']).toBe('8088')
   })
+
+  it('should run prepare job without job container without exception', async () => {
+    prepareJobDefinition.args.container = null
+    const prepareJobOutput = testSetup.createOutputFile(
+      'prepare-job-output.json'
+    )
+    await expect(
+      prepareJob(prepareJobDefinition.args, prepareJobOutput)
+    ).resolves.not.toThrow()
+  })
 })
