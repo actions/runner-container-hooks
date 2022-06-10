@@ -29,17 +29,17 @@ export function containerVolumes(
       name: POD_VOLUME_NAME,
       mountPath: '/__e',
       subPath: 'externals'
+    },
+    {
+      name: POD_VOLUME_NAME,
+      mountPath: '/github/home',
+      subPath: '_temp/_github_home'
+    },
+    {
+      name: POD_VOLUME_NAME,
+      mountPath: '/github/workflow',
+      subPath: '_temp/_github_workflow'
     }
-    // {
-    //   name: POD_VOLUME_NAME,
-    //   mountPath: '/github/home',
-    //   subPath: '_temp/_github_home'
-    // },
-    // {
-    //   name: POD_VOLUME_NAME,
-    //   mountPath: '/github/workflow',
-    //   subPath: '_temp/_github_workflow'
-    // }
   )
 
   if (!userMountVolumes?.length) {

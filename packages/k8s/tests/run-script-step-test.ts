@@ -53,7 +53,6 @@ describe('Run script step', () => {
       jobPod: prepareJobOutputData.state.jobPod
     }
     const responseFile = null
-    await new Promise(r => setTimeout(r, 300000))
     await expect(
       runScriptStep(args, state, responseFile)
     ).resolves.not.toThrow()

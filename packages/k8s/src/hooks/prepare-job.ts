@@ -17,8 +17,7 @@ import {
   containerVolumes,
   DEFAULT_CONTAINER_ENTRY_POINT,
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
-  PodPhase,
-  writeEntryPointScript
+  PodPhase
 } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
 
@@ -169,21 +168,9 @@ function createPodSpec(
   name: string,
   jobContainer = false
 ): k8s.V1Container {
-  if (jobContainer) {
-    const { entryPoint, entryPointArgs } = container
+  if (!container.entryPoint) {
     container.entryPoint = DEFAULT_CONTAINER_ENTRY_POINT
     container.entryPointArgs = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
-    writeEntryPointScript(
-      container.workingDirectory,
-      entryPoint || DEFAULT_CONTAINER_ENTRY_POINT,
-      entryPoint ? entryPointArgs || [] : DEFAULT_CONTAINER_ENTRY_POINT_ARGS
-    )
-    // container.entryPointArgs = ['-e', containerPath]
-  } else {
-    if (!container.entryPoint) {
-      container.entryPoint = DEFAULT_CONTAINER_ENTRY_POINT
-      container.entryPointArgs = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
-    }
   }
 
   const podContainer = {

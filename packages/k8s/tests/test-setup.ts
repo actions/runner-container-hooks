@@ -13,7 +13,6 @@ export class TestHelper {
   private tempDirPath: string
   private podName: string
   constructor() {
-    console.log(__dirname)
     this.tempDirPath = `${__dirname}/_temp/runner`
     this.podName = uuidv4().replace(/-/g, '')
   }
@@ -36,7 +35,6 @@ export class TestHelper {
       await this.createTestJobPod()
     } catch (e) {
       console.log(JSON.stringify(e))
-      throw e
     }
   }
 
