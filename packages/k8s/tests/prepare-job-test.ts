@@ -68,4 +68,11 @@ describe('Prepare job', () => {
       prepareJob(prepareJobData.args, prepareJobOutputFilePath)
     ).rejects.toThrow()
   })
+
+  it('should run prepare job without the job container', async () => {
+    prepareJobData.args.container = undefined
+    await expect(
+      prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+    ).resolves.not.toThrow()
+  })
 })

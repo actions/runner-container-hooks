@@ -1,12 +1,6 @@
 import * as core from '@actions/core'
 import * as io from '@actions/io'
 import * as k8s from '@kubernetes/client-node'
-import {
-  PodPhase,
-  containerVolumes,
-  DEFAULT_CONTAINER_ENTRY_POINT,
-  DEFAULT_CONTAINER_ENTRY_POINT_ARGS
-} from '../k8s/utils'
 import { ContextPorts, prepareJobArgs, writeToResponseFile } from 'hooklib'
 import path from 'path'
 import {
@@ -19,6 +13,12 @@ import {
   requiredPermissions,
   waitForPodPhases
 } from '../k8s'
+import {
+  containerVolumes,
+  DEFAULT_CONTAINER_ENTRY_POINT,
+  DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
+  PodPhase
+} from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
 
 export async function prepareJob(
@@ -71,24 +71,23 @@ export async function prepareJob(
       new Set([PodPhase.RUNNING]),
       new Set([PodPhase.PENDING])
     )
+    core.debug('Job pod is ready for traffic')
+
+    let isAlpine = false
+    try {
+      isAlpine = await isPodContainerAlpine(
+        createdPod.metadata.name,
+        JOB_CONTAINER_NAME
+      )
+    } catch (err) {
+      throw new Error(`Failed to determine if the pod is alpine: ${err}`)
+    }
+    core.debug(`Setting isAlpine to ${isAlpine}`)
+    generateResponseFile(responseFile, createdPod, isAlpine)
   } catch (err) {
     await prunePods()
     throw new Error(`Pod failed to come online with error: ${err}`)
   }
-
-  core.debug('Job pod is ready for traffic')
-
-  let isAlpine = false
-  try {
-    isAlpine = await isPodContainerAlpine(
-      createdPod.metadata.name,
-      JOB_CONTAINER_NAME
-    )
-  } catch (err) {
-    throw new Error(`Failed to determine if the pod is alpine: ${err}`)
-  }
-  core.debug(`Setting isAlpine to ${isAlpine}`)
-  generateResponseFile(responseFile, createdPod, isAlpine)
 }
 
 function generateResponseFile(
