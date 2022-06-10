@@ -1,12 +1,6 @@
 import * as core from '@actions/core'
 import * as io from '@actions/io'
 import * as k8s from '@kubernetes/client-node'
-import {
-  PodPhase,
-  containerVolumes,
-  DEFAULT_CONTAINER_ENTRY_POINT,
-  DEFAULT_CONTAINER_ENTRY_POINT_ARGS
-} from '../k8s/utils'
 import { ContextPorts, prepareJobArgs, writeToResponseFile } from 'hooklib'
 import path from 'path'
 import {
@@ -19,12 +13,22 @@ import {
   requiredPermissions,
   waitForPodPhases
 } from '../k8s'
+import {
+  containerVolumes,
+  DEFAULT_CONTAINER_ENTRY_POINT,
+  DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
+  PodPhase
+} from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
 
 export async function prepareJob(
   args: prepareJobArgs,
   responseFile
 ): Promise<void> {
+  if (!args.container) {
+    throw new Error('Job Container is required.')
+  }
+
   await prunePods()
   if (!(await isAuthPermissionsOK())) {
     throw new Error(

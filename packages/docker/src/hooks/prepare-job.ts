@@ -94,7 +94,10 @@ export async function prepareJob(
     )
   }
 
-  const isAlpine = await isContainerAlpine(containerMetadata!.id)
+  let isAlpine = false
+  if (containerMetadata?.id) {
+    isAlpine = await isContainerAlpine(containerMetadata.id)
+  }
 
   if (containerMetadata?.id) {
     containerMetadata.ports = await containerPorts(containerMetadata.id)
@@ -105,7 +108,10 @@ export async function prepareJob(
     }
   }
 
-  const healthChecks: Promise<void>[] = [healthCheck(containerMetadata!)]
+  const healthChecks: Promise<void>[] = []
+  if (containerMetadata) {
+    healthChecks.push(healthCheck(containerMetadata))
+  }
   for (const service of servicesMetadata) {
     healthChecks.push(healthCheck(service))
   }
@@ -133,7 +139,6 @@ function generateResponseFile(
   servicesMetadata?: ContainerMetadata[],
   isAlpine = false
 ): void {
-  // todo figure out if we are alpine
   const response = {
     state: { network: networkName },
     context: {},
