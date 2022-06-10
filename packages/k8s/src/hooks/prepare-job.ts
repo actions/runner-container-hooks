@@ -174,7 +174,7 @@ function createPodSpec(
       entryPoint || DEFAULT_CONTAINER_ENTRY_POINT,
       entryPoint ? entryPointArgs || [] : DEFAULT_CONTAINER_ENTRY_POINT_ARGS
     )
-    // container.entryPointArgs = ['-l', containerPath]
+    // container.entryPointArgs = ['-e', containerPath]
   } else {
     if (!container.entryPoint) {
       container.entryPoint = DEFAULT_CONTAINER_ENTRY_POINT

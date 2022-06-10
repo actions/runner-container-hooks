@@ -16,8 +16,7 @@ export function containerVolumes(
   const mounts: k8s.V1VolumeMount[] = [
     {
       name: POD_VOLUME_NAME,
-      mountPath: '/__w',
-      mountPropagation: 'HostToContainer'
+      mountPath: '/__w'
     }
   ]
 

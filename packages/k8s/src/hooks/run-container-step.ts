@@ -1,6 +1,13 @@
 import * as core from '@actions/core'
 import * as k8s from '@kubernetes/client-node'
-import { PodPhase, RunContainerStepArgs } from 'hooklib'
+import {
+  PodPhase,
+  containerVolumes,
+  DEFAULT_CONTAINER_ENTRY_POINT,
+  DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
+  writeEntryPointScript
+} from '../k8s/utils'
+import { RunContainerStepArgs } from 'hooklib'
 import {
   createJob,
   createSecretForEnvs,
@@ -10,12 +17,6 @@ import {
   waitForJobToComplete,
   waitForPodPhases
 } from '../k8s'
-import {
-  containerVolumes,
-  DEFAULT_CONTAINER_ENTRY_POINT,
-  DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
-  writeEntryPointScript
-} from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
 
 export async function runContainerStep(
@@ -52,6 +53,9 @@ export async function runContainerStep(
   await waitForJobToComplete(job.metadata.name)
   // pod has failed so pull the status code from the container
   const status = await getPodStatus(podName)
+  if (status?.phase === 'Succeeded') {
+    return 0
+  }
   if (!status?.containerStatuses?.length) {
     core.error(
       `Can't determine container status from response:  ${JSON.stringify(
@@ -82,7 +86,7 @@ function createPodSpec(
     entryPoint || DEFAULT_CONTAINER_ENTRY_POINT,
     entryPoint ? entryPointArgs || [] : DEFAULT_CONTAINER_ENTRY_POINT_ARGS
   )
-  container.entryPointArgs = ['-l', containerPath]
+  container.entryPointArgs = ['-e', containerPath]
   podContainer.command = [container.entryPoint, ...container.entryPointArgs]
 
   if (secretName) {
