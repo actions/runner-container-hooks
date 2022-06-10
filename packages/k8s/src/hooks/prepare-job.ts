@@ -1,12 +1,7 @@
 import * as core from '@actions/core'
 import * as io from '@actions/io'
 import * as k8s from '@kubernetes/client-node'
-import {
-  ContextPorts,
-  PodPhase,
-  prepareJobArgs,
-  writeToResponseFile
-} from 'hooklib'
+import { ContextPorts, prepareJobArgs, writeToResponseFile } from 'hooklib'
 import path from 'path'
 import {
   containerPorts,
@@ -14,7 +9,7 @@ import {
   isAuthPermissionsOK,
   isPodContainerAlpine,
   namespace,
-  podPrune,
+  prunePods,
   requiredPermissions,
   waitForPodPhases
 } from '../k8s'
@@ -22,6 +17,7 @@ import {
   containerVolumes,
   DEFAULT_CONTAINER_ENTRY_POINT,
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
+  PodPhase,
   writeEntryPointScript
 } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
@@ -30,7 +26,7 @@ export async function prepareJob(
   args: prepareJobArgs,
   responseFile
 ): Promise<void> {
-  await podPrune()
+  await prunePods()
   if (!(await isAuthPermissionsOK())) {
     throw new Error(
       `The Service account needs the following permissions ${JSON.stringify(
@@ -41,14 +37,14 @@ export async function prepareJob(
   await copyExternalsToRoot()
   let container: k8s.V1Container | undefined = undefined
   if (args.container?.image) {
-    core.info(`Using image '${args.container.image}' for job image`)
+    core.debug(`Using image '${args.container.image}' for job image`)
     container = createPodSpec(args.container, JOB_CONTAINER_NAME, true)
   }
 
   let services: k8s.V1Container[] = []
   if (args.services?.length) {
     services = args.services.map(service => {
-      core.info(`Adding service '${service.image}' to pod definition`)
+      core.debug(`Adding service '${service.image}' to pod definition`)
       return createPodSpec(service, service.image.split(':')[0])
     })
   }
@@ -59,13 +55,16 @@ export async function prepareJob(
   try {
     createdPod = await createPod(container, services, args.registry)
   } catch (err) {
-    await podPrune()
-    throw new Error(`failed to create job pod: ${err}`)
+    await prunePods()
+    throw new Error(`failed to create job pod: ${JSON.stringify(err)}`)
   }
 
   if (!createdPod?.metadata?.name) {
     throw new Error('created pod should have metadata.name')
   }
+  core.debug(
+    `Job pod created, waiting for it to come online ${createdPod?.metadata?.name}`
+  )
 
   try {
     await waitForPodPhases(
@@ -74,11 +73,11 @@ export async function prepareJob(
       new Set([PodPhase.PENDING])
     )
   } catch (err) {
-    await podPrune()
+    await prunePods()
     throw new Error(`Pod failed to come online with error: ${err}`)
   }
 
-  core.info('Pod is ready for traffic')
+  core.debug('Job pod is ready for traffic')
 
   let isAlpine = false
   try {
@@ -89,7 +88,7 @@ export async function prepareJob(
   } catch (err) {
     throw new Error(`Failed to determine if the pod is alpine: ${err}`)
   }
-
+  core.debug(`Setting isAlpine to ${isAlpine}`)
   generateResponseFile(responseFile, createdPod, isAlpine)
 }
 

@@ -45,15 +45,22 @@ export function containerVolumes(
     return mounts
   }
 
+  const workspacePath = process.env.GITHUB_WORKSPACE as string
   for (const userVolume of userMountVolumes) {
-    const sourceVolumePath = `${
-      path.isAbsolute(userVolume.sourceVolumePath)
-        ? userVolume.sourceVolumePath
-        : path.join(
-            process.env.GITHUB_WORKSPACE as string,
-            userVolume.sourceVolumePath
-          )
-    }`
+    let sourceVolumePath = ''
+    if (path.isAbsolute(userVolume.sourceVolumePath)) {
+      if (!userVolume.sourceVolumePath.startsWith(workspacePath)) {
+        throw new Error(
+          'Volume mounts outside of the work folder are not supported'
+        )
+      }
+      // source volume path should be relative path
+      sourceVolumePath = userVolume.sourceVolumePath.slice(
+        workspacePath.length + 1
+      )
+    } else {
+      sourceVolumePath = userVolume.sourceVolumePath
+    }
 
     mounts.push({
       name: POD_VOLUME_NAME,
@@ -101,4 +108,13 @@ exec ${environmentPrefix}${entryPoint} ${
     containerPath: `/__w/_temp/${filename}`,
     runnerPath: entryPointPath
   }
+}
+
+export enum PodPhase {
+  PENDING = 'Pending',
+  RUNNING = 'Running',
+  SUCCEEDED = 'Succeeded',
+  FAILED = 'Failed',
+  UNKNOWN = 'Unknown',
+  COMPLETED = 'Completed'
 }

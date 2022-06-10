@@ -16,7 +16,7 @@
       "echo \"hello world2\""
     ],
     "entryPoint": "bash",
-    "workingDirectory": "/__w/thboop-test2/thboop-test2",
+    "workingDirectory": "/__w/repo/repo",
     "createOptions": "--cpus 1",
     "environmentVariables": {
       "NODE_ENV": "development"
@@ -34,27 +34,27 @@
     ],
     "systemMountVolumes": [
       {
-        "sourceVolumePath": "//Users/thomas/git/runner/_layout/_work",
+        "sourceVolumePath": "/Users/thomas/git/runner/_layout/_work",
         "targetVolumePath": "/__w",
         "readOnly": false
       },
       {
-        "sourceVolumePath": "//Users/thomas/git/runner/_layout/externals",
+        "sourceVolumePath": "/Users/thomas/git/runner/_layout/externals",
         "targetVolumePath": "/__e",
         "readOnly": true
       },
       {
-        "sourceVolumePath": "//Users/thomas/git/runner/_layout/_work/_temp",
+        "sourceVolumePath": "/Users/thomas/git/runner/_layout/_work/_temp",
         "targetVolumePath": "/__w/_temp",
         "readOnly": false
       },
       {
-        "sourceVolumePath": "//Users/thomas/git/runner/_layout/_work/_actions",
+        "sourceVolumePath": "/Users/thomas/git/runner/_layout/_work/_actions",
         "targetVolumePath": "/__w/_actions",
         "readOnly": false
       },
       {
-        "sourceVolumePath": "//Users/thomas/git/runner/_layout/_work/_tool",
+        "sourceVolumePath": "/Users/thomas/git/runner/_layout/_work/_tool",
         "targetVolumePath": "/__w/_tool",
         "readOnly": false
       },
@@ -64,7 +64,7 @@
         "readOnly": false
       },
       {
-        "sourceVolumePath": "//Users/thomas/git/runner/_layout/_work/_temp/_github_workflow",
+        "sourceVolumePath": "/Users/thomas/git/runner/_layout/_work/_temp/_github_workflow",
         "targetVolumePath": "/github/workflow",
         "readOnly": false
       }

@@ -2,12 +2,11 @@ import * as core from '@actions/core'
 import * as fs from 'fs'
 import {
   ContainerInfo,
-  JobContainerInfo,
+  Registry,
   RunContainerStepArgs,
-  ServiceContainerInfo,
-  StepContainerInfo
+  ServiceContainerInfo
 } from 'hooklib/lib'
-import path from 'path'
+import * as path from 'path'
 import { env } from 'process'
 import { v4 as uuidv4 } from 'uuid'
 import { runDockerCommand, RunDockerCommandOptions } from '../utils'
@@ -43,19 +42,15 @@ export async function createContainer(
   }
 
   if (args.environmentVariables) {
-    for (const [key, value] of Object.entries(args.environmentVariables)) {
+    for (const [key] of Object.entries(args.environmentVariables)) {
       dockerArgs.push('-e')
-      if (!value) {
-        dockerArgs.push(`"${key}"`)
-      } else {
-        dockerArgs.push(`"${key}=${value}"`)
-      }
+      dockerArgs.push(key)
     }
   }
 
   const mountVolumes = [
     ...(args.userMountVolumes || []),
-    ...((args as JobContainerInfo | StepContainerInfo).systemMountVolumes || [])
+    ...(args.systemMountVolumes || [])
   ]
   for (const mountVolume of mountVolumes) {
     dockerArgs.push(
@@ -146,15 +141,39 @@ export async function containerBuild(
   args: RunContainerStepArgs,
   tag: string
 ): Promise<void> {
-  const context = path.dirname(`${env.GITHUB_WORKSPACE}/${args.dockerfile}`)
+  if (!args.dockerfile) {
+    throw new Error("Container build expects 'args.dockerfile' to be set")
+  }
+
   const dockerArgs: string[] = ['build']
   dockerArgs.push('-t', tag)
-  dockerArgs.push('-f', `${env.GITHUB_WORKSPACE}/${args.dockerfile}`)
-  dockerArgs.push(context)
+  dockerArgs.push('-f', args.dockerfile)
+  dockerArgs.push(getBuildContext(args.dockerfile))
   // TODO: figure out build working directory
   await runDockerCommand(dockerArgs, {
-    workingDir: args['buildWorkingDirectory']
+    workingDir: getWorkingDir(args.dockerfile)
   })
+}
+
+function getBuildContext(dockerfilePath: string): string {
+  return path.dirname(dockerfilePath)
+}
+
+function getWorkingDir(dockerfilePath: string): string {
+  const workspace = env.GITHUB_WORKSPACE as string
+  let workingDir = workspace
+  if (!dockerfilePath?.includes(workspace)) {
+    // This is container action
+    const pathSplit = dockerfilePath.split('/')
+    const actionIndex = pathSplit?.findIndex(d => d === '_actions')
+    if (actionIndex) {
+      const actionSubdirectoryDepth = 3 // handle + repo + [branch | tag]
+      pathSplit.splice(actionIndex + actionSubdirectoryDepth + 1)
+      workingDir = pathSplit.join('/')
+    }
+  }
+
+  return workingDir
 }
 
 export async function containerLogs(id: string): Promise<void> {
@@ -168,6 +187,18 @@ export async function containerNetworkRemove(network: string): Promise<void> {
   const dockerArgs: string[] = ['network']
   dockerArgs.push('rm')
   dockerArgs.push(network)
+  await runDockerCommand(dockerArgs)
+}
+
+export async function containerNetworkPrune(): Promise<void> {
+  const dockerArgs = [
+    'network',
+    'prune',
+    '--force',
+    '--filter',
+    `label=${getRunnerLabel()}`
+  ]
+
   await runDockerCommand(dockerArgs)
 }
 
@@ -238,22 +269,22 @@ export async function healthCheck({
 export async function containerPorts(id: string): Promise<string[]> {
   const dockerArgs = ['port', id]
   const portMappings = (await runDockerCommand(dockerArgs)).trim()
-  return portMappings.split('\n')
+  return portMappings.split('\n').filter(p => !!p)
 }
 
-export async function registryLogin(args): Promise<string> {
-  if (!args.registry) {
+export async function registryLogin(registry?: Registry): Promise<string> {
+  if (!registry) {
     return ''
   }
   const credentials = {
-    username: args.registry.username,
-    password: args.registry.password
+    username: registry.username,
+    password: registry.password
   }
 
   const configLocation = `${env.RUNNER_TEMP}/.docker_${uuidv4()}`
   fs.mkdirSync(configLocation)
   try {
-    await dockerLogin(configLocation, args.registry.serverUrl, credentials)
+    await dockerLogin(configLocation, registry.serverUrl, credentials)
   } catch (error) {
     fs.rmdirSync(configLocation, { recursive: true })
     throw error
@@ -271,7 +302,7 @@ export async function registryLogout(configLocation: string): Promise<void> {
 async function dockerLogin(
   configLocation: string,
   registry: string,
-  credentials: { username: string; password: string }
+  credentials: { username?: string; password?: string }
 ): Promise<void> {
   const credentialsArgs =
     credentials.username && credentials.password
@@ -307,17 +338,14 @@ export async function containerExecStep(
 ): Promise<void> {
   const dockerArgs: string[] = ['exec', '-i']
   dockerArgs.push(`--workdir=${args.workingDirectory}`)
-  for (const [key, value] of Object.entries(args['environmentVariables'])) {
+  for (const [key] of Object.entries(args['environmentVariables'])) {
     dockerArgs.push('-e')
-    if (!value) {
-      dockerArgs.push(`"${key}"`)
-    } else {
-      dockerArgs.push(`"${key}=${value}"`)
-    }
+    dockerArgs.push(key)
   }
 
-  // Todo figure out prepend path and update it here
-  // (we need to pass path in as -e Path={fullpath}) where {fullpath is the prepend path added to the current containers path}
+  if (args.prependPath?.length) {
+    dockerArgs.push('-e', `"PATH=${args.prependPath.join(':')}:$PATH"`)
+  }
 
   dockerArgs.push(containerId)
   dockerArgs.push(args.entryPoint)
@@ -330,7 +358,7 @@ export async function containerExecStep(
 export async function containerRun(
   args: RunContainerStepArgs,
   name: string,
-  network: string
+  network?: string
 ): Promise<void> {
   if (!args.image) {
     throw new Error('expected image to be set')
@@ -340,7 +368,9 @@ export async function containerRun(
   dockerArgs.push('--name', name)
   dockerArgs.push(`--workdir=${args.workingDirectory}`)
   dockerArgs.push(`--label=${getRunnerLabel()}`)
-  dockerArgs.push(`--network=${network}`)
+  if (network) {
+    dockerArgs.push(`--network=${network}`)
+  }
 
   if (args.createOptions) {
     dockerArgs.push(...args.createOptions.split(' '))

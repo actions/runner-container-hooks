@@ -13,6 +13,7 @@ import {
   runContainerStep,
   runScriptStep
 } from './hooks'
+import { checkEnvironment } from './utils'
 
 async function run(): Promise<void> {
   const input = await getInputFromStdin()
@@ -23,12 +24,13 @@ async function run(): Promise<void> {
   const state = input['state']
 
   try {
+    checkEnvironment()
     switch (command) {
       case Command.PrepareJob:
         await prepareJob(args as PrepareJobArgs, responseFile)
         return exit(0)
       case Command.CleanupJob:
-        await cleanupJob(null, state, null)
+        await cleanupJob()
         return exit(0)
       case Command.RunScriptStep:
         await runScriptStep(args as RunScriptStepArgs, state)

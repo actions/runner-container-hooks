@@ -1,11 +1,14 @@
 import * as fs from 'fs'
-import { v4 as uuidv4 } from 'uuid'
-import { env } from 'process'
 import { Mount } from 'hooklib'
+import * as path from 'path'
+import { env } from 'process'
+import { v4 as uuidv4 } from 'uuid'
 
 export default class TestSetup {
   private testdir: string
   private runnerMockDir: string
+  readonly runnerOutputDir: string
+
   private runnerMockSubdirs = {
     work: '_work',
     externals: 'externals',
@@ -16,15 +19,16 @@ export default class TestSetup {
     githubWorkflow: '_work/_temp/_github_workflow'
   }
 
-  private readonly projectName = 'example'
+  private readonly projectName = 'repo'
 
   constructor() {
     this.testdir = `${__dirname}/_temp/${uuidv4()}`
     this.runnerMockDir = `${this.testdir}/runner/_layout`
+    this.runnerOutputDir = `${this.testdir}/outputs`
   }
 
   private get allTestDirectories() {
-    const resp = [this.testdir, this.runnerMockDir]
+    const resp = [this.testdir, this.runnerMockDir, this.runnerOutputDir]
 
     for (const [key, value] of Object.entries(this.runnerMockSubdirs)) {
       resp.push(`${this.runnerMockDir}/${value}`)
@@ -38,27 +42,19 @@ export default class TestSetup {
   }
 
   public initialize(): void {
-    for (const dir of this.allTestDirectories) {
-      fs.mkdirSync(dir, { recursive: true })
-    }
+    env['GITHUB_WORKSPACE'] = this.workingDirectory
     env['RUNNER_NAME'] = 'test'
     env[
       'RUNNER_TEMP'
     ] = `${this.runnerMockDir}/${this.runnerMockSubdirs.workTemp}`
+
+    for (const dir of this.allTestDirectories) {
+      fs.mkdirSync(dir, { recursive: true })
+    }
   }
 
   public teardown(): void {
     fs.rmdirSync(this.testdir, { recursive: true })
-  }
-
-  public get userMountVolumes(): Mount[] {
-    return [
-      {
-        sourceVolumePath: 'my_docker_volume',
-        targetVolumePath: '/volume_mount',
-        readOnly: false
-      }
-    ]
   }
 
   public get systemMountVolumes(): Mount[] {
@@ -106,7 +102,42 @@ export default class TestSetup {
     ]
   }
 
+  public createOutputFile(name: string): string {
+    let filePath = path.join(this.runnerOutputDir, name || `${uuidv4()}.json`)
+    fs.writeFileSync(filePath, '')
+    return filePath
+  }
+
   public get workingDirectory(): string {
+    return `${this.runnerMockDir}/_work/${this.projectName}/${this.projectName}`
+  }
+
+  public get containerWorkingDirectory(): string {
     return `/__w/${this.projectName}/${this.projectName}`
+  }
+
+  public initializeDockerAction(): string {
+    const actionPath = `${this.testdir}/_actions/example-handle/example-repo/example-branch/mock-directory`
+    fs.mkdirSync(actionPath, { recursive: true })
+    this.writeDockerfile(actionPath)
+    this.writeEntrypoint(actionPath)
+    return actionPath
+  }
+
+  private writeDockerfile(actionPath: string) {
+    const content = `FROM alpine:3.10
+COPY entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]`
+    fs.writeFileSync(`${actionPath}/Dockerfile`, content)
+  }
+
+  private writeEntrypoint(actionPath) {
+    const content = `#!/bin/sh -l
+echo "Hello $1"
+time=$(date)
+echo "::set-output name=time::$time"`
+    const entryPointPath = `${actionPath}/entrypoint.sh`
+    fs.writeFileSync(entryPointPath, content)
+    fs.chmodSync(entryPointPath, 0o755)
   }
 }

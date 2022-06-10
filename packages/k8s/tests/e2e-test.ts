@@ -6,38 +6,36 @@ import {
   runContainerStep,
   runScriptStep
 } from '../src/hooks'
-import { TestTempOutput } from './test-setup'
+import { TestHelper } from './test-setup'
 
 jest.useRealTimers()
 
-let testTempOutput: TestTempOutput
+let testHelper: TestHelper
 
 const prepareJobJsonPath = path.resolve(
-  `${__dirname}/../../../../examples/prepare-job.json`
+  `${__dirname}/../../../examples/prepare-job.json`
 )
 const runScriptStepJsonPath = path.resolve(
-  `${__dirname}/../../../../examples/run-script-step.json`
+  `${__dirname}/../../../examples/run-script-step.json`
 )
 let runContainerStepJsonPath = path.resolve(
-  `${__dirname}/../../../../examples/run-container-step.json`
+  `${__dirname}/../../../examples/run-container-step.json`
 )
 
 let prepareJobData: any
 
 let prepareJobOutputFilePath: string
 describe('e2e', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     const prepareJobJson = fs.readFileSync(prepareJobJsonPath)
     prepareJobData = JSON.parse(prepareJobJson.toString())
 
-    testTempOutput = new TestTempOutput()
-    testTempOutput.initialize()
-    prepareJobOutputFilePath = testTempOutput.createFile(
-      'prepare-job-output.json'
-    )
+    testHelper = new TestHelper()
+    await testHelper.initialize()
+    prepareJobOutputFilePath = testHelper.createFile('prepare-job-output.json')
   })
   afterEach(async () => {
-    testTempOutput.cleanup()
+    await testHelper.cleanup()
   })
   it('should prepare job, run script step, run container step then cleanup without errors', async () => {
     await expect(

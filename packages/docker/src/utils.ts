@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 /* eslint-disable import/no-commonjs */
 import * as core from '@actions/core'
+import { env } from 'process'
 // Import this way otherwise typescript has errors
 const exec = require('@actions/exec')
 
@@ -40,6 +41,12 @@ export function sanitize(val: string): string {
     }
   }
   return newNameBuilder.join('')
+}
+
+export function checkEnvironment(): void {
+  if (!env.GITHUB_WORKSPACE) {
+    throw new Error('GITHUB_WORKSPACE is not set')
+  }
 }
 
 // isAlpha accepts single character and checks if

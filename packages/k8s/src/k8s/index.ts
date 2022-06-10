@@ -1,13 +1,15 @@
 import * as k8s from '@kubernetes/client-node'
-import { ContainerInfo, PodPhase, Registry } from 'hooklib'
+import { ContainerInfo, Registry } from 'hooklib'
 import * as stream from 'stream'
-import { v4 as uuidv4 } from 'uuid'
 import {
   getJobPodName,
   getRunnerPodName,
+  getSecretName,
+  getStepPodName,
   getVolumeClaimName,
   RunnerInstanceLabel
 } from '../hooks/constants'
+import { PodPhase } from './utils'
 
 const kc = new k8s.KubeConfig()
 
@@ -119,7 +121,7 @@ export async function createJob(
   job.apiVersion = 'batch/v1'
   job.kind = 'Job'
   job.metadata = new k8s.V1ObjectMeta()
-  job.metadata.name = getJobPodName()
+  job.metadata.name = getStepPodName()
   job.metadata.labels = { 'runner-pod': getRunnerPodName() }
 
   job.spec = new k8s.V1JobSpec()
@@ -173,7 +175,13 @@ export async function getContainerJobPodName(jobName: string): Promise<string> {
 }
 
 export async function deletePod(podName: string): Promise<void> {
-  await k8sApi.deleteNamespacedPod(podName, namespace())
+  await k8sApi.deleteNamespacedPod(
+    podName,
+    namespace(),
+    undefined,
+    undefined,
+    0
+  )
 }
 
 export async function execPodStep(
@@ -240,12 +248,13 @@ export async function createDockerSecret(
       }
     }
   }
-  const secretName = generateSecretName()
+  const secretName = getSecretName()
   const secret = new k8s.V1Secret()
   secret.immutable = true
   secret.apiVersion = 'v1'
   secret.metadata = new k8s.V1ObjectMeta()
   secret.metadata.name = secretName
+  secret.metadata.labels = { 'runner-pod': getRunnerPodName() }
   secret.kind = 'Secret'
   secret.data = {
     '.dockerconfigjson': Buffer.from(
@@ -256,6 +265,50 @@ export async function createDockerSecret(
 
   const { body } = await k8sApi.createNamespacedSecret(namespace(), secret)
   return body
+}
+
+export async function createSecretForEnvs(envs: {
+  [key: string]: string
+}): Promise<string> {
+  const secret = new k8s.V1Secret()
+  const secretName = getSecretName()
+  secret.immutable = true
+  secret.apiVersion = 'v1'
+  secret.metadata = new k8s.V1ObjectMeta()
+  secret.metadata.name = secretName
+  secret.metadata.labels = { 'runner-pod': getRunnerPodName() }
+  secret.kind = 'Secret'
+  secret.data = {}
+  for (const [key, value] of Object.entries(envs)) {
+    secret.data[key] = Buffer.from(value).toString('base64')
+  }
+
+  await k8sApi.createNamespacedSecret(namespace(), secret)
+  return secretName
+}
+
+export async function deleteSecret(secretName: string): Promise<void> {
+  await k8sApi.deleteNamespacedSecret(secretName, namespace())
+}
+
+export async function pruneSecrets(): Promise<void> {
+  const secretList = await k8sApi.listNamespacedSecret(
+    namespace(),
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    new RunnerInstanceLabel().toString()
+  )
+  if (!secretList.body.items.length) {
+    return
+  }
+
+  await Promise.all(
+    secretList.body.items.map(
+      secret => secret.metadata?.name && deleteSecret(secret.metadata.name)
+    )
+  )
 }
 
 export async function waitForPodPhases(
@@ -269,7 +322,6 @@ export async function waitForPodPhases(
   try {
     while (true) {
       phase = await getPodPhase(podName)
-
       if (awaitingPhases.has(phase)) {
         return
       }
@@ -300,7 +352,7 @@ async function getPodPhase(podName: string): Promise<PodPhase> {
   if (!pod.status?.phase || !podPhaseLookup.has(pod.status.phase)) {
     return PodPhase.UNKNOWN
   }
-  return pod.status?.phase
+  return pod.status?.phase as PodPhase
 }
 
 async function isJobSucceeded(jobName: string): Promise<boolean> {
@@ -336,7 +388,7 @@ export async function getPodLogs(
   await new Promise(resolve => r.on('close', () => resolve(null)))
 }
 
-export async function podPrune(): Promise<void> {
+export async function prunePods(): Promise<void> {
   const podList = await k8sApi.listNamespacedPod(
     namespace(),
     undefined,
@@ -448,10 +500,6 @@ export function namespace(): string {
     )
   }
   return context.namespace
-}
-
-function generateSecretName(): string {
-  return `github-secret-${uuidv4()}`
 }
 
 function runnerName(): string {

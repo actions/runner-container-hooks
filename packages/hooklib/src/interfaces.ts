@@ -34,6 +34,7 @@ export interface ContainerInfo {
   createOptions?: string
   environmentVariables?: { [key: string]: string }
   userMountVolumes?: Mount[]
+  systemMountVolumes?: Mount[]
   registry?: Registry
   portMappings?: string[]
 }
@@ -71,14 +72,6 @@ export interface Registry {
 export enum Protocol {
   TCP = 'tcp',
   UDP = 'udp'
-}
-
-export enum PodPhase {
-  PENDING = 'Pending',
-  RUNNING = 'Running',
-  SUCCEEDED = 'Succeded',
-  FAILED = 'Failed',
-  UNKNOWN = 'Unknown'
 }
 
 export interface PrepareJobResponse {
