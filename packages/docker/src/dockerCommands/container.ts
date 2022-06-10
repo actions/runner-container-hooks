@@ -378,9 +378,7 @@ export async function containerRun(
     dockerArgs.push(...args.createOptions.split(' '))
   }
   if (args.environmentVariables) {
-    for (const [key, value] of Object.entries(args.environmentVariables)) {
-      // Pass in this way to avoid printing secrets
-      env[key] = value ?? undefined
+    for (const [key] of Object.entries(args.environmentVariables)) {
       dockerArgs.push('-e')
       dockerArgs.push(key)
     }
