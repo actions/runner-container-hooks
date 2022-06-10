@@ -15,7 +15,7 @@ import {
   registryLogout
 } from '../dockerCommands/container'
 import { networkCreate, networkPrune } from '../dockerCommands/network'
-import { runWithEnvironment, sanitize } from '../utils'
+import { sanitize } from '../utils'
 
 export async function prepareJob(
   args: PrepareJobArgs,
@@ -49,15 +49,10 @@ export async function prepareJob(
       await registryLogout(configLocation)
     }
 
-    const createContainerCallback = createContainer.bind(
-      null,
+    containerMetadata = await createContainer(
       container,
       generateContainerName(container.image),
       networkName
-    )
-    containerMetadata = await runWithEnvironment<ContainerMetadata>(
-      createContainerCallback,
-      container.environmentVariables
     )
     if (!containerMetadata?.id) {
       throw new Error('Failed to create container')
@@ -79,16 +74,12 @@ export async function prepareJob(
       }
 
       setupContainer(service)
-      const createContainerCallback = createContainer.bind(
-        null,
+      const response = await createContainer(
         service,
         generateContainerName(service.image),
         networkName
       )
-      const response = await runWithEnvironment<ContainerMetadata>(
-        createContainerCallback,
-        service.environmentVariables
-      )
+
       servicesMetadata.push(response)
       await containerStart(response.id)
     }

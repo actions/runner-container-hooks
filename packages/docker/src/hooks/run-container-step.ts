@@ -8,7 +8,6 @@ import {
   registryLogout
 } from '../dockerCommands'
 import { getRunnerLabel } from '../dockerCommands/constants'
-import { runWithEnvironment } from '../utils'
 
 export async function runContainerStep(
   args: RunContainerStepArgs,
@@ -31,16 +30,7 @@ export async function runContainerStep(
     )
   }
 
-  const runContainerCallback = containerRun.bind(
-    null,
-    args,
-    tag.split(':')[1],
-    state?.network
-  )
-  await runWithEnvironment<void>(
-    runContainerCallback,
-    args.environmentVariables
-  )
+  await containerRun(args, tag.split(':')[1], state?.network)
 }
 
 function generateBuildTag(): string {

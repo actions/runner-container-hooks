@@ -9,18 +9,38 @@ const exec = require('@actions/exec')
 export interface RunDockerCommandOptions {
   workingDir?: string
   input?: Buffer
+  envs?: { [key: string]: string }
 }
 
 export async function runDockerCommand(
   args: string[],
   options?: RunDockerCommandOptions
 ): Promise<string> {
+  let envToRestore: { [key: string]: string } | undefined = undefined
+  if (options?.envs) {
+    envToRestore = JSON.parse(JSON.stringify(process.env)) as {
+      [key: string]: string
+    }
+    for (const [key, value] of Object.entries(options.envs)) {
+      process.env[key] = value
+    }
+    delete options.envs
+  }
+
   const pipes = await exec.getExecOutput('docker', args, options)
   if (pipes.exitCode !== 0) {
     core.error(`Docker failed with exit code ${pipes.exitCode}`)
     return Promise.reject(pipes.stderr)
   }
-  return Promise.resolve(pipes.stdout)
+  const ret = Promise.resolve(pipes.stdout)
+
+  if (envToRestore) {
+    for (const [key, value] of Object.entries(envToRestore)) {
+      process.env[key] = value
+    }
+  }
+
+  return ret
 }
 
 export function sanitize(val: string): string {
@@ -60,27 +80,4 @@ function isAlpha(val: string): boolean {
 
 function isNumeric(val: string): boolean {
   return val.length === 1 && val >= '0' && val <= '9'
-}
-
-export async function runWithEnvironment<T>(
-  cb: () => Promise<T>,
-  containerEnvs?: { [key: string]: string }
-): Promise<T> {
-  let savedPreviousEnvironment: { [key: string]: string } | undefined =
-    undefined
-  if (containerEnvs) {
-    savedPreviousEnvironment = JSON.parse(JSON.stringify(process.env)) as {
-      [key: string]: string
-    }
-    for (const [key, value] of Object.entries(containerEnvs)) {
-      process.env[key] = value
-    }
-  }
-  const ret = await cb()
-  if (savedPreviousEnvironment) {
-    for (const [key, value] of Object.entries(savedPreviousEnvironment)) {
-      process.env[key] = value
-    }
-  }
-  return ret
 }
