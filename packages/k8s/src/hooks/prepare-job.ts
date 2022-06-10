@@ -167,13 +167,14 @@ function createPodSpec(
 ): k8s.V1Container {
   if (jobContainer) {
     const { entryPoint, entryPointArgs } = container
-    container.entryPoint = 'sh'
-    const { containerPath } = writeEntryPointScript(
+    container.entryPoint = DEFAULT_CONTAINER_ENTRY_POINT
+    container.entryPointArgs = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
+    writeEntryPointScript(
       container.workingDirectory,
       entryPoint || DEFAULT_CONTAINER_ENTRY_POINT,
       entryPoint ? entryPointArgs || [] : DEFAULT_CONTAINER_ENTRY_POINT_ARGS
     )
-    container.entryPointArgs = ['-l', containerPath]
+    // container.entryPointArgs = ['-l', containerPath]
   } else {
     if (!container.entryPoint) {
       container.entryPoint = DEFAULT_CONTAINER_ENTRY_POINT

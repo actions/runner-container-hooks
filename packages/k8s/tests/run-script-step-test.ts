@@ -23,6 +23,8 @@ describe('Run script step', () => {
     testHelper = new TestHelper()
     await testHelper.initialize()
     prepareJobOutputFilePath = testHelper.createFile('prepare-job-output.json')
+    prepareJobData.args.container.userMountVolumes = []
+
     await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
     const outputContent = fs.readFileSync(prepareJobOutputFilePath)
     prepareJobOutputData = JSON.parse(outputContent.toString())
@@ -30,7 +32,7 @@ describe('Run script step', () => {
 
   afterEach(async () => {
     await cleanupJob()
-    await testHelper.cleanup()
+    // await testHelper.cleanup()
   })
 
   // NOTE: To use this test, do kubectl apply -f podspec.yaml (from podspec examples)
@@ -44,13 +46,14 @@ describe('Run script step', () => {
       environmentVariables: {
         NODE_ENV: 'development'
       },
-      prependPath: ['/foo/bar', 'bar/foo'],
+      prependPath: [],
       workingDirectory: '/__w/repo/repo'
     }
     const state = {
       jobPod: prepareJobOutputData.state.jobPod
     }
     const responseFile = null
+    await new Promise(r => setTimeout(r, 300000))
     await expect(
       runScriptStep(args, state, responseFile)
     ).resolves.not.toThrow()

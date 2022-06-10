@@ -13,6 +13,7 @@ export class TestHelper {
   private tempDirPath: string
   private podName: string
   constructor() {
+    console.log(__dirname)
     this.tempDirPath = `${__dirname}/_temp/runner`
     this.podName = uuidv4().replace(/-/g, '')
   }
@@ -20,17 +21,20 @@ export class TestHelper {
   public async initialize(): Promise<void> {
     process.env['ACTIONS_RUNNER_POD_NAME'] = `${this.podName}`
     process.env['ACTIONS_RUNNER_CLAIM_NAME'] = `${this.podName}-work`
-    process.env['RUNNER_WORKSPACE'] = `${this.tempDirPath}/work/repo`
-    process.env['GITHUB_WORKSPACE'] = `${this.tempDirPath}/work/repo/repo`
+    process.env['RUNNER_WORKSPACE'] = `${this.tempDirPath}/_work/repo`
+    process.env['RUNNER_TEMP'] = `${this.tempDirPath}/_work/_temp`
+    process.env['GITHUB_WORKSPACE'] = `${this.tempDirPath}/_work/repo/repo`
     process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE'] = 'default'
+
+    fs.mkdirSync(`${this.tempDirPath}/_work/repo/repo`, { recursive: true })
+    fs.mkdirSync(`${this.tempDirPath}/externals`, { recursive: true })
+    fs.mkdirSync(process.env.RUNNER_TEMP, { recursive: true })
 
     await this.cleanupK8sResources()
     try {
       await this.createTestVolume()
       await this.createTestJobPod()
     } catch {}
-    fs.mkdirSync(`${this.tempDirPath}/work/repo/repo`, { recursive: true })
-    fs.mkdirSync(`${this.tempDirPath}/externals`, { recursive: true })
   }
 
   public async cleanup(): Promise<void> {

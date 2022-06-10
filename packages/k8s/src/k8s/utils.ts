@@ -1,3 +1,4 @@
+import * as core from '@actions/core'
 import * as k8s from '@kubernetes/client-node'
 import * as fs from 'fs'
 import { Mount } from 'hooklib'
@@ -15,7 +16,8 @@ export function containerVolumes(
   const mounts: k8s.V1VolumeMount[] = [
     {
       name: POD_VOLUME_NAME,
-      mountPath: '/__w'
+      mountPath: '/__w',
+      mountPropagation: 'HostToContainer'
     }
   ]
 
@@ -28,17 +30,17 @@ export function containerVolumes(
       name: POD_VOLUME_NAME,
       mountPath: '/__e',
       subPath: 'externals'
-    },
-    {
-      name: POD_VOLUME_NAME,
-      mountPath: '/github/home',
-      subPath: '_temp/_github_home'
-    },
-    {
-      name: POD_VOLUME_NAME,
-      mountPath: '/github/workflow',
-      subPath: '_temp/_github_workflow'
     }
+    // {
+    //   name: POD_VOLUME_NAME,
+    //   mountPath: '/github/home',
+    //   subPath: '_temp/_github_home'
+    // },
+    // {
+    //   name: POD_VOLUME_NAME,
+    //   mountPath: '/github/workflow',
+    //   subPath: '_temp/_github_workflow'
+    // }
   )
 
   if (!userMountVolumes?.length) {
@@ -97,12 +99,12 @@ export function writeEntryPointScript(
   const content = `#!/bin/sh -l
 ${exportPath}
 cd ${workingDirectory}
-exec ${environmentPrefix}${entryPoint} ${
-    entryPointArgs?.length ? entryPointArgs.join(' ') : ''
-  }
+${environmentPrefix}
+exec ${entryPoint} ${entryPointArgs?.length ? entryPointArgs.join(' ') : ''}
 `
+  core.info(content)
   const filename = `${uuidv4()}.sh`
-  const entryPointPath = `/runner/_work/_temp/${filename}`
+  const entryPointPath = `${process.env.RUNNER_TEMP}/${filename}`
   fs.writeFileSync(entryPointPath, content)
   return {
     containerPath: `/__w/_temp/${filename}`,

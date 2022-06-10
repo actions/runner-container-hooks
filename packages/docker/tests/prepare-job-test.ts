@@ -19,6 +19,7 @@ describe('prepare job', () => {
       testSetup.systemMountVolumes
     prepareJobDefinition.args.container.workingDirectory =
       testSetup.workingDirectory
+    prepareJobDefinition.args.container.userMountVolumes = undefined
     prepareJobDefinition.args.container.registry = null
     prepareJobDefinition.args.services.forEach(s => {
       s.registry = null
