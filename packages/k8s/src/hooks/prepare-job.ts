@@ -71,11 +71,12 @@ export async function prepareJob(
       new Set([PodPhase.RUNNING]),
       new Set([PodPhase.PENDING])
     )
-    core.debug('Job pod is ready for traffic')
   } catch (err) {
     await prunePods()
     throw new Error(`Pod failed to come online with error: ${err}`)
   }
+
+  core.debug('Job pod is ready for traffic')
 
   let isAlpine = false
   try {
