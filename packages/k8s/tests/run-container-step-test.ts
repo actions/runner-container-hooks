@@ -21,9 +21,8 @@ describe('Run container step', () => {
     await testHelper.initialize()
   })
   it('should not throw', async () => {
-    await expect(
-      runContainerStep(runContainerStepData.args)
-    ).resolves.not.toThrow()
+    const exitCode = await runContainerStep(runContainerStepData.args)
+    expect(exitCode).toBe(0)
   })
   afterEach(async () => {
     await testHelper.cleanup()

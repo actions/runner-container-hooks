@@ -25,8 +25,7 @@ export async function runScriptStep(
     await execPodStep(
       [args.entryPoint, ...args.entryPointArgs],
       state.jobPod,
-      JOB_CONTAINER_NAME,
-      args.prependPath
+      JOB_CONTAINER_NAME
     )
   } finally {
     fs.rmSync(runnerPath)
