@@ -72,22 +72,22 @@ export async function prepareJob(
       new Set([PodPhase.PENDING])
     )
     core.debug('Job pod is ready for traffic')
-
-    let isAlpine = false
-    try {
-      isAlpine = await isPodContainerAlpine(
-        createdPod.metadata.name,
-        JOB_CONTAINER_NAME
-      )
-    } catch (err) {
-      throw new Error(`Failed to determine if the pod is alpine: ${err}`)
-    }
-    core.debug(`Setting isAlpine to ${isAlpine}`)
-    generateResponseFile(responseFile, createdPod, isAlpine)
   } catch (err) {
     await prunePods()
     throw new Error(`Pod failed to come online with error: ${err}`)
   }
+
+  let isAlpine = false
+  try {
+    isAlpine = await isPodContainerAlpine(
+      createdPod.metadata.name,
+      JOB_CONTAINER_NAME
+    )
+  } catch (err) {
+    throw new Error(`Failed to determine if the pod is alpine: ${err}`)
+  }
+  core.debug(`Setting isAlpine to ${isAlpine}`)
+  generateResponseFile(responseFile, createdPod, isAlpine)
 }
 
 function generateResponseFile(
