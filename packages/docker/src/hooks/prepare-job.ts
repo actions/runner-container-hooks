@@ -139,7 +139,6 @@ function generateResponseFile(
   servicesMetadata?: ContainerMetadata[],
   isAlpine = false
 ): void {
-  // todo figure out if we are alpine
   const response = {
     state: { network: networkName },
     context: {},

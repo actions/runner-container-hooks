@@ -149,7 +149,7 @@ export async function containerBuild(
   dockerArgs.push('-t', tag)
   dockerArgs.push('-f', args.dockerfile)
   dockerArgs.push(getBuildContext(args.dockerfile))
-  // TODO: figure out build working directory
+
   await runDockerCommand(dockerArgs, {
     workingDir: getWorkingDir(args.dockerfile)
   })
