@@ -26,6 +26,6 @@ jobs:
       - name: Check linter
         run: |
           npm run lint
-          git diff --exit-code
+          git diff --exit-code -- ':!packages/k8s/tests/test-kind.yaml'
       - name: Run tests
         run: npm run test
