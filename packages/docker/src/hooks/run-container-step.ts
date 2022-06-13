@@ -29,7 +29,7 @@ export async function runContainerStep(
       'run container step should have image or dockerfile fields specified'
     )
   }
-
+  // container will get pruned at the end of the job based on the label, no need to cleanup here
   await containerRun(args, tag.split(':')[1], state?.network)
 }
 
