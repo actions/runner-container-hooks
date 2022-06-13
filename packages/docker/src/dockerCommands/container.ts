@@ -69,7 +69,9 @@ export async function createContainer(
     }
   }
 
-  const id = (await runDockerCommand(dockerArgs)).trim()
+  const id = (
+    await runDockerCommand(dockerArgs, { env: args.environmentVariables })
+  ).trim()
   if (!id) {
     throw new Error('Could not read id from docker command')
   }
@@ -352,7 +354,7 @@ export async function containerExecStep(
   for (const entryPointArg of args.entryPointArgs) {
     dockerArgs.push(entryPointArg)
   }
-  await runDockerCommand(dockerArgs)
+  await runDockerCommand(dockerArgs, { env: args.environmentVariables })
 }
 
 export async function containerRun(
@@ -376,9 +378,7 @@ export async function containerRun(
     dockerArgs.push(...args.createOptions.split(' '))
   }
   if (args.environmentVariables) {
-    for (const [key, value] of Object.entries(args.environmentVariables)) {
-      // Pass in this way to avoid printing secrets
-      env[key] = value ?? undefined
+    for (const [key] of Object.entries(args.environmentVariables)) {
       dockerArgs.push('-e')
       dockerArgs.push(key)
     }
@@ -408,7 +408,7 @@ export async function containerRun(
     }
   }
 
-  await runDockerCommand(dockerArgs)
+  await runDockerCommand(dockerArgs, { env: args.environmentVariables })
 }
 
 export async function isContainerAlpine(containerId: string): Promise<boolean> {

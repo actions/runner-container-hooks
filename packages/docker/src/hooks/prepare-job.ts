@@ -48,6 +48,7 @@ export async function prepareJob(
     } finally {
       await registryLogout(configLocation)
     }
+
     containerMetadata = await createContainer(
       container,
       generateContainerName(container.image),
@@ -78,6 +79,7 @@ export async function prepareJob(
         generateContainerName(service.image),
         networkName
       )
+
       servicesMetadata.push(response)
       await containerStart(response.id)
     }
