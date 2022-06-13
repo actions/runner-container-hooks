@@ -27,6 +27,8 @@ export async function runScriptStep(
       state.jobPod,
       JOB_CONTAINER_NAME
     )
+  } catch (err) {
+    throw new Error(`failed to run script step: ${JSON.stringify(err)}`)
   } finally {
     fs.rmSync(runnerPath)
   }

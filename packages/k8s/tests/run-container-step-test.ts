@@ -20,11 +20,18 @@ describe('Run container step', () => {
     testHelper = new TestHelper()
     await testHelper.initialize()
   })
+
+  afterEach(async () => {
+    await testHelper.cleanup()
+  })
+
   it('should not throw', async () => {
     const exitCode = await runContainerStep(runContainerStepData.args)
     expect(exitCode).toBe(0)
   })
-  afterEach(async () => {
-    await testHelper.cleanup()
+
+  it('should fail if the working directory does not exist', async () => {
+    runContainerStepData.args.workingDirectory = '/foo/bar'
+    await expect(runContainerStep(runContainerStepData.args)).rejects.toThrow()
   })
 })

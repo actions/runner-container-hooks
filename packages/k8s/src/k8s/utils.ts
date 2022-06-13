@@ -1,4 +1,3 @@
-import * as core from '@actions/core'
 import * as k8s from '@kubernetes/client-node'
 import * as fs from 'fs'
 import { Mount } from 'hooklib'
@@ -97,11 +96,10 @@ export function writeEntryPointScript(
 
   const content = `#!/bin/sh -l
 ${exportPath}
-cd ${workingDirectory}
 ${environmentPrefix}
+cd ${workingDirectory} && \
 exec ${entryPoint} ${entryPointArgs?.length ? entryPointArgs.join(' ') : ''}
 `
-  core.info(content)
   const filename = `${uuidv4()}.sh`
   const entryPointPath = `${process.env.RUNNER_TEMP}/${filename}`
   fs.writeFileSync(entryPointPath, content)

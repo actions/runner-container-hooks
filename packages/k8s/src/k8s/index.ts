@@ -191,7 +191,7 @@ export async function execPodStep(
   stdin?: stream.Readable
 ): Promise<void> {
   const exec = new k8s.Exec(kc)
-  return new Promise(async function (resolve, reject) {
+  await new Promise(async function (resolve, reject) {
     try {
       await exec.exec(
         namespace(),
@@ -205,16 +205,20 @@ export async function execPodStep(
         resp => {
           // kube.exec returns an error if exit code is not 0, but we can't actually get the exit code
           if (resp.status === 'Success') {
-            resolve()
+            resolve(resp.code)
           } else {
             reject(
-              JSON.stringify({ message: resp?.message, details: resp?.details })
+              JSON.stringify({
+                message: resp?.message,
+                details: resp?.details
+              })
             )
           }
         }
       )
     } catch (error) {
-      reject(error)
+      console.log(error)
+      reject(JSON.stringify(error))
     }
   })
 }
