@@ -1,6 +1,8 @@
 import * as k8s from '@kubernetes/client-node'
+import * as fs from 'fs'
 import { Mount } from 'hooklib'
 import * as path from 'path'
+import { v1 as uuidv4 } from 'uuid'
 import { POD_VOLUME_NAME } from './index'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
@@ -87,12 +89,7 @@ export function writeEntryPointScript(
   if (environmentVariables && Object.entries(environmentVariables).length) {
     const envBuffer: string[] = []
     for (const [key, value] of Object.entries(environmentVariables)) {
-      envBuffer.push(
-        `"${key}=${value
-          .replace('\\', '\\\\')
-          .replace('"', '\\"')
-          .replace("'", "\\'")}"`
-      )
+      envBuffer.push(`${key}='${value}'`)
     }
     environmentPrefix = `env ${envBuffer.join(' ')} `
   }
