@@ -1,5 +1,4 @@
 import * as fs from 'fs'
-import * as path from 'path'
 import {
   cleanupJob,
   prepareJob,
@@ -12,26 +11,15 @@ jest.useRealTimers()
 
 let testHelper: TestHelper
 
-const prepareJobJsonPath = path.resolve(
-  `${__dirname}/../../../examples/prepare-job.json`
-)
-const runScriptStepJsonPath = path.resolve(
-  `${__dirname}/../../../examples/run-script-step.json`
-)
-let runContainerStepJsonPath = path.resolve(
-  `${__dirname}/../../../examples/run-container-step.json`
-)
-
 let prepareJobData: any
 
 let prepareJobOutputFilePath: string
 describe('e2e', () => {
   beforeEach(async () => {
-    const prepareJobJson = fs.readFileSync(prepareJobJsonPath)
-    prepareJobData = JSON.parse(prepareJobJson.toString())
-
     testHelper = new TestHelper()
     await testHelper.initialize()
+
+    prepareJobData = testHelper.getPrepareJobDefinition()
     prepareJobOutputFilePath = testHelper.createFile('prepare-job-output.json')
   })
   afterEach(async () => {
@@ -42,8 +30,7 @@ describe('e2e', () => {
       prepareJob(prepareJobData.args, prepareJobOutputFilePath)
     ).resolves.not.toThrow()
 
-    const scriptStepContent = fs.readFileSync(runScriptStepJsonPath)
-    const scriptStepData = JSON.parse(scriptStepContent.toString())
+    const scriptStepData = testHelper.getRunScriptStepDefinition()
 
     const prepareJobOutputJson = fs.readFileSync(prepareJobOutputFilePath)
     const prepareJobOutputData = JSON.parse(prepareJobOutputJson.toString())
@@ -52,8 +39,7 @@ describe('e2e', () => {
       runScriptStep(scriptStepData.args, prepareJobOutputData.state, null)
     ).resolves.not.toThrow()
 
-    const runContainerStepContent = fs.readFileSync(runContainerStepJsonPath)
-    const runContainerStepData = JSON.parse(runContainerStepContent.toString())
+    const runContainerStepData = testHelper.getRunContainerStepDefinition()
 
     await expect(
       runContainerStep(runContainerStepData.args)

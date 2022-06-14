@@ -1,5 +1,4 @@
 import * as fs from 'fs'
-import * as path from 'path'
 import { cleanupJob, prepareJob, runScriptStep } from '../src/hooks'
 import { TestHelper } from './test-setup'
 
@@ -19,23 +18,12 @@ describe('Run script step', () => {
       'prepare-job-output.json'
     )
 
-    const prepareJobJsonPath = path.resolve(
-      `${__dirname}/../../../examples/prepare-job.json`
-    )
-    const prepareJobJson = fs.readFileSync(prepareJobJsonPath)
-    const prepareJobData = JSON.parse(prepareJobJson.toString())
-    prepareJobData.args.container.userMountVolumes = []
+    const prepareJobData = testHelper.getPrepareJobDefinition()
+    runScriptStepDefinition = testHelper.getRunScriptStepDefinition()
 
     await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
     const outputContent = fs.readFileSync(prepareJobOutputFilePath)
     prepareJobOutputData = JSON.parse(outputContent.toString())
-    runScriptStepDefinition = JSON.parse(
-      fs
-        .readFileSync(
-          path.resolve(`${__dirname}/../../../examples/run-script-step.json`)
-        )
-        .toString()
-    )
   })
 
   afterEach(async () => {

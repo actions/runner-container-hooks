@@ -1,5 +1,4 @@
 import * as fs from 'fs'
-import * as path from 'path'
 import {
   cleanupJob,
   prepareJob,
@@ -8,28 +7,7 @@ import {
 } from '../src/hooks'
 import TestSetup from './test-setup'
 
-const definitions = {
-  prepareJob: JSON.parse(
-    fs.readFileSync(
-      path.resolve(__dirname + '/../../../examples/prepare-job.json'),
-      'utf8'
-    )
-  ),
-
-  runContainerStep: JSON.parse(
-    fs.readFileSync(
-      path.resolve(__dirname + '/../../../examples/run-container-step.json'),
-      'utf8'
-    )
-  ),
-
-  runScriptStep: JSON.parse(
-    fs.readFileSync(
-      path.resolve(__dirname + '/../../../examples/run-script-step.json'),
-      'utf-8'
-    )
-  )
-}
+let definitions
 
 let testSetup: TestSetup
 
@@ -37,12 +15,12 @@ describe('e2e', () => {
   beforeEach(() => {
     testSetup = new TestSetup()
     testSetup.initialize()
-    definitions.prepareJob.args.container.systemMountVolumes =
-      testSetup.systemMountVolumes
-    definitions.prepareJob.args.container.registry = null
-    definitions.prepareJob.args.services.forEach(s => {
-      s.registry = null
-    })
+
+    definitions = {
+      prepareJob: testSetup.getPrepareJobDefinition(),
+      runScriptStep: testSetup.getRunScriptStepDefinition(),
+      runContainerStep: testSetup.getRunContainerStepDefinition()
+    }
   })
 
   afterEach(() => {

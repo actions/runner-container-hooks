@@ -1,5 +1,6 @@
 import * as fs from 'fs'
 import { Mount } from 'hooklib'
+import { HookData } from 'hooklib/lib'
 import * as path from 'path'
 import { env } from 'process'
 import { v4 as uuidv4 } from 'uuid'
@@ -51,13 +52,18 @@ export default class TestSetup {
     for (const dir of this.allTestDirectories) {
       fs.mkdirSync(dir, { recursive: true })
     }
+
+    fs.copyFileSync(
+      path.resolve(`${__dirname}/../../../examples/example-script.sh`),
+      `${env.RUNNER_TEMP}/example-script.sh`
+    )
   }
 
   public teardown(): void {
     fs.rmdirSync(this.testdir, { recursive: true })
   }
 
-  public get systemMountVolumes(): Mount[] {
+  private get systemMountVolumes(): Mount[] {
     return [
       {
         sourceVolumePath: '/var/run/docker.sock',
@@ -139,5 +145,52 @@ echo "::set-output name=time::$time"`
     const entryPointPath = `${actionPath}/entrypoint.sh`
     fs.writeFileSync(entryPointPath, content)
     fs.chmodSync(entryPointPath, 0o755)
+  }
+
+  public getPrepareJobDefinition(): HookData {
+    const prepareJob = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname + '/../../../examples/prepare-job.json'),
+        'utf8'
+      )
+    )
+
+    prepareJob.args.container.systemMountVolumes = this.systemMountVolumes
+    prepareJob.args.container.workingDirectory = this.workingDirectory
+    prepareJob.args.container.userMountVolumes = undefined
+    prepareJob.args.container.registry = null
+    prepareJob.args.services.forEach(s => {
+      s.registry = null
+    })
+
+    return prepareJob
+  }
+
+  public getRunScriptStepDefinition(): HookData {
+    const runScriptStep = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname + '/../../../examples/run-script-step.json'),
+        'utf8'
+      )
+    )
+
+    runScriptStep.args.entryPointArgs[1] = `/__w/_temp/example-script.sh`
+    return runScriptStep
+  }
+
+  public getRunContainerStepDefinition(): HookData {
+    const runContainerStep = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname + '/../../../examples/run-container-step.json'),
+        'utf8'
+      )
+    )
+
+    runContainerStep.args.entryPointArgs[1] = `/__w/_temp/example-script.sh`
+    runContainerStep.args.systemMountVolumes = this.systemMountVolumes
+    runContainerStep.args.workingDirectory = this.workingDirectory
+    runContainerStep.args.userMountVolumes = undefined
+    runContainerStep.args.registry = null
+    return runContainerStep
   }
 }

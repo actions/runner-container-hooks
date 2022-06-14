@@ -1,5 +1,7 @@
 import * as k8s from '@kubernetes/client-node'
 import * as fs from 'fs'
+import { HookData } from 'hooklib/lib'
+import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 
 const kc = new k8s.KubeConfig()
@@ -28,6 +30,11 @@ export class TestHelper {
     fs.mkdirSync(`${this.tempDirPath}/_work/repo/repo`, { recursive: true })
     fs.mkdirSync(`${this.tempDirPath}/externals`, { recursive: true })
     fs.mkdirSync(process.env.RUNNER_TEMP, { recursive: true })
+
+    fs.copyFileSync(
+      path.resolve(`${__dirname}/../../../examples/example-script.sh`),
+      `${process.env.RUNNER_TEMP}/example-script.sh`
+    )
 
     await this.cleanupK8sResources()
     try {
@@ -143,5 +150,48 @@ export class TestHelper {
       }
     }
     await k8sApi.createNamespacedPersistentVolumeClaim('default', volumeClaim)
+  }
+
+  public getPrepareJobDefinition(): HookData {
+    const prepareJob = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname + '/../../../examples/prepare-job.json'),
+        'utf8'
+      )
+    )
+
+    prepareJob.args.container.userMountVolumes = undefined
+    prepareJob.args.container.registry = null
+    prepareJob.args.services.forEach(s => {
+      s.registry = null
+    })
+
+    return prepareJob
+  }
+
+  public getRunScriptStepDefinition(): HookData {
+    const runScriptStep = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname + '/../../../examples/run-script-step.json'),
+        'utf8'
+      )
+    )
+
+    runScriptStep.args.entryPointArgs[1] = `/__w/_temp/example-script.sh`
+    return runScriptStep
+  }
+
+  public getRunContainerStepDefinition(): HookData {
+    const runContainerStep = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname + '/../../../examples/run-container-step.json'),
+        'utf8'
+      )
+    )
+
+    runContainerStep.args.entryPointArgs[1] = `/__w/_temp/example-script.sh`
+    runContainerStep.args.userMountVolumes = undefined
+    runContainerStep.args.registry = null
+    return runContainerStep
   }
 }

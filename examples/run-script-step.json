@@ -10,8 +10,8 @@
     },
     "args": {
         "entryPointArgs": [
-            "-c",
-            "'echo \"hello world\"'"
+            "-e",
+            "example-script.sh"
         ],
         "entryPoint": "bash",
         "environmentVariables": {
