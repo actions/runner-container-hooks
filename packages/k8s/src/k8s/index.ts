@@ -217,7 +217,6 @@ export async function execPodStep(
         }
       )
     } catch (error) {
-      console.log(error)
       reject(JSON.stringify(error))
     }
   })
