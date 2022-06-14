@@ -50,7 +50,7 @@ export const requiredPermissions = [
     group: '',
     verbs: ['create', 'delete', 'get', 'list'],
     resource: 'secrets',
-    subscribe: ''
+    subresource: ''
   }
 ]
 
