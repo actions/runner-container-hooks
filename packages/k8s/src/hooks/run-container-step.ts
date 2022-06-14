@@ -1,12 +1,5 @@
 import * as core from '@actions/core'
 import * as k8s from '@kubernetes/client-node'
-import {
-  PodPhase,
-  containerVolumes,
-  DEFAULT_CONTAINER_ENTRY_POINT,
-  DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
-  writeEntryPointScript
-} from '../k8s/utils'
 import { RunContainerStepArgs } from 'hooklib'
 import {
   createJob,
@@ -17,6 +10,13 @@ import {
   waitForJobToComplete,
   waitForPodPhases
 } from '../k8s'
+import {
+  containerVolumes,
+  DEFAULT_CONTAINER_ENTRY_POINT,
+  DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
+  PodPhase,
+  writeEntryPointScript
+} from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
 
 export async function runContainerStep(
@@ -25,13 +25,16 @@ export async function runContainerStep(
   if (stepContainer.dockerfile) {
     throw new Error('Building container actions is not currently supported')
   }
+
   let secretName: string | undefined = undefined
   core.debug('')
   if (stepContainer.environmentVariables) {
     secretName = await createSecretForEnvs(stepContainer.environmentVariables)
   }
+
   core.debug(`Created secret ${secretName} for container job envs`)
   const container = createPodSpec(stepContainer, secretName)
+
   const job = await createJob(container)
   if (!job.metadata?.name) {
     throw new Error(
@@ -41,6 +44,7 @@ export async function runContainerStep(
     )
   }
   core.debug(`Job created, waiting for pod to start: ${job.metadata?.name}`)
+
   const podName = await getContainerJobPodName(job.metadata.name)
   await waitForPodPhases(
     podName,
@@ -48,7 +52,9 @@ export async function runContainerStep(
     new Set([PodPhase.PENDING, PodPhase.UNKNOWN])
   )
   core.debug('Container step is running or complete, pulling logs')
+
   await getPodLogs(podName, JOB_CONTAINER_NAME)
+
   core.debug('Waiting for container job to complete')
   await waitForJobToComplete(job.metadata.name)
   // pod has failed so pull the status code from the container

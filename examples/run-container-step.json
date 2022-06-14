@@ -13,7 +13,7 @@
     "dockerfile": null,
     "entryPointArgs": [
       "-c",
-      "echo \"hello world2\""
+      "'echo \"hello world2\"'"
     ],
     "entryPoint": "bash",
     "workingDirectory": "/__w/repo/repo",

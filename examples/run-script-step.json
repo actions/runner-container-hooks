@@ -11,7 +11,7 @@
     "args": {
         "entryPointArgs": [
             "-c",
-            "echo \"hello world\""
+            "'echo \"hello world\"'"
         ],
         "entryPoint": "bash",
         "environmentVariables": {

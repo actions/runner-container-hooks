@@ -14,7 +14,7 @@ let runContainerStepJsonPath = path.resolve(
 let runContainerStepData: any
 
 describe('Run container step', () => {
-  beforeAll(async () => {
+  beforeEach(async () => {
     const content = fs.readFileSync(runContainerStepJsonPath)
     runContainerStepData = JSON.parse(content.toString())
     testHelper = new TestHelper()
@@ -33,5 +33,16 @@ describe('Run container step', () => {
   it('should fail if the working directory does not exist', async () => {
     runContainerStepData.args.workingDirectory = '/foo/bar'
     await expect(runContainerStep(runContainerStepData.args)).rejects.toThrow()
+  })
+
+  it('should shold have env variables available', async () => {
+    runContainerStepData.args.entryPoint = 'bash'
+    runContainerStepData.args.entryPointArgs = [
+      '-c',
+      "'if [[ -z $NODE_ENV ]]; then exit 1; fi'"
+    ]
+    await expect(
+      runContainerStep(runContainerStepData.args)
+    ).resolves.not.toThrow()
   })
 })
