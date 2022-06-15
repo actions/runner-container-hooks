@@ -1,4 +1,3 @@
-import * as core from '@actions/core'
 import * as events from 'events'
 import * as fs from 'fs'
 import * as os from 'os'
