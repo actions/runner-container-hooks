@@ -10,7 +10,8 @@ export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 
 export function containerVolumes(
   userMountVolumes: Mount[] = [],
-  jobContainer = true
+  jobContainer = true,
+  containerAction = false
 ): k8s.V1VolumeMount[] {
   const mounts: k8s.V1VolumeMount[] = [
     {
@@ -40,6 +41,21 @@ export function containerVolumes(
       subPath: '_temp/_github_workflow'
     }
   )
+  if (containerAction) {
+    const workspace = process.env.GITHUB_WORKSPACE as string
+    mounts.push(
+      {
+        name: POD_VOLUME_NAME,
+        mountPath: '/github/workspace',
+        subPath: workspace.substring(workspace.indexOf('work/') + 1)
+      },
+      {
+        name: POD_VOLUME_NAME,
+        mountPath: '/github/file_commands',
+        subPath: workspace.substring(workspace.indexOf('work/') + 1)
+      }
+    )
+  }
 
   if (!userMountVolumes?.length) {
     return mounts

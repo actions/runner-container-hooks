@@ -105,7 +105,7 @@ function createPodSpec(
       }
     ]
   }
-  podContainer.volumeMounts = containerVolumes()
+  podContainer.volumeMounts = containerVolumes(undefined, false, true)
 
   return podContainer
 }
