@@ -1,11 +1,12 @@
-import { Command, getInputFromStdin, prepareJobArgs } from 'hooklib'
 import * as core from '@actions/core'
+import { Command, getInputFromStdin, prepareJobArgs } from 'hooklib'
 import {
   cleanupJob,
   prepareJob,
   runContainerStep,
   runScriptStep
 } from './hooks'
+import { isAuthPermissionsOK, namespace, requiredPermissions } from './k8s'
 
 async function run(): Promise<void> {
   const input = await getInputFromStdin()
@@ -17,6 +18,13 @@ async function run(): Promise<void> {
 
   let exitCode = 0
   try {
+    if (!(await isAuthPermissionsOK())) {
+      throw new Error(
+        `The Service account needs the following permissions ${JSON.stringify(
+          requiredPermissions
+        )} on the pod resource in the '${namespace}' namespace. Please contact your self hosted runner administrator.`
+      )
+    }
     switch (command) {
       case Command.PrepareJob:
         await prepareJob(args as prepareJobArgs, responseFile)
