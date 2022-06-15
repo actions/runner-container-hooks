@@ -1,5 +1,7 @@
 import * as k8s from '@kubernetes/client-node'
 import * as fs from 'fs'
+import { HookData } from 'hooklib/lib'
+import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 
 const kc = new k8s.KubeConfig()
@@ -20,17 +22,27 @@ export class TestHelper {
   public async initialize(): Promise<void> {
     process.env['ACTIONS_RUNNER_POD_NAME'] = `${this.podName}`
     process.env['ACTIONS_RUNNER_CLAIM_NAME'] = `${this.podName}-work`
-    process.env['RUNNER_WORKSPACE'] = `${this.tempDirPath}/work/repo`
-    process.env['GITHUB_WORKSPACE'] = `${this.tempDirPath}/work/repo/repo`
+    process.env['RUNNER_WORKSPACE'] = `${this.tempDirPath}/_work/repo`
+    process.env['RUNNER_TEMP'] = `${this.tempDirPath}/_work/_temp`
+    process.env['GITHUB_WORKSPACE'] = `${this.tempDirPath}/_work/repo/repo`
     process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE'] = 'default'
+
+    fs.mkdirSync(`${this.tempDirPath}/_work/repo/repo`, { recursive: true })
+    fs.mkdirSync(`${this.tempDirPath}/externals`, { recursive: true })
+    fs.mkdirSync(process.env.RUNNER_TEMP, { recursive: true })
+
+    fs.copyFileSync(
+      path.resolve(`${__dirname}/../../../examples/example-script.sh`),
+      `${process.env.RUNNER_TEMP}/example-script.sh`
+    )
 
     await this.cleanupK8sResources()
     try {
       await this.createTestVolume()
       await this.createTestJobPod()
-    } catch {}
-    fs.mkdirSync(`${this.tempDirPath}/work/repo/repo`, { recursive: true })
-    fs.mkdirSync(`${this.tempDirPath}/externals`, { recursive: true })
+    } catch (e) {
+      console.log(JSON.stringify(e))
+    }
   }
 
   public async cleanup(): Promise<void> {
@@ -116,7 +128,7 @@ export class TestHelper {
         volumeMode: 'Filesystem',
         accessModes: ['ReadWriteOnce'],
         hostPath: {
-          path: this.tempDirPath
+          path: `${this.tempDirPath}/_work`
         }
       }
     }
@@ -138,5 +150,48 @@ export class TestHelper {
       }
     }
     await k8sApi.createNamespacedPersistentVolumeClaim('default', volumeClaim)
+  }
+
+  public getPrepareJobDefinition(): HookData {
+    const prepareJob = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname + '/../../../examples/prepare-job.json'),
+        'utf8'
+      )
+    )
+
+    prepareJob.args.container.userMountVolumes = undefined
+    prepareJob.args.container.registry = null
+    prepareJob.args.services.forEach(s => {
+      s.registry = null
+    })
+
+    return prepareJob
+  }
+
+  public getRunScriptStepDefinition(): HookData {
+    const runScriptStep = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname + '/../../../examples/run-script-step.json'),
+        'utf8'
+      )
+    )
+
+    runScriptStep.args.entryPointArgs[1] = `/__w/_temp/example-script.sh`
+    return runScriptStep
+  }
+
+  public getRunContainerStepDefinition(): HookData {
+    const runContainerStep = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname + '/../../../examples/run-container-step.json'),
+        'utf8'
+      )
+    )
+
+    runContainerStep.args.entryPointArgs[1] = `/__w/_temp/example-script.sh`
+    runContainerStep.args.userMountVolumes = undefined
+    runContainerStep.args.registry = null
+    return runContainerStep
   }
 }

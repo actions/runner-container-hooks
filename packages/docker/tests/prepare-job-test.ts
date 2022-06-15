@@ -4,9 +4,7 @@ import TestSetup from './test-setup'
 
 jest.useRealTimers()
 
-const prepareJobDefinition = JSON.parse(
-  fs.readFileSync(`${__dirname}/../../../examples/prepare-job.json`, 'utf-8')
-)
+let prepareJobDefinition
 
 let testSetup: TestSetup
 
@@ -14,15 +12,7 @@ describe('prepare job', () => {
   beforeEach(() => {
     testSetup = new TestSetup()
     testSetup.initialize()
-
-    prepareJobDefinition.args.container.systemMountVolumes =
-      testSetup.systemMountVolumes
-    prepareJobDefinition.args.container.workingDirectory =
-      testSetup.workingDirectory
-    prepareJobDefinition.args.container.registry = null
-    prepareJobDefinition.args.services.forEach(s => {
-      s.registry = null
-    })
+    prepareJobDefinition = testSetup.getPrepareJobDefinition()
   })
 
   afterEach(() => {

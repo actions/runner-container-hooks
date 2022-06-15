@@ -190,12 +190,8 @@ export async function execPodStep(
   containerName: string,
   stdin?: stream.Readable
 ): Promise<void> {
-  // TODO, we need to add the path from `prependPath` to the PATH variable. How can we do that? Maybe another exec before running this one?
-  // Maybe something like, get the current path, if these entries aren't in it, add them, then set the current path to that?
-
-  // TODO: how do we set working directory? There doesn't seem to be an easy way to do it. Should we cd then execute our bash script?
   const exec = new k8s.Exec(kc)
-  return new Promise(async function (resolve, reject) {
+  await new Promise(async function (resolve, reject) {
     try {
       await exec.exec(
         namespace(),
@@ -209,16 +205,19 @@ export async function execPodStep(
         resp => {
           // kube.exec returns an error if exit code is not 0, but we can't actually get the exit code
           if (resp.status === 'Success') {
-            resolve()
+            resolve(resp.code)
           } else {
             reject(
-              JSON.stringify({ message: resp?.message, details: resp?.details })
+              JSON.stringify({
+                message: resp?.message,
+                details: resp?.details
+              })
             )
           }
         }
       )
     } catch (error) {
-      reject(error)
+      reject(JSON.stringify(error))
     }
   })
 }

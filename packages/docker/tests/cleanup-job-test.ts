@@ -1,4 +1,4 @@
-import * as fs from 'fs'
+import { PrepareJobArgs } from 'hooklib/lib'
 import { cleanupJob, prepareJob } from '../src/hooks'
 import TestSetup from './test-setup'
 
@@ -11,22 +11,16 @@ describe('cleanup job', () => {
     testSetup = new TestSetup()
     testSetup.initialize()
 
-    const prepareJobDefinition = JSON.parse(
-      fs.readFileSync(
-        `${__dirname}/../../../examples/prepare-job.json`,
-        'utf-8'
-      )
-    )
+    const prepareJobDefinition = testSetup.getPrepareJobDefinition()
 
     const prepareJobOutput = testSetup.createOutputFile(
       'prepare-job-output.json'
     )
 
-    prepareJobDefinition.args.container.registry = null
-    prepareJobDefinition.args.services.forEach(s => {
-      s.registry = null
-    })
-    await prepareJob(prepareJobDefinition.args, prepareJobOutput)
+    await prepareJob(
+      prepareJobDefinition.args as PrepareJobArgs,
+      prepareJobOutput
+    )
   })
 
   afterEach(() => {

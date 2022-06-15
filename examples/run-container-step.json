@@ -12,8 +12,8 @@
     "image": "node:14.16",
     "dockerfile": null,
     "entryPointArgs": [
-      "-c",
-      "echo \"hello world2\""
+      "-e",
+      "example-script.sh"
     ],
     "entryPoint": "bash",
     "workingDirectory": "/__w/repo/repo",

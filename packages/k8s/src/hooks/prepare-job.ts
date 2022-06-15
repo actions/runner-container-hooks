@@ -100,8 +100,13 @@ function generateResponseFile(
   appPod: k8s.V1Pod,
   isAlpine
 ): void {
+  if (!appPod.metadata?.name) {
+    throw new Error('app pod must have metadata.name specified')
+  }
   const response = {
-    state: {},
+    state: {
+      jobPod: appPod.metadata.name
+    },
     context: {},
     isAlpine
   }
@@ -163,13 +168,11 @@ function createPodSpec(
   name: string,
   jobContainer = false
 ): k8s.V1Container {
-  if (!container.entryPointArgs) {
-    container.entryPointArgs = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
-  }
-  container.entryPointArgs = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
   if (!container.entryPoint) {
     container.entryPoint = DEFAULT_CONTAINER_ENTRY_POINT
+    container.entryPointArgs = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
   }
+
   const podContainer = {
     name,
     image: container.image,

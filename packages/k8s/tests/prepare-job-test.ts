@@ -8,20 +8,15 @@ jest.useRealTimers()
 
 let testHelper: TestHelper
 
-const prepareJobJsonPath = path.resolve(
-  `${__dirname}/../../../examples/prepare-job.json`
-)
 let prepareJobData: any
 
 let prepareJobOutputFilePath: string
 
 describe('Prepare job', () => {
   beforeEach(async () => {
-    const prepareJobJson = fs.readFileSync(prepareJobJsonPath)
-    prepareJobData = JSON.parse(prepareJobJson.toString())
-
     testHelper = new TestHelper()
     await testHelper.initialize()
+    prepareJobData = testHelper.getPrepareJobDefinition()
     prepareJobOutputFilePath = testHelper.createFile('prepare-job-output.json')
   })
   afterEach(async () => {
@@ -42,28 +37,29 @@ describe('Prepare job', () => {
   })
 
   it('should prepare job with absolute path for userVolumeMount', async () => {
-    prepareJobData.args.container.userMountVolumes.forEach(v => {
-      if (!path.isAbsolute(v.sourceVolumePath)) {
-        v.sourceVolumePath = path.join(
+    prepareJobData.args.container.userMountVolumes = [
+      {
+        sourceVolumePath: path.join(
           process.env.GITHUB_WORKSPACE as string,
-          v.sourceVolumePath
-        )
+          '/myvolume'
+        ),
+        targetVolumePath: '/volume_mount',
+        readOnly: false
       }
-    })
+    ]
     await expect(
       prepareJob(prepareJobData.args, prepareJobOutputFilePath)
     ).resolves.not.toThrow()
   })
 
   it('should throw an exception if the user volume mount is absolute path outside of GITHUB_WORKSPACE', async () => {
-    prepareJobData.args.container.userMountVolumes.forEach(v => {
-      if (!path.isAbsolute(v.sourceVolumePath)) {
-        v.sourceVolumePath = path.join(
-          '/path/outside/of/github-workspace',
-          v.sourceVolumePath
-        )
+    prepareJobData.args.container.userMountVolumes = [
+      {
+        sourceVolumePath: '/somewhere/not/in/gh-workspace',
+        targetVolumePath: '/containermount',
+        readOnly: false
       }
-    })
+    ]
     await expect(
       prepareJob(prepareJobData.args, prepareJobOutputFilePath)
     ).rejects.toThrow()
