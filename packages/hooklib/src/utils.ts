@@ -1,4 +1,3 @@
-import * as core from '@actions/core'
 import * as events from 'events'
 import * as fs from 'fs'
 import * as os from 'os'
@@ -13,7 +12,6 @@ export async function getInputFromStdin(): Promise<HookData> {
   })
 
   rl.on('line', line => {
-    core.debug(`Line from STDIN: ${line}`)
     input = line
   })
   await events.default.once(rl, 'close')
