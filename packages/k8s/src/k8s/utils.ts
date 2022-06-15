@@ -89,7 +89,12 @@ export function writeEntryPointScript(
   if (environmentVariables && Object.entries(environmentVariables).length) {
     const envBuffer: string[] = []
     for (const [key, value] of Object.entries(environmentVariables)) {
-      envBuffer.push(`${key}='${value}'`)
+      envBuffer.push(
+        `"${key}=${value
+          .replace(/\\/g, '\\\\')
+          .replace(/"/g, '\\"')
+          .replace(/=/g, '\\=')}"`
+      )
     }
     environmentPrefix = `env ${envBuffer.join(' ')} `
   }
