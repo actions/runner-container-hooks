@@ -27,7 +27,6 @@ export async function runContainerStep(
   }
 
   let secretName: string | undefined = undefined
-  core.debug('')
   if (stepContainer.environmentVariables) {
     secretName = await createSecretForEnvs(stepContainer.environmentVariables)
   }

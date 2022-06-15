@@ -13,7 +13,6 @@ export async function getInputFromStdin(): Promise<HookData> {
   })
 
   rl.on('line', line => {
-    core.debug(`Line from STDIN: ${line}`)
     input = line
   })
   await events.default.once(rl, 'close')
