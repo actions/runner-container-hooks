@@ -54,13 +54,6 @@ export const requiredPermissions = [
   }
 ]
 
-const secretPermission = {
-  group: '',
-  verbs: ['get', 'list', 'create', 'delete'],
-  resource: 'secrets',
-  subresource: ''
-}
-
 export async function createPod(
   jobContainer?: k8s.V1Container,
   services?: k8s.V1Container[],
@@ -100,19 +93,13 @@ export async function createPod(
   ]
 
   if (registry) {
-    if (await isSecretsAuthOK()) {
-      const secret = await createDockerSecret(registry)
-      if (!secret?.metadata?.name) {
-        throw new Error(`created secret does not have secret.metadata.name`)
-      }
-      const secretReference = new k8s.V1LocalObjectReference()
-      secretReference.name = secret.metadata.name
-      appPod.spec.imagePullSecrets = [secretReference]
-    } else {
-      throw new Error(
-        `Pulls from private registry is not allowed. Please contact your self hosted runner administrator. Service account needs permissions for ${secretPermission.verbs} in resource ${secretPermission.resource}`
-      )
+    const secret = await createDockerSecret(registry)
+    if (!secret?.metadata?.name) {
+      throw new Error(`created secret does not have secret.metadata.name`)
     }
+    const secretReference = new k8s.V1LocalObjectReference()
+    secretReference.name = secret.metadata.name
+    appPod.spec.imagePullSecrets = [secretReference]
   }
 
   const { body } = await k8sApi.createNamespacedPod(namespace(), appPod)
@@ -442,26 +429,6 @@ export async function isAuthPermissionsOK(): Promise<boolean> {
       sar.spec.resourceAttributes.subresource = resource.subresource
       asyncs.push(k8sAuthorizationV1Api.createSelfSubjectAccessReview(sar))
     }
-  }
-  const responses = await Promise.all(asyncs)
-  return responses.every(resp => resp.body.status?.allowed)
-}
-
-export async function isSecretsAuthOK(): Promise<boolean> {
-  const sar = new k8s.V1SelfSubjectAccessReview()
-  const asyncs: Promise<{
-    response: unknown
-    body: k8s.V1SelfSubjectAccessReview
-  }>[] = []
-  for (const verb of secretPermission.verbs) {
-    sar.spec = new k8s.V1SelfSubjectAccessReviewSpec()
-    sar.spec.resourceAttributes = new k8s.V1ResourceAttributes()
-    sar.spec.resourceAttributes.verb = verb
-    sar.spec.resourceAttributes.namespace = namespace()
-    sar.spec.resourceAttributes.group = secretPermission.group
-    sar.spec.resourceAttributes.resource = secretPermission.resource
-    sar.spec.resourceAttributes.subresource = secretPermission.subresource
-    asyncs.push(k8sAuthorizationV1Api.createSelfSubjectAccessReview(sar))
   }
   const responses = await Promise.all(asyncs)
   return responses.every(resp => resp.body.status?.allowed)

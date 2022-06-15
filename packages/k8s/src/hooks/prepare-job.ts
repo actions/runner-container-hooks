@@ -6,11 +6,8 @@ import path from 'path'
 import {
   containerPorts,
   createPod,
-  isAuthPermissionsOK,
   isPodContainerAlpine,
-  namespace,
   prunePods,
-  requiredPermissions,
   waitForPodPhases
 } from '../k8s'
 import {
@@ -30,13 +27,6 @@ export async function prepareJob(
   }
 
   await prunePods()
-  if (!(await isAuthPermissionsOK())) {
-    throw new Error(
-      `The Service account needs the following permissions ${JSON.stringify(
-        requiredPermissions
-      )} on the pod resource in the '${namespace}' namespace. Please contact your self hosted runner administrator.`
-    )
-  }
   await copyExternalsToRoot()
   let container: k8s.V1Container | undefined = undefined
   if (args.container?.image) {
