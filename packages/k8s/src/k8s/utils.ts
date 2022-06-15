@@ -20,6 +20,23 @@ export function containerVolumes(
     }
   ]
 
+  if (containerAction) {
+    const workspace = process.env.GITHUB_WORKSPACE as string
+    mounts.push(
+      {
+        name: POD_VOLUME_NAME,
+        mountPath: '/github/workspace',
+        subPath: workspace.substring(workspace.indexOf('work/') + 1)
+      },
+      {
+        name: POD_VOLUME_NAME,
+        mountPath: '/github/file_commands',
+        subPath: workspace.substring(workspace.indexOf('work/') + 1)
+      }
+    )
+    return mounts
+  }
+
   if (!jobContainer) {
     return mounts
   }
@@ -41,21 +58,6 @@ export function containerVolumes(
       subPath: '_temp/_github_workflow'
     }
   )
-  if (containerAction) {
-    const workspace = process.env.GITHUB_WORKSPACE as string
-    mounts.push(
-      {
-        name: POD_VOLUME_NAME,
-        mountPath: '/github/workspace',
-        subPath: workspace.substring(workspace.indexOf('work/') + 1)
-      },
-      {
-        name: POD_VOLUME_NAME,
-        mountPath: '/github/file_commands',
-        subPath: workspace.substring(workspace.indexOf('work/') + 1)
-      }
-    )
-  }
 
   if (!userMountVolumes?.length) {
     return mounts
