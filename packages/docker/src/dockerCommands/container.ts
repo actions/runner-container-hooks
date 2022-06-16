@@ -274,6 +274,20 @@ export async function containerPorts(id: string): Promise<string[]> {
   return portMappings.split('\n').filter(p => !!p)
 }
 
+export async function getContainerEnvValue(
+  id: string,
+  name: string
+): Promise<string> {
+  const dockerArgs = [
+    'inspect',
+    `--format='{{range $index, $value := .Config.Env}}{{if eq (index (split $value "=") 0) "${name}"}}{{index (split $value "=") 1}}{{end}}{{end}}'`,
+    id
+  ]
+  const value = (await runDockerCommand(dockerArgs)).trim()
+  const lines = value.split('\n')
+  return lines.length ? lines[0].replace(/^'/, '').replace(/'$/, '') : ''
+}
+
 export async function registryLogin(registry?: Registry): Promise<string> {
   if (!registry) {
     return ''
@@ -346,7 +360,16 @@ export async function containerExecStep(
   }
 
   if (args.prependPath?.length) {
-    dockerArgs.push('-e', `"PATH=${args.prependPath.join(':')}:$PATH"`)
+    // TODO: remove compatibility with typeof prependPath === 'string' as we bump to next major version, the hooks will lose PrependPath compat with runners 2.293.0 and older
+    const prependPath =
+      typeof args.prependPath === 'string'
+        ? args.prependPath
+        : args.prependPath.join(':')
+
+    dockerArgs.push(
+      '-e',
+      `PATH=${prependPath}:${await getContainerEnvValue(containerId, 'PATH')}`
+    )
   }
 
   dockerArgs.push(containerId)

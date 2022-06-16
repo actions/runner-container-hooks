@@ -71,4 +71,38 @@ describe('Run script step', () => {
       )
     ).resolves.not.toThrow()
   })
+
+  it('Should have path variable changed in container with prepend path string', async () => {
+    runScriptStepDefinition.args.prependPath = '/some/path'
+    runScriptStepDefinition.args.entryPoint = '/bin/bash'
+    runScriptStepDefinition.args.entryPointArgs = [
+      '-c',
+      `'if [[ ! $(env | grep "^PATH=") = "PATH=${runScriptStepDefinition.args.prependPath}:"* ]]; then exit 1; fi'`
+    ]
+
+    await expect(
+      runScriptStep(
+        runScriptStepDefinition.args,
+        prepareJobOutputData.state,
+        null
+      )
+    ).resolves.not.toThrow()
+  })
+
+  it('Should have path variable changed in container with prepend path string array', async () => {
+    runScriptStepDefinition.args.prependPath = ['/some/other/path']
+    runScriptStepDefinition.args.entryPoint = '/bin/bash'
+    runScriptStepDefinition.args.entryPointArgs = [
+      '-c',
+      `'if [[ ! $(env | grep "^PATH=") = "PATH=${runScriptStepDefinition.args.prependPath}:"* ]]; then exit 1; fi'`
+    ]
+
+    await expect(
+      runScriptStep(
+        runScriptStepDefinition.args,
+        prepareJobOutputData.state,
+        null
+      )
+    ).resolves.not.toThrow()
+  })
 })

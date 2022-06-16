@@ -100,7 +100,10 @@ export function writeEntryPointScript(
 ): { containerPath: string; runnerPath: string } {
   let exportPath = ''
   if (prependPath?.length) {
-    exportPath = `export PATH=${prependPath.join(':')}:$PATH`
+    // TODO: remove compatibility with typeof prependPath === 'string' as we bump to next major version, the hooks will lose PrependPath compat with runners 2.293.0 and older
+    const prepend =
+      typeof prependPath === 'string' ? prependPath : prependPath.join(':')
+    exportPath = `export PATH=${prepend}:$PATH`
   }
   let environmentPrefix = ''
 
