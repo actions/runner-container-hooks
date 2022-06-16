@@ -39,7 +39,7 @@ rules:
 
 
 ## Limitations
-- Container actions
-  - Building container actions from a dockerfile is not supported at this time
-  - Container actions will not have access to the services network or job container network
+- A [job containers](https://docs.github.com/en/actions/using-jobs/running-jobs-in-a-container) will be required for all jobs
+- Building container actions from a dockerfile is not supported at this time
+- Container actions will not have access to the services network or job container network
 - Docker [create options](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idcontaineroptions) are not supported
