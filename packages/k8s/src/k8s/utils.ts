@@ -100,7 +100,9 @@ export function writeEntryPointScript(
 ): { containerPath: string; runnerPath: string } {
   let exportPath = ''
   if (prependPath?.length) {
-    exportPath = `export PATH=${prependPath.join(':')}:$PATH`
+    const prepend =
+      typeof prependPath === 'string' ? prependPath : prependPath.join(':')
+    exportPath = `export PATH=${prepend}:$PATH`
   }
   let environmentPrefix = ''
 
