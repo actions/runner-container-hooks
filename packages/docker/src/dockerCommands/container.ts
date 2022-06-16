@@ -360,6 +360,7 @@ export async function containerExecStep(
   }
 
   if (args.prependPath?.length) {
+    // TODO: remove compatibility with typeof prependPath === 'string' as we bump to next major version, the hooks will lose PrependPath compat with runners 2.293.0 and older
     const prependPath =
       typeof args.prependPath === 'string'
         ? args.prependPath
