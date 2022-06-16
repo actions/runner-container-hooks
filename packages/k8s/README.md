@@ -7,18 +7,27 @@ This implementation provides a way to dynamically spin up jobs to run container 
 Some things are expected to be set when using these hooks
 - The runner itself should be running in a pod, with a service account with the following permissions
 ```
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: default
+  name: runner-role
+rules:
 - apiGroups: [""]
   resources: ["pods"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  verbs: ["get", "list", "create", "delete"]
 - apiGroups: [""]
   resources: ["pods/exec"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  verbs: ["get", "create"]
 - apiGroups: [""]
   resources: ["pods/log"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  verbs: ["get", "list", "watch",]
 - apiGroups: ["batch"]
   resources: ["jobs"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  verbs: ["get", "list", "create", "delete"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "create", "delete"]
 ```
 - The `ACTIONS_RUNNER_POD_NAME` env should be set to the name of the pod
 - The `ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER` env should be set to true to prevent the runner from running any jobs outside of a container
@@ -30,7 +39,7 @@ Some things are expected to be set when using these hooks
 
 
 ## Limitations
-- Container actions
-  - Building container actions from a dockerfile is not supported at this time
-  - Container actions will not have access to the services network or job container network
+- A [job containers](https://docs.github.com/en/actions/using-jobs/running-jobs-in-a-container) will be required for all jobs
+- Building container actions from a dockerfile is not supported at this time
+- Container actions will not have access to the services network or job container network
 - Docker [create options](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idcontaineroptions) are not supported

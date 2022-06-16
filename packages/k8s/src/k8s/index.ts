@@ -311,7 +311,7 @@ export async function waitForPodPhases(
   podName: string,
   awaitingPhases: Set<PodPhase>,
   backOffPhases: Set<PodPhase>,
-  maxTimeSeconds = 45 * 60 // 45 min
+  maxTimeSeconds = 10 * 60 // 10 min
 ): Promise<void> {
   const backOffManager = new BackOffManager(maxTimeSeconds)
   let phase: PodPhase = PodPhase.UNKNOWN

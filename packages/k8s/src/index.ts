@@ -43,7 +43,7 @@ async function run(): Promise<void> {
         throw new Error(`Command not recognized: ${command}`)
     }
   } catch (error) {
-    core.error(JSON.stringify(error))
+    core.error(error as Error)
     exitCode = 1
   }
   process.exitCode = exitCode
