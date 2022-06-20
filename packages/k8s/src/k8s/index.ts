@@ -210,7 +210,7 @@ export async function execPodStep(
         }
       )
     } catch (error) {
-      reject(JSON.stringify(error))
+      reject(error)
     }
   })
 }
@@ -372,7 +372,7 @@ export async function getPodLogs(
   })
 
   logStream.on('error', err => {
-    process.stderr.write(JSON.stringify(err))
+    process.stderr.write(err.message)
   })
 
   const r = await log.log(namespace(), podName, containerName, logStream, {
