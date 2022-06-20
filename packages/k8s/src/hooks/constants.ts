@@ -27,7 +27,7 @@ export function getStepPodName(): string {
 export function getVolumeClaimName(): string {
   const name = process.env.ACTIONS_RUNNER_CLAIM_NAME
   if (!name) {
-    return `${getRunnerPodName}-work`
+    return `${getRunnerPodName()}-work`
   }
   return name
 }
