@@ -27,9 +27,7 @@ export function getStepPodName(): string {
 export function getVolumeClaimName(): string {
   const name = process.env.ACTIONS_RUNNER_CLAIM_NAME
   if (!name) {
-    throw new Error(
-      "'ACTIONS_RUNNER_CLAIM_NAME' is required, please contact your self hosted runner administrator"
-    )
+    return `${getRunnerPodName()}-work`
   }
   return name
 }
