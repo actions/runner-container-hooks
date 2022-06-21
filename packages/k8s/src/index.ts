@@ -22,7 +22,7 @@ async function run(): Promise<void> {
       throw new Error(
         `The Service account needs the following permissions ${JSON.stringify(
           requiredPermissions
-        )} on the pod resource in the '${namespace}' namespace. Please contact your self hosted runner administrator.`
+        )} on the pod resource in the '${namespace()}' namespace. Please contact your self hosted runner administrator.`
       )
     }
     switch (command) {
