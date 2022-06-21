@@ -109,13 +109,14 @@ export async function createPod(
 export async function createJob(
   container: k8s.V1Container
 ): Promise<k8s.V1Job> {
-  const job = new k8s.V1Job()
+  const runnerInstanceLabel = new RunnerInstanceLabel()
 
+  const job = new k8s.V1Job()
   job.apiVersion = 'batch/v1'
   job.kind = 'Job'
   job.metadata = new k8s.V1ObjectMeta()
   job.metadata.name = getStepPodName()
-  job.metadata.labels = { 'runner-pod': getRunnerPodName() }
+  job.metadata.labels = { [runnerInstanceLabel.key]: runnerInstanceLabel.value }
 
   job.spec = new k8s.V1JobSpec()
   job.spec.ttlSecondsAfterFinished = 300
@@ -127,7 +128,7 @@ export async function createJob(
   job.spec.template.spec.restartPolicy = 'Never'
   job.spec.template.spec.nodeName = await getCurrentNodeName()
 
-  const claimName = `${runnerName()}-work`
+  const claimName = getVolumeClaimName()
   job.spec.template.spec.volumes = [
     {
       name: 'work',
@@ -244,13 +245,18 @@ export async function createDockerSecret(
       }
     }
   }
+
+  const runnerInstanceLabel = new RunnerInstanceLabel()
+
   const secretName = getSecretName()
   const secret = new k8s.V1Secret()
   secret.immutable = true
   secret.apiVersion = 'v1'
   secret.metadata = new k8s.V1ObjectMeta()
   secret.metadata.name = secretName
-  secret.metadata.labels = { 'runner-pod': getRunnerPodName() }
+  secret.metadata.labels = {
+    [runnerInstanceLabel.key]: runnerInstanceLabel.value
+  }
   secret.kind = 'Secret'
   secret.data = {
     '.dockerconfigjson': Buffer.from(
@@ -266,13 +272,18 @@ export async function createDockerSecret(
 export async function createSecretForEnvs(envs: {
   [key: string]: string
 }): Promise<string> {
+  const runnerInstanceLabel = new RunnerInstanceLabel()
+
   const secret = new k8s.V1Secret()
   const secretName = getSecretName()
   secret.immutable = true
   secret.apiVersion = 'v1'
   secret.metadata = new k8s.V1ObjectMeta()
   secret.metadata.name = secretName
-  secret.metadata.labels = { 'runner-pod': getRunnerPodName() }
+
+  secret.metadata.labels = {
+    [runnerInstanceLabel.key]: runnerInstanceLabel.value
+  }
   secret.kind = 'Secret'
   secret.data = {}
   for (const [key, value] of Object.entries(envs)) {
@@ -476,16 +487,6 @@ export function namespace(): string {
     )
   }
   return context.namespace
-}
-
-function runnerName(): string {
-  const name = process.env.ACTIONS_RUNNER_POD_NAME
-  if (!name) {
-    throw new Error(
-      'Failed to determine runner name. "ACTIONS_RUNNER_POD_NAME" env variables should be set.'
-    )
-  }
-  return name
 }
 
 class BackOffManager {
