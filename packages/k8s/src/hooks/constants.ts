@@ -25,7 +25,11 @@ export function getStepPodName(): string {
 }
 
 export function getVolumeClaimName(): string {
-  return `${process.env.ACTIONS_RUNNER_POD_NAME as string}-work`
+  const name = process.env.ACTIONS_RUNNER_CLAIM_NAME
+  if (!name) {
+    return `${getRunnerPodName()}-work`
+  }
+  return name
 }
 
 export function getSecretName(): string {

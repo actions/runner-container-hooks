@@ -21,7 +21,6 @@ export class TestHelper {
 
   public async initialize(): Promise<void> {
     process.env['ACTIONS_RUNNER_POD_NAME'] = `${this.podName}`
-    process.env['ACTIONS_RUNNER_CLAIM_NAME'] = `${this.podName}-work`
     process.env['RUNNER_WORKSPACE'] = `${this.tempDirPath}/_work/repo`
     process.env['RUNNER_TEMP'] = `${this.tempDirPath}/_work/_temp`
     process.env['GITHUB_WORKSPACE'] = `${this.tempDirPath}/_work/repo/repo`
