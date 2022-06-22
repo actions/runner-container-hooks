@@ -44,9 +44,9 @@ const STEP_POD_NAME_SUFFIX_LENGTH = 8
 export const JOB_CONTAINER_NAME = 'job'
 
 export class RunnerInstanceLabel {
-  runnerhook: string
+  private podName: string
   constructor() {
-    this.runnerhook = process.env.ACTIONS_RUNNER_POD_NAME as string
+    this.podName = getRunnerPodName()
   }
 
   get key(): string {
@@ -54,10 +54,10 @@ export class RunnerInstanceLabel {
   }
 
   get value(): string {
-    return this.runnerhook
+    return this.podName
   }
 
   toString(): string {
-    return `runner-pod=${this.runnerhook}`
+    return `runner-pod=${this.podName}`
   }
 }
