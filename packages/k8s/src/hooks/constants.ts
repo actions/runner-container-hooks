@@ -39,8 +39,8 @@ export function getSecretName(): string {
   )}-secret-${uuidv4().substring(0, STEP_POD_NAME_SUFFIX_LENGTH)}`
 }
 
-const MAX_POD_NAME_LENGTH = 63
-const STEP_POD_NAME_SUFFIX_LENGTH = 8
+export const MAX_POD_NAME_LENGTH = 63
+export const STEP_POD_NAME_SUFFIX_LENGTH = 8
 export const JOB_CONTAINER_NAME = 'job'
 
 export class RunnerInstanceLabel {
