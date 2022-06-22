@@ -1,8 +1,12 @@
 import {
   getJobPodName,
   getRunnerPodName,
+  getSecretName,
+  getStepPodName,
   getVolumeClaimName,
-  RunnerInstanceLabel
+  MAX_POD_NAME_LENGTH,
+  RunnerInstanceLabel,
+  STEP_POD_NAME_SUFFIX_LENGTH
 } from '../src/hooks/constants'
 
 describe('constants', () => {
@@ -79,14 +83,14 @@ describe('constants', () => {
 
       for (const tt of tableTests) {
         process.env.ACTIONS_RUNNER_POD_NAME = tt.podName
-        const got = getJobPodName()
-        expect(got).toBe(tt.expect)
+        const actual = getJobPodName()
+        expect(actual).toBe(tt.expect)
       }
     })
   })
 
   describe('getVolumeClaimName', () => {
-    it('should throw on getJobPodName if ACTIONS_RUNNER_POD_NAME env is not set', () => {
+    it('should throw if ACTIONS_RUNNER_POD_NAME env is not set', () => {
       delete process.env.ACTIONS_RUNNER_CLAIM_NAME
       delete process.env.ACTIONS_RUNNER_POD_NAME
       expect(() => getVolumeClaimName()).toThrow()
@@ -106,6 +110,64 @@ describe('constants', () => {
       delete process.env.ACTIONS_RUNNER_CLAIM_NAME
       process.env.ACTIONS_RUNNER_POD_NAME = 'example'
       expect(getVolumeClaimName()).toBe('example-work')
+    })
+  })
+
+  describe('getSecretName', () => {
+    it('should throw if ACTIONS_RUNNER_POD_NAME env is not set', () => {
+      delete process.env.ACTIONS_RUNNER_POD_NAME
+      expect(() => getSecretName()).toThrow()
+
+      process.env.ACTIONS_RUNNER_POD_NAME = ''
+      expect(() => getSecretName()).toThrow()
+    })
+
+    it('should contain suffix -secret- and name trimmed', () => {
+      const podNames = [
+        'test',
+        'abcdaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      ]
+
+      for (const podName of podNames) {
+        process.env.ACTIONS_RUNNER_POD_NAME = podName
+        const actual = getSecretName()
+        const re = new RegExp(
+          `${podName.substring(
+            MAX_POD_NAME_LENGTH -
+              '-secret-'.length -
+              STEP_POD_NAME_SUFFIX_LENGTH
+          )}-secret-[a-z0-9]{8,}`
+        )
+        expect(actual).toMatch(re)
+      }
+    })
+  })
+
+  describe('getStepPodName', () => {
+    it('should throw if ACTIONS_RUNNER_POD_NAME env is not set', () => {
+      delete process.env.ACTIONS_RUNNER_POD_NAME
+      expect(() => getStepPodName()).toThrow()
+
+      process.env.ACTIONS_RUNNER_POD_NAME = ''
+      expect(() => getStepPodName()).toThrow()
+    })
+
+    it('should contain suffix -step- and name trimmed', () => {
+      const podNames = [
+        'test',
+        'abcdaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      ]
+
+      for (const podName of podNames) {
+        process.env.ACTIONS_RUNNER_POD_NAME = podName
+        const actual = getStepPodName()
+        const re = new RegExp(
+          `${podName.substring(
+            MAX_POD_NAME_LENGTH - '-step-'.length - STEP_POD_NAME_SUFFIX_LENGTH
+          )}-step-[a-z0-9]{8,}`
+        )
+        expect(actual).toMatch(re)
+      }
     })
   })
 })
