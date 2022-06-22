@@ -40,7 +40,7 @@ export class TestHelper {
       await this.createTestVolume()
       await this.createTestJobPod()
     } catch (e) {
-      console.log(JSON.stringify(e))
+      console.log(e)
     }
   }
 
