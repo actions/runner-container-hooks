@@ -28,7 +28,7 @@ export async function runScriptStep(
       JOB_CONTAINER_NAME
     )
   } catch (err) {
-    throw new Error(`failed to run script step: ${JSON.stringify(err)}`)
+    throw new Error(`failed to run script step: ${err}`)
   } finally {
     fs.rmSync(runnerPath)
   }

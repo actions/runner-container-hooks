@@ -94,7 +94,9 @@ describe('Run script step', () => {
     runScriptStepDefinition.args.entryPoint = '/bin/bash'
     runScriptStepDefinition.args.entryPointArgs = [
       '-c',
-      `'if [[ ! $(env | grep "^PATH=") = "PATH=${runScriptStepDefinition.args.prependPath}:"* ]]; then exit 1; fi'`
+      `'if [[ ! $(env | grep "^PATH=") = "PATH=${runScriptStepDefinition.args.prependPath.join(
+        ':'
+      )}:"* ]]; then exit 1; fi'`
     ]
 
     await expect(
