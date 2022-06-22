@@ -20,18 +20,18 @@ export function containerVolumes(
     }
   ]
 
+  const workspacePath = process.env.GITHUB_WORKSPACE as string
   if (containerAction) {
-    const workspace = process.env.GITHUB_WORKSPACE as string
     mounts.push(
       {
         name: POD_VOLUME_NAME,
         mountPath: '/github/workspace',
-        subPath: workspace.substring(workspace.indexOf('work/') + 1)
+        subPath: workspacePath.substring(workspacePath.indexOf('work/') + 1)
       },
       {
         name: POD_VOLUME_NAME,
         mountPath: '/github/file_commands',
-        subPath: workspace.substring(workspace.indexOf('work/') + 1)
+        subPath: workspacePath.substring(workspacePath.indexOf('work/') + 1)
       }
     )
     return mounts
@@ -63,7 +63,6 @@ export function containerVolumes(
     return mounts
   }
 
-  const workspacePath = process.env.GITHUB_WORKSPACE as string
   for (const userVolume of userMountVolumes) {
     let sourceVolumePath = ''
     if (path.isAbsolute(userVolume.sourceVolumePath)) {
