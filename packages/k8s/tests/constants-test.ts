@@ -1,10 +1,42 @@
 import {
   getJobPodName,
   getRunnerPodName,
-  getVolumeClaimName
+  getVolumeClaimName,
+  RunnerInstanceLabel
 } from '../src/hooks/constants'
 
 describe('constants', () => {
+  describe('runner instance label', () => {
+    beforeEach(() => {
+      process.env.ACTIONS_RUNNER_POD_NAME = 'example'
+    })
+    it('should throw if ACTIONS_RUNNER_POD_NAME env is not set', () => {
+      delete process.env.ACTIONS_RUNNER_POD_NAME
+      expect(() => new RunnerInstanceLabel()).toThrow()
+    })
+
+    it('should have key truthy', () => {
+      const runnerInstanceLabel = new RunnerInstanceLabel()
+      expect(typeof runnerInstanceLabel.key).toBe('string')
+      expect(runnerInstanceLabel.key).toBeTruthy()
+      expect(runnerInstanceLabel.key.length).toBeGreaterThan(0)
+    })
+
+    it('should have value as runner pod name', () => {
+      const name = process.env.ACTIONS_RUNNER_POD_NAME as string
+      const runnerInstanceLabel = new RunnerInstanceLabel()
+      expect(typeof runnerInstanceLabel.value).toBe('string')
+      expect(runnerInstanceLabel.value).toBe(name)
+    })
+
+    it('should have toString combination of key and value', () => {
+      const runnerInstanceLabel = new RunnerInstanceLabel()
+      expect(runnerInstanceLabel.toString()).toBe(
+        `${runnerInstanceLabel.key}=${runnerInstanceLabel.value}`
+      )
+    })
+  })
+
   describe('getRunnerPodName', () => {
     it('should throw if ACTIONS_RUNNER_POD_NAME env is not set', () => {
       delete process.env.ACTIONS_RUNNER_POD_NAME
