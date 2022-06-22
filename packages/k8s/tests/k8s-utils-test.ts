@@ -56,7 +56,7 @@ describe('k8s utils', () => {
         }
       )
       expect(containerPath).toMatch(/\/__w\/_temp\/.*\.sh/)
-      const re = new RegExp(`${process.env.RUNNER_TEMP}/.*\.sh`)
+      const re = new RegExp(`${process.env.RUNNER_TEMP}/.*\\.sh`)
       expect(runnerPath).toMatch(re)
     })
 
