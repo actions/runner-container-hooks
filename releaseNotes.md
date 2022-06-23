@@ -1,7 +1,6 @@
 ## Features
-- Loosened the restriction on `ACTIONS_RUNNER_CLAIM_NAME` to be optional, not required for k8s hooks
 
 ## Bugs
-
+- Improved error handling so that more actionable error messages are displayed for k8s hooks failures [#19]
 
 ## Misc 
