@@ -1,3 +1,4 @@
+import * as core from '@actions/core'
 import * as k8s from '@kubernetes/client-node'
 import { ContainerInfo, Registry } from 'hooklib'
 import * as stream from 'stream'
@@ -200,12 +201,13 @@ export async function execPodStep(
         if (resp.status === 'Success') {
           resolve(resp.code)
         } else {
-          reject(
+          core.debug(
             JSON.stringify({
               message: resp?.message,
               details: resp?.details
             })
           )
+          reject(resp?.message)
         }
       }
     )
