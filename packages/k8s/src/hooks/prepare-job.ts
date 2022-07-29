@@ -46,7 +46,7 @@ export async function prepareJob(
   }
   let createdPod: k8s.V1Pod | undefined = undefined
   try {
-    createdPod = await createPod(container, services, args.registry)
+    createdPod = await createPod(container, services, args.container.registry)
   } catch (err) {
     await prunePods()
     throw new Error(`failed to create job pod: ${err}`)
