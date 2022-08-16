@@ -233,13 +233,12 @@ export async function createDockerSecret(
 ): Promise<k8s.V1Secret> {
   const authContent = {
     auths: {
-      [registry.serverUrl]: {
+      [registry.serverUrl || 'https://index.docker.io/v1/']: {
         username: registry.username,
         password: registry.password,
-        auth: Buffer.from(
-          `${registry.username}:${registry.password}`,
+        auth: Buffer.from(`${registry.username}:${registry.password}`).toString(
           'base64'
-        ).toString()
+        )
       }
     }
   }
@@ -252,15 +251,16 @@ export async function createDockerSecret(
   secret.apiVersion = 'v1'
   secret.metadata = new k8s.V1ObjectMeta()
   secret.metadata.name = secretName
+  secret.metadata.namespace = namespace()
   secret.metadata.labels = {
     [runnerInstanceLabel.key]: runnerInstanceLabel.value
   }
+  secret.type = 'kubernetes.io/dockerconfigjson'
   secret.kind = 'Secret'
   secret.data = {
-    '.dockerconfigjson': Buffer.from(
-      JSON.stringify(authContent),
+    '.dockerconfigjson': Buffer.from(JSON.stringify(authContent)).toString(
       'base64'
-    ).toString()
+    )
   }
 
   const { body } = await k8sApi.createNamespacedSecret(namespace(), secret)
