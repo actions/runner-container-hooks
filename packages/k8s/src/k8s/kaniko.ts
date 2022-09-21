@@ -173,7 +173,10 @@ export function registryService(): k8s.V1Service {
   return svc
 }
 
-export function kanikoPod(): k8s.V1Pod {
+export function kanikoPod(
+  workingDirectory: string, // git://github.com/<handle>/<repo>
+  imagePath: string // <handle>/<image>:<tag>
+): k8s.V1Pod {
   const pod = new k8s.V1Pod()
   pod.apiVersion = 'v1'
   pod.kind = 'Pod'
@@ -193,8 +196,8 @@ export function kanikoPod(): k8s.V1Pod {
   ]
   c.args = [
     '--dockerfile=Dockerfile',
-    '--context=git://github.com/nikola-jokic/dockeraction.git',
-    '--destination=docker-registry.default.svc.cluster.local:5000/test/app:1.0'
+    `--context=${workingDirectory}`,
+    `--destination=docker-registry.default.svc.cluster.local:5000/${imagePath}`
   ]
   spec.containers = [c]
   spec.dnsPolicy = 'ClusterFirst'

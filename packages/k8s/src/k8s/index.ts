@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
 import * as k8s from '@kubernetes/client-node'
-import { ContainerInfo, Registry } from 'hooklib'
+import { RunContainerStepArgs, ContainerInfo, Registry } from 'hooklib'
 import * as stream from 'stream'
 import {
   getJobPodName,
@@ -485,12 +485,15 @@ export async function isPodContainerAlpine(
   return isAlpine
 }
 
-export async function buildContainer(): Promise<void> {
+export async function containerBuild(
+  args: RunContainerStepArgs,
+  imagePath: string
+): Promise<void> {
   const cm = registryConfigMap()
   const secret = registrySecret()
   const ss = registryStatefulSet()
   const svc = registryService()
-  const pod = kanikoPod()
+  const pod = kanikoPod(args.workingDirectory, imagePath)
   await Promise.all([
     k8sApi.createNamespacedConfigMap(namespace(), cm),
     k8sApi.createNamespacedSecret(namespace(), secret)

@@ -1,4 +1,5 @@
 import * as core from '@actions/core'
+import { v4 as uuidv4 } from 'uuid'
 import * as k8s from '@kubernetes/client-node'
 import { RunContainerStepArgs } from 'hooklib'
 import {
@@ -8,7 +9,8 @@ import {
   getPodLogs,
   getPodStatus,
   waitForJobToComplete,
-  waitForPodPhases
+  waitForPodPhases,
+  containerBuild
 } from '../k8s'
 import {
   containerVolumes,
@@ -17,12 +19,14 @@ import {
   PodPhase,
   writeEntryPointScript
 } from '../k8s/utils'
-import { JOB_CONTAINER_NAME } from './constants'
+import { getRunnerPodName, JOB_CONTAINER_NAME } from './constants'
 
 export async function runContainerStep(
   stepContainer: RunContainerStepArgs
 ): Promise<number> {
   if (stepContainer.dockerfile) {
+    const imagePath = `${generateRandomHandle()}/${generateBuildTag()}`
+    await containerBuild(stepContainer, imagePath)
     throw new Error('Building container actions is not currently supported')
   }
 
@@ -107,4 +111,17 @@ function createPodSpec(
   podContainer.volumeMounts = containerVolumes(undefined, false, true)
 
   return podContainer
+}
+
+function generateBuildTag(): string {
+  return `${getRunnerPodName}:${uuidv4().substring(0, 6)}`
+}
+
+function generateRandomHandle(length = 10): string {
+  let handle = ''
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+  for (let i = 0; i < length; i++) {
+    handle += chars.charAt(Math.floor(Math.random() * length))
+  }
+  return handle
 }
