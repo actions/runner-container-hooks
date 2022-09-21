@@ -60,6 +60,12 @@ export const requiredPermissions = [
     verbs: ['create', 'delete', 'get', 'list'],
     resource: 'secrets',
     subresource: ''
+  },
+  {
+    group: '',
+    verbs: ['create', 'delete', 'get', 'list'],
+    resource: 'configmaps',
+    subresource: ''
   }
 ]
 
@@ -334,7 +340,14 @@ export async function waitForPodPhases(
   let phase: PodPhase = PodPhase.UNKNOWN
   try {
     while (true) {
-      phase = await getPodPhase(podName)
+      try {
+        phase = await getPodPhase(podName)
+      } catch (err) {
+        const e = err as k8s.HttpError
+        if (e?.body?.reason === 'NotFound') {
+          phase = PodPhase.UNKNOWN
+        }
+      }
       if (awaitingPhases.has(phase)) {
         return
       }
@@ -482,9 +495,30 @@ export async function buildContainer(): Promise<void> {
     k8sApi.createNamespacedConfigMap(namespace(), cm),
     k8sApi.createNamespacedSecret(namespace(), secret)
   ])
-  await k8sAppsV1.createNamespacedStatefulSet(namespace(), ss)
-  await k8sApi.createNamespacedService(namespace(), svc)
-  await k8sApi.createNamespacedPod(namespace(), pod)
+  try {
+    await k8sAppsV1.createNamespacedStatefulSet(namespace(), ss)
+    await waitForPodPhases(
+      'docker-registry-0',
+      new Set([PodPhase.RUNNING]),
+      new Set([PodPhase.PENDING, PodPhase.UNKNOWN])
+    )
+  } catch (err) {
+    console.log(err)
+    console.log(JSON.stringify(err))
+    throw err
+  }
+  try {
+    await k8sApi.createNamespacedService(namespace(), svc)
+  } catch (err) {
+    console.log(JSON.stringify(err))
+    throw err
+  }
+  try {
+    await k8sApi.createNamespacedPod(namespace(), pod)
+  } catch (err) {
+    console.log(JSON.stringify(err))
+    throw err
+  }
 }
 
 async function getCurrentNodeName(): Promise<string> {

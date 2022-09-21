@@ -1,6 +1,10 @@
 import * as k8s from '@kubernetes/client-node'
 
 const REGISTRY_CONFIG_MAP_YAML = `
+storage:
+  filesystem:
+    rootdirectory: /var/lib/registry
+    maxthreads: 100
 health:
   storagedriver:
     enabled: true
@@ -96,6 +100,13 @@ export function registryStatefulSet(): k8s.V1StatefulSet {
     }
   ]
 
+  c.volumeMounts = [
+    {
+      mountPath: '/etc/docker/registry',
+      name: 'docker-registry-config'
+    }
+  ]
+
   c.livenessProbe = new k8s.V1Probe()
   c.livenessProbe.failureThreshold = 3
   c.livenessProbe.periodSeconds = 10
@@ -119,12 +130,6 @@ export function registryStatefulSet(): k8s.V1StatefulSet {
   tmpl.spec.containers = [c]
   tmpl.spec.volumes = [
     {
-      name: 'data',
-      persistentVolumeClaim: {
-        claimName: 'docker-registry'
-      }
-    },
-    {
       name: 'docker-registry-config',
       configMap: {
         name: 'docker-registry-config'
@@ -133,22 +138,6 @@ export function registryStatefulSet(): k8s.V1StatefulSet {
   ]
 
   spec.template = tmpl
-  spec.volumeClaimTemplates = [
-    {
-      metadata: {
-        name: 'data'
-      },
-      spec: {
-        accessModes: ['ReadWriteOnce'],
-        storageClassName: 'local-storage',
-        resources: {
-          requests: {
-            storage: '5Gi'
-          }
-        }
-      }
-    }
-  ]
   ss.spec = spec
 
   return ss
@@ -196,19 +185,20 @@ export function kanikoPod(): k8s.V1Pod {
   c.image = 'gcr.io/kaniko-project/executor:latest'
   c.name = 'kaniko'
   c.imagePullPolicy = 'Always'
+  c.env = [
+    {
+      name: 'GIT_TOKEN',
+      value: process.env.GITHUB_TOKEN
+    }
+  ]
   c.args = [
-    '--dockerfile=',
-    '--context=',
+    '--dockerfile=Dockerfile',
+    '--context=git://github.com/nikola-jokic/dockeraction.git',
     '--destination=docker-registry.default.svc.cluster.local:5000/test/app:1.0'
   ]
-  c.volumeMounts = [
-    // TODO: ...
-  ]
+  spec.containers = [c]
   spec.dnsPolicy = 'ClusterFirst'
   spec.restartPolicy = 'Never'
-  spec.volumes = [
-    // TODO: ...
-  ]
   pod.spec = spec
 
   return pod
