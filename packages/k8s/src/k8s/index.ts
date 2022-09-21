@@ -10,6 +10,13 @@ import {
   getVolumeClaimName,
   RunnerInstanceLabel
 } from '../hooks/constants'
+import {
+  registryConfigMap,
+  registrySecret,
+  registryStatefulSet,
+  registryService,
+  kanikoPod
+} from './kaniko'
 import { PodPhase } from './utils'
 
 const kc = new k8s.KubeConfig()
@@ -18,6 +25,7 @@ kc.loadFromDefault()
 
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api)
 const k8sBatchV1Api = kc.makeApiClient(k8s.BatchV1Api)
+const k8sAppsV1 = kc.makeApiClient(k8s.AppsV1Api)
 const k8sAuthorizationV1Api = kc.makeApiClient(k8s.AuthorizationV1Api)
 
 export const POD_VOLUME_NAME = 'work'
@@ -462,6 +470,21 @@ export async function isPodContainerAlpine(
   }
 
   return isAlpine
+}
+
+export async function buildContainer(): Promise<void> {
+  const cm = registryConfigMap()
+  const secret = registrySecret()
+  const ss = registryStatefulSet()
+  const svc = registryService()
+  const pod = kanikoPod()
+  await Promise.all([
+    k8sApi.createNamespacedConfigMap(namespace(), cm),
+    k8sApi.createNamespacedSecret(namespace(), secret)
+  ])
+  await k8sAppsV1.createNamespacedStatefulSet(namespace(), ss)
+  await k8sApi.createNamespacedService(namespace(), svc)
+  await k8sApi.createNamespacedPod(namespace(), pod)
 }
 
 async function getCurrentNodeName(): Promise<string> {
