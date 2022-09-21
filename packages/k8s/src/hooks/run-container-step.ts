@@ -19,13 +19,13 @@ import {
   PodPhase,
   writeEntryPointScript
 } from '../k8s/utils'
-import { getRunnerPodName, JOB_CONTAINER_NAME } from './constants'
+import { JOB_CONTAINER_NAME } from './constants'
 
 export async function runContainerStep(
   stepContainer: RunContainerStepArgs
 ): Promise<number> {
   if (stepContainer.dockerfile) {
-    const imagePath = `${generateRandomHandle()}/${generateBuildTag()}`
+    const imagePath = `${generateBuildHandle()}/${generateBuildTag()}`
     await containerBuild(stepContainer, imagePath)
     throw new Error('Building container actions is not currently supported')
   }
@@ -114,14 +114,18 @@ function createPodSpec(
 }
 
 function generateBuildTag(): string {
-  return `${getRunnerPodName}:${uuidv4().substring(0, 6)}`
+  return `${generateRandomString()}:${uuidv4().substring(0, 6)}`
 }
 
-function generateRandomHandle(length = 10): string {
-  let handle = ''
+function generateBuildHandle(): string {
+  return generateRandomString()
+}
+
+function generateRandomString(length = 10): string {
+  let v = ''
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
   for (let i = 0; i < length; i++) {
-    handle += chars.charAt(Math.floor(Math.random() * length))
+    v += chars.charAt(Math.floor(Math.random() * length))
   }
-  return handle
+  return v
 }
