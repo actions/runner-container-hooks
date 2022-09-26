@@ -26,8 +26,9 @@ export async function runContainerStep(
 ): Promise<number> {
   if (stepContainer.dockerfile) {
     const imagePath = `${generateBuildHandle()}/${generateBuildTag()}`
-    await containerBuild(stepContainer, imagePath)
-    throw new Error('Building container actions is not currently supported')
+    const imageUrl = await containerBuild(stepContainer, imagePath)
+    // throw new Error('Building container actions is not currently supported')
+    stepContainer.image = imageUrl
   }
 
   let secretName: string | undefined = undefined

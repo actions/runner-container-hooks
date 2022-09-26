@@ -488,11 +488,13 @@ export async function isPodContainerAlpine(
 export async function containerBuild(
   args: RunContainerStepArgs,
   imagePath: string
-): Promise<void> {
+): Promise<string> {
   const cm = registryConfigMap()
   const secret = registrySecret()
   const ss = registryStatefulSet()
   const svc = registryService()
+  const port = svc?.spec?.ports?.[0]?.nodePort
+  const registryUri = `localhost:${port}/${imagePath}`
   const pod = kanikoPod(args.workingDirectory, imagePath)
   await Promise.all([
     k8sApi.createNamespacedConfigMap(namespace(), cm),
@@ -522,6 +524,7 @@ export async function containerBuild(
     console.log(JSON.stringify(err))
     throw err
   }
+  return registryUri
 }
 
 async function getCurrentNodeName(): Promise<string> {
