@@ -114,7 +114,7 @@ function createPodSpec(
 }
 
 function generateBuildTag(): string {
-  return `${generateRandomString()}:${uuidv4().substring(0, 6)}`
+  return `${generateRandomString()}:${generateRandomString(6)}`
 }
 
 function generateBuildHandle(): string {
@@ -123,7 +123,7 @@ function generateBuildHandle(): string {
 
 function generateRandomString(length = 10): string {
   let v = ''
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+  const chars = 'abcdefghijklmnopqrstuvwxyz'
   for (let i = 0; i < length; i++) {
     v += chars.charAt(Math.floor(Math.random() * length))
   }

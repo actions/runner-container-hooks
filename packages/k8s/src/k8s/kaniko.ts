@@ -1,4 +1,6 @@
 import * as k8s from '@kubernetes/client-node'
+import { getVolumeClaimName } from '../hooks/constants'
+import { POD_VOLUME_NAME } from '.'
 
 const REGISTRY_CONFIG_MAP_YAML = `
 storage:
@@ -188,6 +190,14 @@ export function kanikoPod(
   c.image = 'gcr.io/kaniko-project/executor:latest'
   c.name = 'kaniko'
   c.imagePullPolicy = 'Always'
+  c.volumeMounts = [
+    {
+      name: POD_VOLUME_NAME,
+      mountPath: '/mnt/kan',
+      subPath: "_actions/fhammerl/container-actions-demo/main/docker-built-from-file",
+      readOnly: true
+    }
+  ]
   c.env = [
     {
       name: 'GIT_TOKEN',
@@ -196,13 +206,18 @@ export function kanikoPod(
   ]
   c.args = [
     '--dockerfile=Dockerfile',
-    `--context=${workingDirectory}`,
+    `--context=dir:///mnt/kan`,
     `--destination=docker-registry.default.svc.cluster.local:5000/${imagePath}`
   ]
   spec.containers = [c]
   spec.dnsPolicy = 'ClusterFirst'
   spec.restartPolicy = 'Never'
   pod.spec = spec
-
+  const claimName:string = getVolumeClaimName()
+  pod.spec.volumes = [
+    {
+      name: POD_VOLUME_NAME,
+      persistentVolumeClaim: { claimName },      
+    }]
   return pod
 }
