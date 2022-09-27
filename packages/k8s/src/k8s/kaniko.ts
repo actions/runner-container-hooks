@@ -194,7 +194,8 @@ export function kanikoPod(
     {
       name: POD_VOLUME_NAME,
       mountPath: '/mnt/kan',
-      subPath: "_actions/fhammerl/container-actions-demo/main/docker-built-from-file",
+      subPath:
+        '_actions/fhammerl/container-actions-demo/main/docker-built-from-file',
       readOnly: true
     }
   ]
@@ -213,11 +214,12 @@ export function kanikoPod(
   spec.dnsPolicy = 'ClusterFirst'
   spec.restartPolicy = 'Never'
   pod.spec = spec
-  const claimName:string = getVolumeClaimName()
+  const claimName: string = getVolumeClaimName()
   pod.spec.volumes = [
     {
       name: POD_VOLUME_NAME,
-      persistentVolumeClaim: { claimName },      
-    }]
+      persistentVolumeClaim: { claimName }
+    }
+  ]
   return pod
 }
