@@ -1,5 +1,4 @@
 import * as core from '@actions/core'
-import { v4 as uuidv4 } from 'uuid'
 import * as k8s from '@kubernetes/client-node'
 import { RunContainerStepArgs } from 'hooklib'
 import {
@@ -27,7 +26,6 @@ export async function runContainerStep(
   if (stepContainer.dockerfile) {
     const imagePath = `${generateBuildHandle()}/${generateBuildTag()}`
     const imageUrl = await containerBuild(stepContainer, imagePath)
-    // throw new Error('Building container actions is not currently supported')
     stepContainer.image = imageUrl
   }
 

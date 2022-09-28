@@ -3,11 +3,10 @@ import { TestHelper } from './test-setup'
 
 jest.useRealTimers()
 
-let testHelper: TestHelper
+describe('Run container step with image', () => {
+  let testHelper: TestHelper
+  let runContainerStepData: any
 
-let runContainerStepData: any
-
-describe('Run container step', () => {
   beforeEach(async () => {
     testHelper = new TestHelper()
     await testHelper.initialize()
@@ -37,5 +36,35 @@ describe('Run container step', () => {
     await expect(
       runContainerStep(runContainerStepData.args)
     ).resolves.not.toThrow()
+  })
+})
+
+describe('run container step with docker build', () => {
+  let testHelper: TestHelper
+  let runContainerStepData: any
+  beforeEach(async () => {
+    testHelper = new TestHelper()
+    await testHelper.initialize()
+    runContainerStepData = testHelper.getRunContainerStepDefinition()
+  })
+
+  afterEach(async () => {
+    await testHelper.cleanup()
+  })
+
+  it('should build container and execute docker action', async () => {
+    const { registryName, registryPort, nodePort } =
+      await testHelper.createContainerRegistry()
+
+    // process.env.RUNNER_CONTAINER_HOOKS_REGISTRY_HOST = 'docker-registry'
+    // process.env.RUNNER_CONTAINER_HOOKS_REGISTRY_PORT = '5000'
+    // process.env.RUNNER_CONTAINER_HOOKS_REGISTRY_NODE_PORT = '31500'
+    process.env.RUNNER_CONTAINER_HOOKS_REGISTRY_HOST = registryName
+    process.env.RUNNER_CONTAINER_HOOKS_REGISTRY_PORT = registryPort.toString()
+    process.env.RUNNER_CONTAINER_HOOKS_REGISTRY_NODE_PORT = nodePort.toString()
+    const actionPath = testHelper.initializeDockerAction()
+    const data = JSON.parse(JSON.stringify(runContainerStepData))
+    data.args.dockerfile = `${actionPath}/Dockerfile`
+    await expect(runContainerStep(data.args)).resolves.not.toThrow()
   })
 })

@@ -10,23 +10,18 @@ import {
   getVolumeClaimName,
   RunnerInstanceLabel
 } from '../hooks/constants'
-import {
-  registryConfigMap,
-  registrySecret,
-  registryStatefulSet,
-  registryService,
-  kanikoPod
-} from './kaniko'
+import { kanikoPod } from './kaniko'
 import { PodPhase } from './utils'
+import {
+  namespace,
+  kc,
+  k8sApi,
+  k8sBatchV1Api,
+  k8sAuthorizationV1Api,
+  registryNodePort
+} from './settings'
 
-const kc = new k8s.KubeConfig()
-
-kc.loadFromDefault()
-
-const k8sApi = kc.makeApiClient(k8s.CoreV1Api)
-const k8sBatchV1Api = kc.makeApiClient(k8s.BatchV1Api)
-const k8sAppsV1 = kc.makeApiClient(k8s.AppsV1Api)
-const k8sAuthorizationV1Api = kc.makeApiClient(k8s.AuthorizationV1Api)
+export * from './settings'
 
 export const POD_VOLUME_NAME = 'work'
 
@@ -489,41 +484,9 @@ export async function containerBuild(
   args: RunContainerStepArgs,
   imagePath: string
 ): Promise<string> {
-  const cm = registryConfigMap()
-  const secret = registrySecret()
-  const ss = registryStatefulSet()
-  const svc = registryService()
-  const port = svc?.spec?.ports?.[0]?.nodePort
-  const registryUri = `localhost:${port}/${imagePath}`
-  const pod = kanikoPod(args.workingDirectory, imagePath)
-  await Promise.all([
-    k8sApi.createNamespacedConfigMap(namespace(), cm),
-    k8sApi.createNamespacedSecret(namespace(), secret)
-  ])
-  try {
-    await k8sAppsV1.createNamespacedStatefulSet(namespace(), ss)
-    await waitForPodPhases(
-      'docker-registry-0',
-      new Set([PodPhase.RUNNING]),
-      new Set([PodPhase.PENDING, PodPhase.UNKNOWN])
-    )
-  } catch (err) {
-    console.log(err)
-    console.log(JSON.stringify(err))
-    throw err
-  }
-  try {
-    await k8sApi.createNamespacedService(namespace(), svc)
-  } catch (err) {
-    console.log(JSON.stringify(err))
-    throw err
-  }
-  try {
-    await k8sApi.createNamespacedPod(namespace(), pod)
-  } catch (err) {
-    console.log(JSON.stringify(err))
-    throw err
-  }
+  const registryUri = `localhost:${registryNodePort()}/${imagePath}`
+  const pod = kanikoPod(args.dockerfile, imagePath)
+  await k8sApi.createNamespacedPod(namespace(), pod)
   return registryUri
 }
 
@@ -535,19 +498,6 @@ async function getCurrentNodeName(): Promise<string> {
     throw new Error('Failed to determine node name')
   }
   return nodeName
-}
-export function namespace(): string {
-  if (process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE']) {
-    return process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE']
-  }
-
-  const context = kc.getContexts().find(ctx => ctx.namespace)
-  if (!context?.namespace) {
-    throw new Error(
-      'Failed to determine namespace, falling back to `default`. Namespace should be set in context, or in env variable "ACTIONS_RUNNER_KUBERNETES_NAMESPACE"'
-    )
-  }
-  return context.namespace
 }
 
 class BackOffManager {
