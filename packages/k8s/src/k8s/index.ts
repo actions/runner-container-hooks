@@ -49,18 +49,6 @@ export const requiredPermissions = [
     verbs: ['get', 'list', 'create', 'delete'],
     resource: 'jobs',
     subresource: ''
-  },
-  {
-    group: '',
-    verbs: ['create', 'delete', 'get', 'list'],
-    resource: 'secrets',
-    subresource: ''
-  },
-  {
-    group: '',
-    verbs: ['create', 'delete', 'get', 'list'],
-    resource: 'configmaps',
-    subresource: ''
   }
 ]
 
