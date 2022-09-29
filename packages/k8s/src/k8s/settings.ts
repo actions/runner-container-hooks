@@ -23,7 +23,7 @@ export function namespace(): string {
 }
 
 export function registryHost(): string {
-  const name = 'RUNNER_CONTAINER_HOOKS_REGISTRY_HOST'
+  const name = 'ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_HOST'
   if (process.env[name]) {
     return process.env[name]
   }
@@ -31,7 +31,7 @@ export function registryHost(): string {
 }
 
 export function registryPort(): number {
-  const name = 'RUNNER_CONTAINER_HOOKS_REGISTRY_PORT'
+  const name = 'ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_PORT'
   if (process.env[name]) {
     return parseInt(process.env[name])
   }
@@ -39,7 +39,7 @@ export function registryPort(): number {
 }
 
 export function registryNodePort(): number {
-  const name = 'RUNNER_CONTAINER_HOOKS_REGISTRY_NODE_PORT'
+  const name = 'ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_NODE_PORT'
   if (process.env[name]) {
     return parseInt(process.env[name])
   }

@@ -78,6 +78,15 @@ export class TestHelper {
         0
       )
       .catch(e => {})
+    await k8sApi
+      .deleteNamespacedPod(
+        `${this.podName}-kaniko`,
+        'default',
+        undefined,
+        undefined,
+        0
+      )
+      .catch(e => {})
   }
   public createFile(fileName?: string, content = ''): string {
     const filePath = `${this.tempDirPath}/${fileName || uuidv4()}`
