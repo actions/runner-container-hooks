@@ -50,12 +50,6 @@ export function kanikoPod(
       readOnly: true
     }
   ]
-  c.env = [
-    {
-      name: 'GIT_TOKEN',
-      value: process.env.GITHUB_TOKEN
-    }
-  ]
   c.args = [
     `--dockerfile=${path.basename(dockerfile)}`,
     `--context=dir://${KANIKO_MOUNT_PATH}`,

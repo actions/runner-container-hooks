@@ -474,7 +474,15 @@ export async function containerBuild(
 ): Promise<string> {
   const registryUri = `localhost:${registryNodePort()}/${imagePath}`
   const pod = kanikoPod(args.dockerfile, imagePath)
+  if (!pod.metadata?.name) {
+    throw new Error('kaniko pod name is not set')
+  }
   await k8sApi.createNamespacedPod(namespace(), pod)
+  await waitForPodPhases(
+    pod.metadata.name,
+    new Set([PodPhase.SUCCEEDED]),
+    new Set([PodPhase.PENDING, PodPhase.UNKNOWN, PodPhase.RUNNING])
+  )
   return registryUri
 }
 
