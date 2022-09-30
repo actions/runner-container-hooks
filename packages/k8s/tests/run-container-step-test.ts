@@ -56,9 +56,9 @@ describe('run container step with docker build', () => {
     const { registryName, registryPort, nodePort } =
       await testHelper.createContainerRegistry()
 
-    process.env.RUNNER_CONTAINER_HOOKS_REGISTRY_HOST = registryName
-    process.env.RUNNER_CONTAINER_HOOKS_REGISTRY_PORT = registryPort.toString()
-    process.env.RUNNER_CONTAINER_HOOKS_REGISTRY_NODE_PORT = nodePort.toString()
+    process.env.ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_HOST = registryName
+    process.env.ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_PORT = registryPort.toString()
+    process.env.ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_NODE_PORT = nodePort.toString()
     const actionPath = testHelper.initializeDockerAction()
     const data = JSON.parse(JSON.stringify(runContainerStepData))
     data.args.dockerfile = `${actionPath}/Dockerfile`
