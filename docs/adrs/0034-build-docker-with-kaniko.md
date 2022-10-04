@@ -21,8 +21,10 @@ Whether using dind/docker-in-docker or Kaniko, in this ADR I will refer to these
 ## Interface
 - You will set `containerMode:kubernetes` when creating a runner - this is mandatory as we're only changing the behaviour of our k8s hooks
 - The user will have to provide a port to a (cluster-local) docker registry into which the Kaniko builder container can push the image
-    - Currently it is provided using the `ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_NODE_PORT` env var
-    - The hooks then build up a URI like `localhost:${registryNodePort()}/${generated-random-string-handle-image}`
+    - `ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_HOST` # Registry (service) name for kaniko where to push, e.g. 'docker-registry', kaniko pushes to this domain
+    - `ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_PORT` # Container (service) port of the registry, e.g. 5000, kaniko pushes through this port
+    - `ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_NODE_PORT` # NodePort - the K8S job will pull the image from here
+    - The hooks then build up a URI like `localhost:${registryNodePort()}/${generated-random-string-handle-image}` for the k8s job to pull from
     - `localhost` is the current limitation enforcing the existence of a docker registry exposed through the `nodePort` of a k8s service
 - To execute a container-action, we run a k8s job by loading the image from the specified registry
 - (TBD) Our hooks will then remove the image from the registry
