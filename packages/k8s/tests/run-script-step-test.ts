@@ -59,6 +59,7 @@ describe('Run script step', () => {
   it('should shold have env variables available', async () => {
     runScriptStepDefinition.args.entryPoint = 'bash'
 
+    runScriptStepDefinition.args.workingDirectory = '/' // set to '/' so that cd does not throw
     runScriptStepDefinition.args.entryPointArgs = [
       '-c',
       "'if [[ -z $NODE_ENV ]]; then exit 1; fi'"
