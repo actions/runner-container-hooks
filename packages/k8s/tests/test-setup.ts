@@ -231,7 +231,7 @@ export class TestHelper {
     await waitForPodPhases(
       `${registryName}-0`,
       new Set([PodPhase.RUNNING]),
-      new Set([PodPhase.PENDING, PodPhase.UNKNOWN])
+      new Set([PodPhase.PENDING])
     )
     await k8sApi.createNamespacedService(namespace, svc)
     return {

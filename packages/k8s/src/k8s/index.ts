@@ -322,13 +322,18 @@ export async function waitForPodPhases(
   const backOffManager = new BackOffManager(maxTimeSeconds)
   let phase: PodPhase = PodPhase.UNKNOWN
   try {
-    while (true) {
+    let retryCount = 0
+    while (retryCount < 3) {
       try {
         phase = await getPodPhase(podName)
       } catch (err) {
         const e = err as k8s.HttpError
         if (e?.body?.reason === 'NotFound') {
-          phase = PodPhase.UNKNOWN
+          retryCount++
+          await backOffManager.backOff()
+          continue
+        } else {
+          throw err
         }
       }
       if (awaitingPhases.has(phase)) {
@@ -342,6 +347,7 @@ export async function waitForPodPhases(
       }
       await backOffManager.backOff()
     }
+    throw new Error(`Failed to get pod phase after ${retryCount} attempts`)
   } catch (error) {
     throw new Error(`Pod ${podName} is unhealthy with phase status ${phase}`)
   }
