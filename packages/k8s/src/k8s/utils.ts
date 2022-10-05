@@ -26,12 +26,12 @@ export function containerVolumes(
       {
         name: POD_VOLUME_NAME,
         mountPath: '/github/workspace',
-        subPath: workspacePath.substring(workspacePath.indexOf('work/') + 1)
+        subPath: workspacePath.split('work/')[1]
       },
       {
         name: POD_VOLUME_NAME,
         mountPath: '/github/file_commands',
-        subPath: workspacePath.substring(workspacePath.indexOf('work/') + 1)
+        subPath: workspacePath.split('work/')[1]
       }
     )
     return mounts
