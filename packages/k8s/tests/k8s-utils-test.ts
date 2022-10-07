@@ -108,19 +108,17 @@ describe('k8s utils', () => {
         e => e.mountPath === '/github/file_commands'
       )
       expect(workspace).toBeTruthy()
-      expect(workspace?.subPath).toBe("repo/repo")
+      expect(workspace?.subPath).toBe('repo/repo')
       expect(fileCommands).toBeTruthy()
-      expect(fileCommands?.subPath).toBe("repo/repo")
+      expect(fileCommands?.subPath).toBe('repo/repo')
 
       volumes = containerVolumes([], false, true)
       workspace = volumes.find(e => e.mountPath === '/github/workspace')
-      fileCommands = volumes.find(
-        e => e.mountPath === '/github/file_commands'
-      )
+      fileCommands = volumes.find(e => e.mountPath === '/github/file_commands')
       expect(workspace).toBeTruthy()
-      expect(workspace?.subPath).toBe("repo/repo")
+      expect(workspace?.subPath).toBe('repo/repo')
       expect(fileCommands).toBeTruthy()
-      expect(fileCommands?.subPath).toBe("repo/repo")
+      expect(fileCommands?.subPath).toBe('repo/repo')
     })
 
     it('should have externals, github home and github workflow mounts if job container', () => {
