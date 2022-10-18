@@ -1,5 +1,6 @@
 import * as core from '@actions/core'
 import * as k8s from '@kubernetes/client-node'
+import { v4 as uuidv4 } from 'uuid'
 import { RunContainerStepArgs } from 'hooklib'
 import {
   createJob,
@@ -113,18 +114,9 @@ function createPodSpec(
 }
 
 function generateBuildTag(): string {
-  return `${generateRandomString()}:${generateRandomString(6)}`
+  return `${uuidv4()}:${uuidv4()}`
 }
 
 function generateBuildHandle(): string {
-  return generateRandomString()
-}
-
-function generateRandomString(length = 10): string {
-  let v = ''
-  const chars = 'abcdefghijklmnopqrstuvwxyz'
-  for (let i = 0; i < length; i++) {
-    v += chars.charAt(Math.floor(Math.random() * length))
-  }
-  return v
+  return uuidv4()
 }
