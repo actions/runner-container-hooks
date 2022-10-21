@@ -1,6 +1,5 @@
 import * as core from '@actions/core'
 import * as k8s from '@kubernetes/client-node'
-import { v4 as uuidv4 } from 'uuid'
 import { RunContainerStepArgs } from 'hooklib'
 import {
   createJob,
@@ -25,8 +24,7 @@ export async function runContainerStep(
   stepContainer: RunContainerStepArgs
 ): Promise<number> {
   if (stepContainer.dockerfile) {
-    const imagePath = `${generateBuildHandle()}/${generateBuildTag()}`
-    const imageUrl = await containerBuild(stepContainer, imagePath)
+    const imageUrl = await containerBuild(stepContainer)
     stepContainer.image = imageUrl
   }
 
@@ -111,12 +109,4 @@ function createPodSpec(
   podContainer.volumeMounts = containerVolumes(undefined, false, true)
 
   return podContainer
-}
-
-function generateBuildTag(): string {
-  return `${uuidv4()}:${uuidv4()}`
-}
-
-function generateBuildHandle(): string {
-  return uuidv4()
 }

@@ -209,17 +209,17 @@ export class TestHelper {
 
   public async createContainerRegistry(): Promise<{
     registryName: string
-    registryPort: number
+    localRegistryPort: number
     nodePort: number
   }> {
     const registryName = 'docker-registry'
-    const registryPort = 5000
+    const localRegistryPort = 5000
     const nodePort = 31500
 
-    const cm = registryConfigMap(registryName, registryPort)
+    const cm = registryConfigMap(registryName, localRegistryPort)
     const secret = registrySecret(registryName)
-    const ss = registryStatefulSet(registryName, registryPort)
-    const svc = registryService(registryName, registryPort, nodePort)
+    const ss = registryStatefulSet(registryName, localRegistryPort)
+    const svc = registryService(registryName, localRegistryPort, nodePort)
     const namespace =
       process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE'] || 'default'
 
@@ -236,7 +236,7 @@ export class TestHelper {
     await k8sApi.createNamespacedService(namespace, svc)
     return {
       registryName,
-      registryPort,
+      localRegistryPort,
       nodePort
     }
   }

@@ -11,6 +11,7 @@ import {
   RunnerInstanceLabel
 } from '../hooks/constants'
 import { kanikoPod } from './kaniko'
+import { v4 as uuidv4 } from 'uuid'
 import { PodPhase } from './utils'
 import {
   namespace,
@@ -18,7 +19,11 @@ import {
   k8sApi,
   k8sBatchV1Api,
   k8sAuthorizationV1Api,
-  registryNodePort
+  localRegistryNodePort,
+  localRegistryHost,
+  localRegistryPort,
+  remoteRegistryHost,
+  remoteRegistryHandle
 } from './settings'
 
 export * from './settings'
@@ -475,11 +480,21 @@ export async function isPodContainerAlpine(
 }
 
 export async function containerBuild(
-  args: RunContainerStepArgs,
-  imagePath: string
+  args: RunContainerStepArgs
 ): Promise<string> {
-  const registryUri = `localhost:${registryNodePort()}/${imagePath}`
-  const pod = kanikoPod(args.dockerfile, imagePath)
+  let kanikoRegistry = ''
+  let pullRegistry = ''
+  if (localRegistryHost()) {
+    const host = `${localRegistryHost()}.${namespace()}.svc.cluster.local`
+    const port = localRegistryPort()
+    const uri = `${generateBuildHandle()}/${generateBuildImage()}`
+    kanikoRegistry = `${host}:${port}/${uri}`
+    pullRegistry = `localhost:${localRegistryNodePort()}/${uri}`
+  } else {
+    kanikoRegistry = `${remoteRegistryHost()}/${remoteRegistryHandle()}/${generateBuildImage()}`
+    pullRegistry = kanikoRegistry
+  }
+  const pod = kanikoPod(args.dockerfile, kanikoRegistry)
   if (!pod.metadata?.name) {
     throw new Error('kaniko pod name is not set')
   }
@@ -489,7 +504,7 @@ export async function containerBuild(
     new Set([PodPhase.SUCCEEDED]),
     new Set([PodPhase.PENDING, PodPhase.UNKNOWN, PodPhase.RUNNING])
   )
-  return registryUri
+  return pullRegistry
 }
 
 async function getCurrentNodeName(): Promise<string> {
@@ -555,4 +570,12 @@ export function containerPorts(
     ports.push(port)
   }
   return ports
+}
+
+function generateBuildImage(): string {
+  return `${uuidv4()}:${uuidv4()}`
+}
+
+function generateBuildHandle(): string {
+  return uuidv4()
 }

@@ -1,6 +1,5 @@
 import * as k8s from '@kubernetes/client-node'
 import * as path from 'path'
-import { namespace, registryHost, registryPort } from './settings'
 import {
   getRunnerPodName,
   getVolumeClaimName,
@@ -18,10 +17,7 @@ function getKanikoName(): string {
   )}-kaniko`
 }
 
-export function kanikoPod(
-  dockerfile: string,
-  imagePath: string // <handle>/<image>:<tag>
-): k8s.V1Pod {
+export function kanikoPod(dockerfile: string, destination: string): k8s.V1Pod {
   const pod = new k8s.V1Pod()
   pod.apiVersion = 'v1'
   pod.kind = 'Pod'
@@ -53,7 +49,7 @@ export function kanikoPod(
   c.args = [
     `--dockerfile=${path.basename(dockerfile)}`,
     `--context=dir://${KANIKO_MOUNT_PATH}`,
-    `--destination=${registryHost()}.${namespace()}.svc.cluster.local:${registryPort()}/${imagePath}`
+    `--destination=${destination}`
   ]
   spec.containers = [c]
   spec.dnsPolicy = 'ClusterFirst'

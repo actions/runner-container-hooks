@@ -22,26 +22,42 @@ export function namespace(): string {
   return context.namespace
 }
 
-export function registryHost(): string {
-  const name = 'ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_HOST'
+export function localRegistryHost(): string {
+  const name = 'ACTIONS_RUNNER_CONTAINER_HOOKS_LOCAL_REGISTRY_HOST'
   if (process.env[name]) {
     return process.env[name]
   }
   throw new Error(`environment variable ${name} is not set`)
 }
 
-export function registryPort(): number {
-  const name = 'ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_PORT'
+export function localRegistryPort(): number {
+  const name = 'ACTIONS_RUNNER_CONTAINER_HOOKS_LOCAL_REGISTRY_PORT'
   if (process.env[name]) {
     return parseInt(process.env[name])
   }
   throw new Error(`environment variable ${name} is not set`)
 }
 
-export function registryNodePort(): number {
-  const name = 'ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_NODE_PORT'
+export function localRegistryNodePort(): number {
+  const name = 'ACTIONS_RUNNER_CONTAINER_HOOKS_LOCAL_REGISTRY_NODE_PORT'
   if (process.env[name]) {
     return parseInt(process.env[name])
+  }
+  throw new Error(`environment variable ${name} is not set`)
+}
+
+export function remoteRegistryHost(): string {
+  const name = 'ACTIONS_RUNNER_CONTAINER_HOOKS_REMOTE_REGISTRY_HOST'
+  if (process.env[name]) {
+    return process.env[name]
+  }
+  throw new Error(`environment variable ${name} is not set`)
+}
+
+export function remoteRegistryHandle(): string {
+  const name = 'ACTIONS_RUNNER_CONTAINER_HOOKS_REMOTE_REGISTRY_HANDLE'
+  if (process.env[name]) {
+    return process.env[name]
   }
   throw new Error(`environment variable ${name} is not set`)
 }
