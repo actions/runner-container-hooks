@@ -23,7 +23,8 @@ import {
   localRegistryHost,
   localRegistryPort,
   remoteRegistryHost,
-  remoteRegistryHandle
+  remoteRegistryHandle,
+  remoteRegistrySecretName
 } from './settings'
 
 export * from './settings'
@@ -484,6 +485,7 @@ export async function containerBuild(
 ): Promise<string> {
   let kanikoRegistry = ''
   let pullRegistry = ''
+  let secretName: string | undefined = undefined
   if (localRegistryHost()) {
     const host = `${localRegistryHost()}.${namespace()}.svc.cluster.local`
     const port = localRegistryPort()
@@ -493,8 +495,10 @@ export async function containerBuild(
   } else {
     kanikoRegistry = `${remoteRegistryHost()}/${remoteRegistryHandle()}/${generateBuildImage()}`
     pullRegistry = kanikoRegistry
+    secretName = remoteRegistrySecretName()
   }
-  const pod = kanikoPod(args.dockerfile, kanikoRegistry)
+
+  const pod = kanikoPod(args.dockerfile, kanikoRegistry, secretName)
   if (!pod.metadata?.name) {
     throw new Error('kaniko pod name is not set')
   }

@@ -17,7 +17,11 @@ function getKanikoName(): string {
   )}-kaniko`
 }
 
-export function kanikoPod(dockerfile: string, destination: string): k8s.V1Pod {
+export function kanikoPod(
+  dockerfile: string,
+  destination: string,
+  secretName?: string
+): k8s.V1Pod {
   const pod = new k8s.V1Pod()
   pod.apiVersion = 'v1'
   pod.kind = 'Pod'
@@ -62,5 +66,30 @@ export function kanikoPod(dockerfile: string, destination: string): k8s.V1Pod {
       persistentVolumeClaim: { claimName }
     }
   ]
+  if (secretName) {
+    const volumeName = 'docker-registry'
+    pod.spec.volumes.push({
+      name: volumeName,
+      projected: {
+        sources: [
+          {
+            secret: {
+              name: secretName,
+              items: [
+                {
+                  key: '.dockerconfigjson',
+                  path: 'config.json'
+                }
+              ]
+            }
+          }
+        ]
+      }
+    })
+    c.volumeMounts.push({
+      name: volumeName,
+      mountPath: '/kaniko/.docker/'
+    })
+  }
   return pod
 }

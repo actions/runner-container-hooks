@@ -61,3 +61,11 @@ export function remoteRegistryHandle(): string {
   }
   throw new Error(`environment variable ${name} is not set`)
 }
+
+export function remoteRegistrySecretName(): string {
+  const name = 'ACTIONS_RUNNER_CONTAINER_HOOKS_REMOTE_REGISTRY_SECRET_NAME'
+  if (process.env[name]) {
+    return process.env[name]
+  }
+  throw new Error(`environment variable ${name} is not set`)
+}
