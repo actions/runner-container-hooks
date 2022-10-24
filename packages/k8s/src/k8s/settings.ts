@@ -22,6 +22,11 @@ export function namespace(): string {
   return context.namespace
 }
 
+export function isLocalRegistrySet(): boolean {
+  const name = 'ACTIONS_RUNNER_CONTAINER_HOOKS_LOCAL_REGISTRY_HOST'
+  return !!process.env[name]
+}
+
 export function localRegistryHost(): string {
   const name = 'ACTIONS_RUNNER_CONTAINER_HOOKS_LOCAL_REGISTRY_HOST'
   if (process.env[name]) {
@@ -48,10 +53,7 @@ export function localRegistryNodePort(): number {
 
 export function remoteRegistryHost(): string {
   const name = 'ACTIONS_RUNNER_CONTAINER_HOOKS_REMOTE_REGISTRY_HOST'
-  if (process.env[name]) {
-    return process.env[name]
-  }
-  throw new Error(`environment variable ${name} is not set`)
+  return process.env[name] || ''
 }
 
 export function remoteRegistryHandle(): string {

@@ -24,7 +24,8 @@ import {
   localRegistryPort,
   remoteRegistryHost,
   remoteRegistryHandle,
-  remoteRegistrySecretName
+  remoteRegistrySecretName,
+  isLocalRegistrySet
 } from './settings'
 
 export * from './settings'
@@ -486,14 +487,19 @@ export async function containerBuild(
   let kanikoRegistry = ''
   let pullRegistry = ''
   let secretName: string | undefined = undefined
-  if (localRegistryHost()) {
+  if (isLocalRegistrySet()) {
     const host = `${localRegistryHost()}.${namespace()}.svc.cluster.local`
     const port = localRegistryPort()
     const uri = `${generateBuildHandle()}/${generateBuildImage()}`
     kanikoRegistry = `${host}:${port}/${uri}`
     pullRegistry = `localhost:${localRegistryNodePort()}/${uri}`
   } else {
-    kanikoRegistry = `${remoteRegistryHost()}/${remoteRegistryHandle()}/${generateBuildImage()}`
+    const uri = `${remoteRegistryHandle()}/${generateBuildImage()}`
+    if (remoteRegistryHost()) {
+      kanikoRegistry = `${remoteRegistryHost()}/${uri}`
+    } else {
+      kanikoRegistry = uri
+    }
     pullRegistry = kanikoRegistry
     secretName = remoteRegistrySecretName()
   }
