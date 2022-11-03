@@ -103,19 +103,22 @@ describe('k8s utils', () => {
 
     it('should have container action volumes', () => {
       let volumes = containerVolumes([], true, true)
-      expect(
-        volumes.find(e => e.mountPath === '/github/workspace')
-      ).toBeTruthy()
-      expect(
-        volumes.find(e => e.mountPath === '/github/file_commands')
-      ).toBeTruthy()
+      let workspace = volumes.find(e => e.mountPath === '/github/workspace')
+      let fileCommands = volumes.find(
+        e => e.mountPath === '/github/file_commands'
+      )
+      expect(workspace).toBeTruthy()
+      expect(workspace?.subPath).toBe('repo/repo')
+      expect(fileCommands).toBeTruthy()
+      expect(fileCommands?.subPath).toBe('_temp/_runner_file_commands')
+
       volumes = containerVolumes([], false, true)
-      expect(
-        volumes.find(e => e.mountPath === '/github/workspace')
-      ).toBeTruthy()
-      expect(
-        volumes.find(e => e.mountPath === '/github/file_commands')
-      ).toBeTruthy()
+      workspace = volumes.find(e => e.mountPath === '/github/workspace')
+      fileCommands = volumes.find(e => e.mountPath === '/github/file_commands')
+      expect(workspace).toBeTruthy()
+      expect(workspace?.subPath).toBe('repo/repo')
+      expect(fileCommands).toBeTruthy()
+      expect(fileCommands?.subPath).toBe('_temp/_runner_file_commands')
     })
 
     it('should have externals, github home and github workflow mounts if job container', () => {
