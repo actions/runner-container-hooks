@@ -8,7 +8,6 @@ import {
   getSecretName,
   getStepPodName,
   getVolumeClaimName,
-  PORT_REGEXP,
   RunnerInstanceLabel
 } from '../hooks/constants'
 import { PodPhase } from './utils'
@@ -519,20 +518,32 @@ export function containerPorts(
 ): k8s.V1ContainerPort[] {
   const ports: k8s.V1ContainerPort[] = []
   for (const portDefinition of container.portMappings) {
-    const submatches = PORT_REGEXP.exec(portDefinition)
-    if (!submatches) {
+    const portProtoSplit = portDefinition.split('/')
+    if (portProtoSplit.length > 2) {
       throw new Error(
-        `Port definition "${portDefinition}" is in incorrect format`
+        `port definition should be in format [port(s)]/[proto], got ${portDefinition}`
       )
     }
+
     const port = new k8s.V1ContainerPort()
-    if (Number(submatches[3])) {
-      port.hostPort = Number(submatches[1])
-      port.containerPort = Number(submatches[3])
-    } else {
-      port.containerPort = Number(submatches[1])
+    port.protocol =
+      portProtoSplit.length === 2 ? portProtoSplit[1].toUpperCase() : 'TCP'
+
+    const portSplit = portProtoSplit[0].split(':')
+    if (portSplit.length > 2) {
+      throw new Error('ports should have at most one ":" separator')
     }
-    port.protocol = submatches[5] ? submatches[5].toUpperCase() : 'TCP'
+    if (!Number(portSplit[0])) {
+      throw new Error('port specification is invalid')
+    }
+
+    if (portSplit.length === 1) {
+      port.containerPort = Number(portSplit[0])
+    } else {
+      port.hostPort = Number(portSplit[0])
+      port.containerPort = Number(portSplit[1])
+    }
+
     ports.push(port)
   }
   return ports

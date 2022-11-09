@@ -6,7 +6,6 @@ import {
   getVolumeClaimName,
   JOB_CONTAINER_NAME,
   MAX_POD_NAME_LENGTH,
-  PORT_REGEXP,
   RunnerInstanceLabel,
   STEP_POD_NAME_SUFFIX_LENGTH
 } from '../src/hooks/constants'
@@ -178,8 +177,6 @@ describe('constants', () => {
       expect(JOB_CONTAINER_NAME).toBeTruthy()
       expect(MAX_POD_NAME_LENGTH).toBeGreaterThan(0)
       expect(STEP_POD_NAME_SUFFIX_LENGTH).toBeGreaterThan(0)
-      expect(PORT_REGEXP).toBeDefined()
-      expect(PORT_REGEXP).toBeInstanceOf(RegExp)
     })
   })
 })

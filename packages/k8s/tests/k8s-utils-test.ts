@@ -178,6 +178,14 @@ describe('k8s utils', () => {
             hostPort: undefined,
             protocol: 'UDP'
           }
+        },
+        {
+          spec: '8080',
+          want: {
+            containerPort: 8080,
+            hostPort: undefined,
+            protocol: 'TCP'
+          }
         }
       ]
 

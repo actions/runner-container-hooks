@@ -61,5 +61,3 @@ export class RunnerInstanceLabel {
     return `runner-pod=${this.podName}`
   }
 }
-
-export const PORT_REGEXP = /(\d{1,5})(:(\d{1,5}))?(\/(tcp|udp))?/
