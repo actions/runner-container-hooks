@@ -1,5 +1,5 @@
 import * as fs from 'fs'
-import { POD_VOLUME_NAME } from '../src/k8s'
+import { containerPorts, POD_VOLUME_NAME } from '../src/k8s'
 import { containerVolumes, writeEntryPointScript } from '../src/k8s/utils'
 import { TestHelper } from './test-setup'
 
@@ -151,6 +151,42 @@ describe('k8s utils', () => {
       expect(volumes.every(e => e.name === POD_VOLUME_NAME)).toBeTruthy()
       volumes = containerVolumes([], false, false)
       expect(volumes.every(e => e.name === POD_VOLUME_NAME)).toBeTruthy()
+    })
+
+    it('should parse container ports', () => {
+      const tt = [
+        {
+          spec: '8080:80',
+          want: {
+            containerPort: 80,
+            hostPort: 8080,
+            protocol: 'TCP'
+          }
+        },
+        {
+          spec: '8080:80/udp',
+          want: {
+            containerPort: 80,
+            hostPort: 8080,
+            protocol: 'UDP'
+          }
+        },
+        {
+          spec: '8080/udp',
+          want: {
+            containerPort: 8080,
+            hostPort: undefined,
+            protocol: 'UDP'
+          }
+        }
+      ]
+
+      for (const tc of tt) {
+        const got = containerPorts({ portMappings: [tc.spec] })
+        for (const [key, value] of Object.entries(tc.want)) {
+          expect(got[0][key]).toBe(value)
+        }
+      }
     })
   })
 })

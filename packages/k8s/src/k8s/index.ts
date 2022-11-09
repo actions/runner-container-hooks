@@ -8,6 +8,7 @@ import {
   getSecretName,
   getStepPodName,
   getVolumeClaimName,
+  PORT_REGEXP,
   RunnerInstanceLabel
 } from '../hooks/constants'
 import { PodPhase } from './utils'
@@ -516,27 +517,22 @@ class BackOffManager {
 export function containerPorts(
   container: ContainerInfo
 ): k8s.V1ContainerPort[] {
-  // 8080:8080/tcp
-  const portFormat = /(\d{1,5})(:(\d{1,5}))?(\/(tcp|udp))?/
-
   const ports: k8s.V1ContainerPort[] = []
   for (const portDefinition of container.portMappings) {
-    const submatches = portFormat.exec(portDefinition)
+    const submatches = PORT_REGEXP.exec(portDefinition)
     if (!submatches) {
       throw new Error(
         `Port definition "${portDefinition}" is in incorrect format`
       )
     }
     const port = new k8s.V1ContainerPort()
-    port.hostPort = Number(submatches[1])
-    if (submatches[3]) {
+    if (Number(submatches[3])) {
+      port.hostPort = Number(submatches[1])
       port.containerPort = Number(submatches[3])
-    }
-    if (submatches[5]) {
-      port.protocol = submatches[5].toUpperCase()
     } else {
-      port.protocol = 'TCP'
+      port.containerPort = Number(submatches[1])
     }
+    port.protocol = submatches[5] ? submatches[5].toUpperCase() : 'TCP'
     ports.push(port)
   }
   return ports
