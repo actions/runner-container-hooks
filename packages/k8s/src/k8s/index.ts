@@ -520,9 +520,7 @@ export function containerPorts(
   for (const portDefinition of container.portMappings) {
     const portProtoSplit = portDefinition.split('/')
     if (portProtoSplit.length > 2) {
-      throw new Error(
-        `port definition should be in format [port(s)]/[proto], got ${portDefinition}`
-      )
+      throw new Error(`Unexpected port format: ${portDefinition}`)
     }
 
     const port = new k8s.V1ContainerPort()
@@ -533,24 +531,20 @@ export function containerPorts(
     if (portSplit.length > 2) {
       throw new Error('ports should have at most one ":" separator')
     }
-    if (!Number(portSplit[0])) {
-      throw new Error('port specification is invalid')
+
+    const parsePort = (p: string): number => {
+      const num = Number(p)
+      if (!Number.isInteger(num) || num < 1 || num > 65535) {
+        throw new Error(`invalid container port: ${p}`)
+      }
+      return num
     }
 
     if (portSplit.length === 1) {
-      port.containerPort = Number(portSplit[0])
-      if (port.containerPort < 0 || port.containerPort > 65535) {
-        throw new Error(`invalid container port: ${port.containerPort}`)
-      }
+      port.containerPort = parsePort(portSplit[0])
     } else {
-      port.hostPort = Number(portSplit[0])
-      port.containerPort = Number(portSplit[1])
-      if (port.hostPort < 0 || port.hostPort > 65535) {
-        throw new Error(`invalid container port: ${port.hostPort}`)
-      }
-      if (port.containerPort < 0 || port.containerPort > 65535) {
-        throw new Error(`invalid container port: ${port.containerPort}`)
-      }
+      port.hostPort = parsePort(portSplit[0])
+      port.containerPort = parsePort(portSplit[1])
     }
 
     ports.push(port)
