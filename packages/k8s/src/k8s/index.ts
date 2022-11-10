@@ -539,9 +539,18 @@ export function containerPorts(
 
     if (portSplit.length === 1) {
       port.containerPort = Number(portSplit[0])
+      if (port.containerPort < 0 || port.containerPort > 65535) {
+        throw new Error(`invalid container port: ${port.containerPort}`)
+      }
     } else {
       port.hostPort = Number(portSplit[0])
       port.containerPort = Number(portSplit[1])
+      if (port.hostPort < 0 || port.hostPort > 65535) {
+        throw new Error(`invalid container port: ${port.hostPort}`)
+      }
+      if (port.containerPort < 0 || port.containerPort > 65535) {
+        throw new Error(`invalid container port: ${port.containerPort}`)
+      }
     }
 
     ports.push(port)

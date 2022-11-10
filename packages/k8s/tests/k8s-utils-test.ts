@@ -196,5 +196,15 @@ describe('k8s utils', () => {
         }
       }
     })
+    it('should throw when ports are out of range (0, 65536)', () => {
+      expect(() => containerPorts({ portMappings: ["65536"]})).toThrow()
+      expect(() => containerPorts({ portMappings: ["0"]})).toThrow()
+      expect(() => containerPorts({ portMappings: ["65536/udp"]})).toThrow()
+      expect(() => containerPorts({ portMappings: ["0/udp"]})).toThrow()
+      expect(() => containerPorts({ portMappings: ["1:65536"]})).toThrow()
+      expect(() => containerPorts({ portMappings: ["65536:1"]})).toThrow()
+      expect(() => containerPorts({ portMappings: ["1:65536/tcp"]})).toThrow()
+      expect(() => containerPorts({ portMappings: ["65536:1/tcp"]})).toThrow()
+    })
   })
 })
