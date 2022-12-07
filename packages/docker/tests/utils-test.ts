@@ -41,7 +41,9 @@ describe('Utilities', () => {
       expect(options).toBeDefined()
       expect(options?.workingDir).toBe(opt.workingDir)
       expect(options?.input).toBe(opt.input)
-      expect(options?.env).toStrictEqual({ DOCKER_HOST: process.env.DOCKER_HOST })
+      expect(options?.env).toStrictEqual({
+        DOCKER_HOST: process.env.DOCKER_HOST
+      })
     })
   })
 })
