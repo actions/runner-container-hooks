@@ -28,14 +28,26 @@ export async function runDockerCommand(
 export function optionsWithDockerEnvs(
   options?: RunDockerCommandOptions
 ): RunDockerCommandOptions | undefined {
+  // From https://docs.docker.com/engine/reference/commandline/cli/#environment-variables
+  const dockerCliEnvs = new Set([
+    'DOCKER_API_VERSION',
+    'DOCKER_CERT_PATH',
+    'DOCKER_CONFIG',
+    'DOCKER_CONTENT_TRUST_SERVER',
+    'DOCKER_CONTENT_TRUST',
+    'DOCKER_CONTEXT',
+    'DOCKER_DEFAULT_PLATFORM',
+    'DOCKER_HIDE_LEGACY_COMMANDS',
+    'DOCKER_HOST',
+    'DOCKER_STACK_ORCHESTRATOR',
+    'DOCKER_TLS_VERIFY',
+    'BUILDKIT_PROGRESS'
+  ])
   const dockerEnvs = {}
-  for (const e in process.env) {
-    if (e.startsWith('DOCKER_')) {
-      dockerEnvs[e] = process.env[e]
+  for (const key in process.env) {
+    if (dockerCliEnvs.has(key)) {
+      dockerEnvs[key] = process.env[key]
     }
-  }
-  if (Object.keys(dockerEnvs).length === 0) {
-    return
   }
 
   const newOptions = {
@@ -44,10 +56,9 @@ export function optionsWithDockerEnvs(
     env: options?.env || {}
   }
 
+  // Set docker envs or overwrite provided ones
   for (const [key, value] of Object.entries(dockerEnvs)) {
-    if (!newOptions.env[key]) {
-      newOptions.env[key] = value as string
-    }
+    newOptions.env[key] = value as string
   }
 
   return newOptions
