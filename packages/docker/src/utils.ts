@@ -16,12 +16,52 @@ export async function runDockerCommand(
   args: string[],
   options?: RunDockerCommandOptions
 ): Promise<string> {
+  options = optionsWithDockerEnvs(options)
   const pipes = await exec.getExecOutput('docker', args, options)
   if (pipes.exitCode !== 0) {
     core.error(`Docker failed with exit code ${pipes.exitCode}`)
     return Promise.reject(pipes.stderr)
   }
   return Promise.resolve(pipes.stdout)
+}
+
+export function optionsWithDockerEnvs(
+  options?: RunDockerCommandOptions
+): RunDockerCommandOptions | undefined {
+  // From https://docs.docker.com/engine/reference/commandline/cli/#environment-variables
+  const dockerCliEnvs = new Set([
+    'DOCKER_API_VERSION',
+    'DOCKER_CERT_PATH',
+    'DOCKER_CONFIG',
+    'DOCKER_CONTENT_TRUST_SERVER',
+    'DOCKER_CONTENT_TRUST',
+    'DOCKER_CONTEXT',
+    'DOCKER_DEFAULT_PLATFORM',
+    'DOCKER_HIDE_LEGACY_COMMANDS',
+    'DOCKER_HOST',
+    'DOCKER_STACK_ORCHESTRATOR',
+    'DOCKER_TLS_VERIFY',
+    'BUILDKIT_PROGRESS'
+  ])
+  const dockerEnvs = {}
+  for (const key in process.env) {
+    if (dockerCliEnvs.has(key)) {
+      dockerEnvs[key] = process.env[key]
+    }
+  }
+
+  const newOptions = {
+    workingDir: options?.workingDir,
+    input: options?.input,
+    env: options?.env || {}
+  }
+
+  // Set docker envs or overwrite provided ones
+  for (const [key, value] of Object.entries(dockerEnvs)) {
+    newOptions.env[key] = value as string
+  }
+
+  return newOptions
 }
 
 export function sanitize(val: string): string {

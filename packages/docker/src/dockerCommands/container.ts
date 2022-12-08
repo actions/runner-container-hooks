@@ -427,6 +427,9 @@ export async function containerRun(
   dockerArgs.push(args.image)
   if (args.entryPointArgs) {
     for (const entryPointArg of args.entryPointArgs) {
+      if (!entryPointArg) {
+        continue
+      }
       dockerArgs.push(entryPointArg)
     }
   }
