@@ -158,7 +158,7 @@ function createPodSpec(
   name: string,
   jobContainer = false
 ): k8s.V1Container {
-  if (!container.entryPoint) {
+  if (!container.entryPoint && jobContainer) {
     container.entryPoint = DEFAULT_CONTAINER_ENTRY_POINT
     container.entryPointArgs = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
   }
