@@ -21,8 +21,9 @@ Whether using dind/docker-in-docker sidecar or Kaniko, in this ADR I will refer 
 
 ## Interface
 The user will set `containerMode:kubernetes` since this is a change to the behaviour of our k8s hooks
-The user will either
-- Provide a port to a (cluster-local) docker registry into which the Kaniko builder container can push the image
+The user will 
+EITHER
+- Provide a set of ENVs to a (cluster-local) docker registry into which the Kaniko builder container can push the image
     - `ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_HOST` # Registry (service) name for kaniko where to push, e.g. 'docker-registry', kaniko pushes to this domain
     - `ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_PORT` # Container (service) port of the registry, e.g. 5000, kaniko pushes through this port
     - `ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_NODE_PORT` # NodePort - the K8S job will pull the image from here
