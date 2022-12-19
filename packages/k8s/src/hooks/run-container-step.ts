@@ -18,6 +18,7 @@ import {
   writeEntryPointScript
 } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
+import { V1EnvVar } from '@kubernetes/client-node'
 
 export async function runContainerStep(
   stepContainer: RunContainerStepArgs
@@ -106,5 +107,19 @@ function createPodSpec(
   }
   podContainer.volumeMounts = containerVolumes(undefined, false, true)
 
+  const envAdd: [V1EnvVar] = [
+    {
+      "name": "TEST",
+      "value": "test"
+    }
+  ]
+
+  if (podContainer.env === undefined) {
+    podContainer.env = []
+  }
+  podContainer.env = podContainer.env?.concat(envAdd)
+
   return podContainer
 }
+
+function extendPodSpec()
