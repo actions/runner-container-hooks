@@ -112,7 +112,10 @@ export async function createPod(
   return body
 }
 
-function concatArraysCustomizer(objValue, srcValue) {
+//Custom function to pass to the lodash merge
+//Will concat all arrays it encounters during the merge
+//except for the container list of the spec
+function concatArraysCustomizer(objValue, srcValue): any[] | undefined {
   if (_.isArray(objValue)) {
     if ( objValue[0] instanceof k8s.V1Container){
       return
@@ -143,10 +146,6 @@ export async function createJob(
   job.spec.template.spec.restartPolicy = 'Never'
   job.spec.template.spec.nodeName = await getCurrentNodeName()
 
-  const yaml = fs.readFileSync('/Users/nielstenboom/workspace/runner-container-hooks/test.yaml','utf8');
-  const template = k8s.loadYaml<k8s.V1Job>(yaml)
-  job.spec.template.spec = _.mergeWith(job.spec.template.spec, template.spec?.template.spec, concatArraysCustomizer)
-
   const claimName = getVolumeClaimName()
   job.spec.template.spec.volumes = [
     {
@@ -154,6 +153,14 @@ export async function createJob(
       persistentVolumeClaim: { claimName }
     }
   ]
+
+  //Enrich the job spec with the fields defined in the template if there is one
+  const jobTemplatePath = process.env.ACTIONS_RUNNER_JOB_TEMPLATE_PATH
+  if (jobTemplatePath !== undefined){
+    const yaml = fs.readFileSync(jobTemplatePath,'utf8');
+    const template = k8s.loadYaml<k8s.V1Job>(yaml)
+    job.spec.template.spec = _.mergeWith(job.spec.template.spec, template.spec?.template.spec, concatArraysCustomizer)
+  }
 
   const { body } = await k8sBatchV1Api.createNamespacedJob(namespace(), job)
   return body

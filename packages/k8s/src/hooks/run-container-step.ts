@@ -75,7 +75,7 @@ export async function runContainerStep(
   return Number(exitCode) || 1
 }
 
-function createPodSpec(
+export function createPodSpec(
   container: RunContainerStepArgs,
   secretName?: string
 ): k8s.V1Container {

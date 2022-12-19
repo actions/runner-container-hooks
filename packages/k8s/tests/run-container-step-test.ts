@@ -1,5 +1,10 @@
-import { runContainerStep } from '../src/hooks'
+import { V1EnvVar, V1ResourceRequirements, V1Volume, V1VolumeMount } from '@kubernetes/client-node'
+import { createPodSpec, runContainerStep } from '../src/hooks'
+import { createJob } from '../src/k8s'
+
+
 import { TestHelper } from './test-setup'
+import path from 'path'
 
 jest.useRealTimers()
 
@@ -37,5 +42,17 @@ describe('Run container step', () => {
     await expect(
       runContainerStep(runContainerStepData.args)
     ).resolves.not.toThrow()
+  })
+
+  it('should have the extra fields set by the jobtemplate file if env variable is set', async () => {
+
+    process.env.ACTIONS_RUNNER_JOB_TEMPLATE_PATH = path.resolve(__dirname, 'jobtemplate.yaml')
+    const container = await createPodSpec(runContainerStepData.args)
+    const job = await createJob(container)
+
+    expect(job.spec?.template.spec?.containers[0].env).toContainEqual({"name": "TEST", "value": "testvalue"} as V1EnvVar)
+    expect(job.spec?.template.spec?.containers[0].resources).toEqual({"requests": {"ephemeral-storage": "500Mi"}} as V1ResourceRequirements)
+    expect(job.spec?.template.spec?.containers[0].volumeMounts).toContainEqual({"name": "ephemeral", "mountPath": "/tmp"} as V1VolumeMount)
+    expect(job.spec?.template.spec?.volumes).toContainEqual({"name": "ephemeral", "emptyDir": {"sizeLimit": "500Mi"}} as V1Volume)
   })
 })

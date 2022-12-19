@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: whatever
+  name: thisvaluewillbeignored
 spec:
   template:
     spec:
@@ -14,8 +14,8 @@ spec:
           - name: ephemeral
             mountPath: "/tmp"
           env:
-            - name: "TEST22"
-              value: "ROAR"
+            - name: "TEST"
+              value: "testvalue"
       volumes:
         - name: ephemeral
           emptyDir:
