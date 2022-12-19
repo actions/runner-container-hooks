@@ -1,5 +1,7 @@
 import * as core from '@actions/core'
 import * as k8s from '@kubernetes/client-node'
+import * as _ from "lodash";
+
 import { ContainerInfo, Registry } from 'hooklib'
 import * as stream from 'stream'
 import {
@@ -11,6 +13,9 @@ import {
   RunnerInstanceLabel
 } from '../hooks/constants'
 import { PodPhase } from './utils'
+import * as fs from 'fs';
+import { V1Container } from '@kubernetes/client-node';
+
 
 const kc = new k8s.KubeConfig()
 
@@ -107,6 +112,15 @@ export async function createPod(
   return body
 }
 
+function concatArraysCustomizer(objValue, srcValue) {
+  if (_.isArray(objValue)) {
+    if ( objValue[0] instanceof k8s.V1Container){
+      return
+    }
+    return objValue.concat(srcValue);
+  }
+}
+
 export async function createJob(
   container: k8s.V1Container
 ): Promise<k8s.V1Job> {
@@ -128,6 +142,10 @@ export async function createJob(
   job.spec.template.spec.containers = [container]
   job.spec.template.spec.restartPolicy = 'Never'
   job.spec.template.spec.nodeName = await getCurrentNodeName()
+
+  const yaml = fs.readFileSync('/Users/nielstenboom/workspace/runner-container-hooks/test.yaml','utf8');
+  const template = k8s.loadYaml<k8s.V1Job>(yaml)
+  job.spec.template.spec = _.mergeWith(job.spec.template.spec, template.spec?.template.spec, concatArraysCustomizer)
 
   const claimName = getVolumeClaimName()
   job.spec.template.spec.volumes = [

@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: whatever
+spec:
+  template:
+    spec:
+      containers:
+        # important to not set image & name keys of container, as that will cause it to override
+        - resources:
+            requests:
+              ephemeral-storage: "500Mi"
+          volumeMounts:
+          - name: ephemeral
+            mountPath: "/tmp"
+          env:
+            - name: "TEST22"
+              value: "ROAR"
+      volumes:
+        - name: ephemeral
+          emptyDir:
+            sizeLimit: 500Mi
