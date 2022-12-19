@@ -9,15 +9,14 @@ import {
 import { isAuthPermissionsOK, namespace, requiredPermissions } from './k8s'
 
 async function run(): Promise<void> {
-  const input = await getInputFromStdin()
-
-  const args = input['args']
-  const command = input['command']
-  const responseFile = input['responseFile']
-  const state = input['state']
-
   let exitCode = 0
   try {
+    const input = await getInputFromStdin()
+
+    const args = input['args']
+    const command = input['command']
+    const responseFile = input['responseFile']
+    const state = input['state']
     if (!(await isAuthPermissionsOK())) {
       throw new Error(
         `The Service account needs the following permissions ${JSON.stringify(

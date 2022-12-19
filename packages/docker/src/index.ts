@@ -16,15 +16,14 @@ import {
 import { checkEnvironment } from './utils'
 
 async function run(): Promise<void> {
-  const input = await getInputFromStdin()
-
-  const args = input['args']
-  const command = input['command']
-  const responseFile = input['responseFile']
-  const state = input['state']
-
   try {
     checkEnvironment()
+    const input = await getInputFromStdin()
+
+    const args = input['args']
+    const command = input['command']
+    const responseFile = input['responseFile']
+    const state = input['state']
     switch (command) {
       case Command.PrepareJob:
         await prepareJob(args as PrepareJobArgs, responseFile)
