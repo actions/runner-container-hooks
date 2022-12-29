@@ -1,5 +1,7 @@
 import * as core from '@actions/core'
 import * as k8s from '@kubernetes/client-node'
+import * as _ from 'lodash'
+
 import { ContainerInfo, Registry } from 'hooklib'
 import * as stream from 'stream'
 import {
@@ -11,6 +13,7 @@ import {
   RunnerInstanceLabel
 } from '../hooks/constants'
 import { PodPhase } from './utils'
+import * as fs from 'fs'
 
 const kc = new k8s.KubeConfig()
 
@@ -85,6 +88,7 @@ export async function createPod(
   appPod.spec.containers = containers
   appPod.spec.restartPolicy = 'Never'
   appPod.spec.nodeName = await getCurrentNodeName()
+
   const claimName = getVolumeClaimName()
   appPod.spec.volumes = [
     {
@@ -103,8 +107,38 @@ export async function createPod(
     appPod.spec.imagePullSecrets = [secretReference]
   }
 
+  //Enrich the job spec with the fields defined in the template if there is one
+  const podTemplatePath = process.env.ACTIONS_RUNNER_POD_TEMPLATE_PATH
+  if (podTemplatePath !== undefined) {
+    core.debug('Podtemplate provided, merging fields with pod spec')
+    const yaml = fs.readFileSync(podTemplatePath, 'utf8')
+    const template = k8s.loadYaml<k8s.V1Pod>(yaml)
+    appPod.spec = _.mergeWith(appPod.spec, template.spec, podSpecCustomizer)
+  }
+
   const { body } = await k8sApi.createNamespacedPod(namespace(), appPod)
   return body
+}
+
+/**
+ * Custom function to pass to the lodash mergeWith to merge the podSpec with the provided template.
+ * Will concat all arrays it encounters during the merge, except for the container list of the spec.
+ * Will also skip merging the "image", "name", "command", "args" values of the template
+ *
+ * https://lodash.com/docs/4.17.15#mergeWith
+ */
+function podSpecCustomizer(objValue, srcValue, key): any[] | undefined {
+  if (['image', 'name', 'command', 'args'].includes(key)) {
+    return objValue
+  }
+
+  //check if passed object is array and concat instead of merge if yes
+  if (_.isArray(objValue)) {
+    if (key === 'containers') {
+      return
+    }
+    return objValue.concat(srcValue)
+  }
 }
 
 export async function createJob(

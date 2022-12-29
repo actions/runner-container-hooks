@@ -13,7 +13,7 @@ const k8sStorageApi = kc.makeApiClient(k8s.StorageV1Api)
 
 export class TestHelper {
   private tempDirPath: string
-  private podName: string
+  public podName: string
   constructor() {
     this.tempDirPath = `${__dirname}/_temp/runner`
     this.podName = uuidv4().replace(/-/g, '')

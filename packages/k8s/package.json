@@ -17,6 +17,7 @@
     "@actions/exec": "^1.1.1",
     "@actions/io": "^1.1.2",
     "@kubernetes/client-node": "^0.16.3",
+    "@types/lodash": "^4.14.191",
     "hooklib": "file:../hooklib"
   },
   "devDependencies": {

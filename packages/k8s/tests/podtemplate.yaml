@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: thisvaluewillbeignored
+spec:
+  containers:
+    # the runner will override the "image", "name" and "command" fields
+    - image: "test/test"
+      name: "thisvaluewillbeignored"
+      command:
+        - "these"
+        - "are"
+        - "overridden"
+      resources:
+        requests:
+          cpu: "128m"
+      env:
+        - name: "TEST"
+          value: "testvalue"

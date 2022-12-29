@@ -17,6 +17,7 @@ import {
   PodPhase
 } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
+import { HttpError } from '@kubernetes/client-node'
 
 export async function prepareJob(
   args: prepareJobArgs,
@@ -31,14 +32,14 @@ export async function prepareJob(
   let container: k8s.V1Container | undefined = undefined
   if (args.container?.image) {
     core.debug(`Using image '${args.container.image}' for job image`)
-    container = createPodSpec(args.container, JOB_CONTAINER_NAME, true)
+    container = createContainerSpec(args.container, JOB_CONTAINER_NAME, true)
   }
 
   let services: k8s.V1Container[] = []
   if (args.services?.length) {
     services = args.services.map(service => {
       core.debug(`Adding service '${service.image}' to pod definition`)
-      return createPodSpec(service, service.image.split(':')[0])
+      return createContainerSpec(service, service.image.split(':')[0])
     })
   }
   if (!container && !services?.length) {
@@ -49,6 +50,9 @@ export async function prepareJob(
     createdPod = await createPod(container, services, args.container.registry)
   } catch (err) {
     await prunePods()
+    if (err instanceof HttpError) {
+      core.error(JSON.stringify(err.body))
+    }
     throw new Error(`failed to create job pod: ${err}`)
   }
 
@@ -58,6 +62,7 @@ export async function prepareJob(
   core.debug(
     `Job pod created, waiting for it to come online ${createdPod?.metadata?.name}`
   )
+  core.debug(k8s.dumpYaml(createdPod))
 
   try {
     await waitForPodPhases(
@@ -153,7 +158,7 @@ async function copyExternalsToRoot(): Promise<void> {
   }
 }
 
-function createPodSpec(
+export function createContainerSpec(
   container,
   name: string,
   jobContainer = false
