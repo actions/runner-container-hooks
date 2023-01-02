@@ -159,14 +159,19 @@ function createPodSpec(
   jobContainer = false
 ): k8s.V1Container {
   if (!container.entryPoint && jobContainer) {
-    container.entryPoint = DEFAULT_CONTAINER_ENTRY_POINT
+    container.entryPoint = [DEFAULT_CONTAINER_ENTRY_POINT]
     container.entryPointArgs = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
+  } else if (!container.entryPoint && !jobContainer) {
+    container.entryPoint = undefined
+    container.entryPointArgs = container.createOptions
+      ? container.createOptions.split(' ')
+      : undefined
   }
 
   const podContainer = {
     name,
     image: container.image,
-    command: [container.entryPoint],
+    command: container.entryPoint,
     args: container.entryPointArgs,
     ports: containerPorts(container)
   } as k8s.V1Container
