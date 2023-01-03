@@ -14,6 +14,7 @@ import {
   containerVolumes,
   DEFAULT_CONTAINER_ENTRY_POINT,
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
+  generateContainerName,
   PodPhase
 } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
@@ -38,7 +39,7 @@ export async function prepareJob(
   if (args.services?.length) {
     services = args.services.map(service => {
       core.debug(`Adding service '${service.image}' to pod definition`)
-      return createContainerSpec(service, service.image.split(':')[0])
+      return createContainerSpec(service, generateContainerName(service.image))
     })
   }
   if (!container && !services?.length) {

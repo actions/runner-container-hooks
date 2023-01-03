@@ -1,6 +1,10 @@
 import * as fs from 'fs'
 import { containerPorts, POD_VOLUME_NAME } from '../src/k8s'
-import { containerVolumes, writeEntryPointScript } from '../src/k8s/utils'
+import {
+  containerVolumes,
+  generateContainerName,
+  writeEntryPointScript
+} from '../src/k8s/utils'
 import { TestHelper } from './test-setup'
 
 let testHelper: TestHelper
@@ -219,6 +223,27 @@ describe('k8s utils', () => {
     it('should throw on multi "/" splits', () => {
       expect(() => containerPorts({ portMappings: ['1:1/tcp/udp'] })).toThrow()
       expect(() => containerPorts({ portMappings: ['1/tcp/udp'] })).toThrow()
+    })
+  })
+
+  describe('generate container name', () => {
+    it('should return the container name from image string', () => {
+      expect(
+        generateContainerName('public.ecr.aws/localstack/localstack')
+      ).toEqual('localstack')
+      expect(
+        generateContainerName(
+          'public.ecr.aws/url/with/multiple/slashes/postgres:latest'
+        )
+      ).toEqual('postgres')
+      expect(generateContainerName('postgres')).toEqual('postgres')
+      expect(generateContainerName('postgres:latest')).toEqual('postgres')
+      expect(generateContainerName('localstack/localstack')).toEqual(
+        'localstack'
+      )
+      expect(generateContainerName('localstack/localstack:latest')).toEqual(
+        'localstack'
+      )
     })
   })
 })
