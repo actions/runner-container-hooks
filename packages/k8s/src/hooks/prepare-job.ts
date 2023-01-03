@@ -31,14 +31,14 @@ export async function prepareJob(
   let container: k8s.V1Container | undefined = undefined
   if (args.container?.image) {
     core.debug(`Using image '${args.container.image}' for job image`)
-    container = createPodSpec(args.container, JOB_CONTAINER_NAME, true)
+    container = createContainerSpec(args.container, JOB_CONTAINER_NAME, true)
   }
 
   let services: k8s.V1Container[] = []
   if (args.services?.length) {
     services = args.services.map(service => {
       core.debug(`Adding service '${service.image}' to pod definition`)
-      return createPodSpec(service, service.image.split(':')[0])
+      return createContainerSpec(service, service.image.split(':')[0])
     })
   }
   if (!container && !services?.length) {
@@ -153,7 +153,7 @@ async function copyExternalsToRoot(): Promise<void> {
   }
 }
 
-function createPodSpec(
+function createContainerSpec(
   container,
   name: string,
   jobContainer = false
