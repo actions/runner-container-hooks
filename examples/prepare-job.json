@@ -73,6 +73,7 @@
         "contextName": "redis",
         "image": "redis",
         "createOptions": "--cpus 1",
+        "entrypoint": null,
         "environmentVariables": {},
         "userMountVolumes": [
           {

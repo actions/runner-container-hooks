@@ -167,12 +167,15 @@ function createContainerSpec(
   const podContainer = {
     name,
     image: container.image,
-    command: [container.entryPoint],
     args: container.entryPointArgs,
     ports: containerPorts(container)
   } as k8s.V1Container
   if (container.workingDirectory) {
     podContainer.workingDir = container.workingDirectory
+  }
+
+  if (container.entryPoint ){
+    podContainer.command = [container.entryPoint]
   }
 
   podContainer.env = []
