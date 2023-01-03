@@ -174,7 +174,7 @@ function createContainerSpec(
     podContainer.workingDir = container.workingDirectory
   }
 
-  if (container.entryPoint ){
+  if (container.entryPoint) {
     podContainer.command = [container.entryPoint]
   }
 
