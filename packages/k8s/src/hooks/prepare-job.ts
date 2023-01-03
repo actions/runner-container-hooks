@@ -154,7 +154,7 @@ async function copyExternalsToRoot(): Promise<void> {
   }
 }
 
-function createContainerSpec(
+export function createContainerSpec(
   container,
   name: string,
   jobContainer = false
