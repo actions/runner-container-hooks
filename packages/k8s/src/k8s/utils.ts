@@ -22,16 +22,18 @@ export function containerVolumes(
 
   const workspacePath = process.env.GITHUB_WORKSPACE as string
   if (containerAction) {
+    const i = workspacePath.lastIndexOf('_work/')
+    const workspaceRelativePath = workspacePath.slice(i + '_work/'.length)
     mounts.push(
       {
         name: POD_VOLUME_NAME,
         mountPath: '/github/workspace',
-        subPath: workspacePath.substring(workspacePath.indexOf('work/') + 1)
+        subPath: workspaceRelativePath
       },
       {
         name: POD_VOLUME_NAME,
         mountPath: '/github/file_commands',
-        subPath: workspacePath.substring(workspacePath.indexOf('work/') + 1)
+        subPath: '_temp/_runner_file_commands'
       }
     )
     return mounts

@@ -1,5 +1,5 @@
 import * as fs from 'fs'
-import { POD_VOLUME_NAME } from '../src/k8s'
+import { containerPorts, POD_VOLUME_NAME } from '../src/k8s'
 import { containerVolumes, writeEntryPointScript } from '../src/k8s/utils'
 import { TestHelper } from './test-setup'
 
@@ -103,19 +103,22 @@ describe('k8s utils', () => {
 
     it('should have container action volumes', () => {
       let volumes = containerVolumes([], true, true)
-      expect(
-        volumes.find(e => e.mountPath === '/github/workspace')
-      ).toBeTruthy()
-      expect(
-        volumes.find(e => e.mountPath === '/github/file_commands')
-      ).toBeTruthy()
+      let workspace = volumes.find(e => e.mountPath === '/github/workspace')
+      let fileCommands = volumes.find(
+        e => e.mountPath === '/github/file_commands'
+      )
+      expect(workspace).toBeTruthy()
+      expect(workspace?.subPath).toBe('repo/repo')
+      expect(fileCommands).toBeTruthy()
+      expect(fileCommands?.subPath).toBe('_temp/_runner_file_commands')
+
       volumes = containerVolumes([], false, true)
-      expect(
-        volumes.find(e => e.mountPath === '/github/workspace')
-      ).toBeTruthy()
-      expect(
-        volumes.find(e => e.mountPath === '/github/file_commands')
-      ).toBeTruthy()
+      workspace = volumes.find(e => e.mountPath === '/github/workspace')
+      fileCommands = volumes.find(e => e.mountPath === '/github/file_commands')
+      expect(workspace).toBeTruthy()
+      expect(workspace?.subPath).toBe('repo/repo')
+      expect(fileCommands).toBeTruthy()
+      expect(fileCommands?.subPath).toBe('_temp/_runner_file_commands')
     })
 
     it('should have externals, github home and github workflow mounts if job container', () => {
@@ -148,6 +151,74 @@ describe('k8s utils', () => {
       expect(volumes.every(e => e.name === POD_VOLUME_NAME)).toBeTruthy()
       volumes = containerVolumes([], false, false)
       expect(volumes.every(e => e.name === POD_VOLUME_NAME)).toBeTruthy()
+    })
+
+    it('should parse container ports', () => {
+      const tt = [
+        {
+          spec: '8080:80',
+          want: {
+            containerPort: 80,
+            hostPort: 8080,
+            protocol: 'TCP'
+          }
+        },
+        {
+          spec: '8080:80/udp',
+          want: {
+            containerPort: 80,
+            hostPort: 8080,
+            protocol: 'UDP'
+          }
+        },
+        {
+          spec: '8080/udp',
+          want: {
+            containerPort: 8080,
+            hostPort: undefined,
+            protocol: 'UDP'
+          }
+        },
+        {
+          spec: '8080',
+          want: {
+            containerPort: 8080,
+            hostPort: undefined,
+            protocol: 'TCP'
+          }
+        }
+      ]
+
+      for (const tc of tt) {
+        const got = containerPorts({ portMappings: [tc.spec] })
+        for (const [key, value] of Object.entries(tc.want)) {
+          expect(got[0][key]).toBe(value)
+        }
+      }
+    })
+
+    it('should throw when ports are out of range (0, 65536)', () => {
+      expect(() => containerPorts({ portMappings: ['65536'] })).toThrow()
+      expect(() => containerPorts({ portMappings: ['0'] })).toThrow()
+      expect(() => containerPorts({ portMappings: ['65536/udp'] })).toThrow()
+      expect(() => containerPorts({ portMappings: ['0/udp'] })).toThrow()
+      expect(() => containerPorts({ portMappings: ['1:65536'] })).toThrow()
+      expect(() => containerPorts({ portMappings: ['65536:1'] })).toThrow()
+      expect(() => containerPorts({ portMappings: ['1:65536/tcp'] })).toThrow()
+      expect(() => containerPorts({ portMappings: ['65536:1/tcp'] })).toThrow()
+      expect(() => containerPorts({ portMappings: ['1:'] })).toThrow()
+      expect(() => containerPorts({ portMappings: [':1'] })).toThrow()
+      expect(() => containerPorts({ portMappings: ['1:/tcp'] })).toThrow()
+      expect(() => containerPorts({ portMappings: [':1/tcp'] })).toThrow()
+    })
+
+    it('should throw on multi ":" splits', () => {
+      expect(() => containerPorts({ portMappings: ['1:1:1'] })).toThrow()
+    })
+
+    it('should throw on multi "/" splits', () => {
+      expect(() => containerPorts({ portMappings: ['1:1/tcp/udp'] })).toThrow()
+      expect(() => containerPorts({ portMappings: ['1/tcp/udp'] })).toThrow()
     })
   })
 })

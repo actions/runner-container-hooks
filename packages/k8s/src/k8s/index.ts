@@ -556,27 +556,37 @@ class BackOffManager {
 export function containerPorts(
   container: ContainerInfo
 ): k8s.V1ContainerPort[] {
-  // 8080:8080/tcp
-  const portFormat = /(\d{1,5})(:(\d{1,5}))?(\/(tcp|udp))?/
-
   const ports: k8s.V1ContainerPort[] = []
   for (const portDefinition of container.portMappings) {
-    const submatches = portFormat.exec(portDefinition)
-    if (!submatches) {
-      throw new Error(
-        `Port definition "${portDefinition}" is in incorrect format`
-      )
+    const portProtoSplit = portDefinition.split('/')
+    if (portProtoSplit.length > 2) {
+      throw new Error(`Unexpected port format: ${portDefinition}`)
     }
+
     const port = new k8s.V1ContainerPort()
-    port.hostPort = Number(submatches[1])
-    if (submatches[3]) {
-      port.containerPort = Number(submatches[3])
+    port.protocol =
+      portProtoSplit.length === 2 ? portProtoSplit[1].toUpperCase() : 'TCP'
+
+    const portSplit = portProtoSplit[0].split(':')
+    if (portSplit.length > 2) {
+      throw new Error('ports should have at most one ":" separator')
     }
-    if (submatches[5]) {
-      port.protocol = submatches[5].toUpperCase()
+
+    const parsePort = (p: string): number => {
+      const num = Number(p)
+      if (!Number.isInteger(num) || num < 1 || num > 65535) {
+        throw new Error(`invalid container port: ${p}`)
+      }
+      return num
+    }
+
+    if (portSplit.length === 1) {
+      port.containerPort = parsePort(portSplit[0])
     } else {
-      port.protocol = 'TCP'
+      port.hostPort = parsePort(portSplit[0])
+      port.containerPort = parsePort(portSplit[1])
     }
+
     ports.push(port)
   }
   return ports

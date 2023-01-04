@@ -4,6 +4,7 @@ import {
   getSecretName,
   getStepPodName,
   getVolumeClaimName,
+  JOB_CONTAINER_NAME,
   MAX_POD_NAME_LENGTH,
   RunnerInstanceLabel,
   STEP_POD_NAME_SUFFIX_LENGTH
@@ -168,6 +169,14 @@ describe('constants', () => {
         )
         expect(actual).toMatch(re)
       }
+    })
+  })
+
+  describe('const values', () => {
+    it('should have constants set', () => {
+      expect(JOB_CONTAINER_NAME).toBeTruthy()
+      expect(MAX_POD_NAME_LENGTH).toBeGreaterThan(0)
+      expect(STEP_POD_NAME_SUFFIX_LENGTH).toBeGreaterThan(0)
     })
   })
 })
