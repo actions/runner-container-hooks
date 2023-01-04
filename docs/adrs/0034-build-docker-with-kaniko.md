@@ -39,8 +39,8 @@ To execute a container-action, we run a k8s job by loading the image from the sp
 
 
 ## Limitations
-- The user needs to provide a local Docker Registry (TBD on supporting ghcr or dockerhub)
+- The user needs to provide a local Docker Registry or config for a remote registry (like ghcr or dockerhub)
 - Potential incompatibilities / inconsistencies between Docker and Kaniko, none is known at this time
 
 ## Consequences
-- Users can now run AND build container-actions with a local Dockerfile in their k8s cluster
+- Users build container-actions with a local Dockerfile in their k8s cluster without a privileged docker builder container
