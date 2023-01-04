@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "name": "run prepare job tests",
+            "request": "launch",
+            "program": "${workspaceFolder}/packages/k8s/node_modules/.bin/jest",
+            "args": ["${relativeFile}", "--runInBand"],
+            "cwd": "${workspaceFolder}/packages/k8s",
+            "console": "integratedTerminal",
+        }
+    ]
+}
