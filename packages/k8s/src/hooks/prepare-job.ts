@@ -179,7 +179,7 @@ export function createContainerSpec(
 
   if (container.entryPointArgs?.length > 0) {
     podContainer.args = container.entryPointArgs
-}
+  }
 
   podContainer.env = []
   for (const [key, value] of Object.entries(

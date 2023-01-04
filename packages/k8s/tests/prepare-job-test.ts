@@ -81,6 +81,5 @@ describe('Prepare job', () => {
 
     expect(services[0].command).toBe(undefined)
     expect(services[0].args).toBe(undefined)
-
   })
 })
