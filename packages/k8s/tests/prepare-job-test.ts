@@ -74,11 +74,13 @@ describe('Prepare job', () => {
     ).rejects.toThrow()
   })
 
-  it('should not set entrypoint for service container', async () => {
+  it('should not set command + args for service container if not passed in args', async () => {
     const services = prepareJobData.args.services.map(service => {
       return createContainerSpec(service, generateContainerName(service.image))
     }) as [V1Container]
 
     expect(services[0].command).toBe(undefined)
+    expect(services[0].args).toBe(undefined)
+
   })
 })
