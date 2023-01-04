@@ -138,8 +138,14 @@ exec ${environmentPrefix} ${entryPoint} ${
 }
 
 export function generateContainerName(image: string): string {
-  const name = image.split('/').pop()
-  return name?.split(':').at(0) || 'service'
+  const nameWithTag = image.split('/').pop()
+  const name = nameWithTag?.split(':').at(0)
+
+  if (name === undefined || name === '') {
+    throw new Error('Image definition is invalid')
+  }
+
+  return name
 }
 
 export enum PodPhase {

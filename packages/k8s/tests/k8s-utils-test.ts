@@ -245,5 +245,12 @@ describe('k8s utils', () => {
         'localstack'
       )
     })
+
+    it('should throw on invalid image string', () => {
+      expect(() =>
+        generateContainerName('localstack/localstack/:latest')
+      ).toThrow()
+      expect(() => generateContainerName(':latest')).toThrow()
+    })
   })
 })
