@@ -141,7 +141,7 @@ export function generateContainerName(image: string): string {
   const nameWithTag = image.split('/').pop()
   const name = nameWithTag?.split(':').at(0)
 
-  if (name === undefined || name === '') {
+  if (!name) {
     throw new Error('Image definition is invalid')
   }
 
