@@ -29,7 +29,9 @@ EITHER
     - `ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_NODE_PORT` # NodePort - the K8S job will pull the image from here
     - The hooks then build up a URI like `localhost:${registryNodePort()}/${generated-random-string-handle-image}` for the k8s job to pull from
     - `localhost` is the current limitation enforcing the existence of a docker registry exposed through the `nodePort` of a k8s service
+
 OR
+
 - Define a remote docker registry (dockerhub, ghcr) and its secrets (WIP)
 
 To execute a container-action, we run a k8s job by loading the image from the specified registry
