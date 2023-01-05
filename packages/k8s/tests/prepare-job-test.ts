@@ -71,4 +71,15 @@ describe('Prepare job', () => {
       prepareJob(prepareJobData.args, prepareJobOutputFilePath)
     ).rejects.toThrow()
   })
+
+  it('should not throw an exception on jobs without service port defined', async () => {
+    prepareJobData.args.services.forEach(s => {
+      s.portMappings = []
+    })
+    await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+    const content = JSON.parse(
+      fs.readFileSync(prepareJobOutputFilePath).toString()
+    )
+    expect(() => content.context.services[0].image).not.toThrow()
+  })
 })
