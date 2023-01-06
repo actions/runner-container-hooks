@@ -72,9 +72,9 @@ describe('Prepare job', () => {
     ).rejects.toThrow()
   })
 
-  it('should not throw an exception on jobs without service port defined', async () => {
+  test.each([undefined, null, []])('should not throw exception when portMapping=%p', async pm => {
     prepareJobData.args.services.forEach(s => {
-      s.portMappings = []
+      s.portMappings = pm
     })
     await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
     const content = JSON.parse(

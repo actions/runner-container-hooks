@@ -124,11 +124,13 @@ function generateResponseFile(
   )
   if (serviceContainers?.length) {
     response.context['services'] = serviceContainers.map(c => {
+      if (!c.ports?.length) {
+        return { image: c.image }
+      }
       const ctxPorts: ContextPorts = {}
-      if (c.ports)
-        for (const port of c.ports) {
-          ctxPorts[port.containerPort] = port.hostPort
-        }
+      for (const port of c.ports) {
+        ctxPorts[port.containerPort] = port.hostPort
+      }
 
       return {
         image: c.image,
