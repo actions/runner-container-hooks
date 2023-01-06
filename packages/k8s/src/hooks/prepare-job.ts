@@ -14,6 +14,7 @@ import {
   containerVolumes,
   DEFAULT_CONTAINER_ENTRY_POINT,
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
+  generateContainerName,
   PodPhase
 } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
@@ -31,14 +32,14 @@ export async function prepareJob(
   let container: k8s.V1Container | undefined = undefined
   if (args.container?.image) {
     core.debug(`Using image '${args.container.image}' for job image`)
-    container = createPodSpec(args.container, JOB_CONTAINER_NAME, true)
+    container = createContainerSpec(args.container, JOB_CONTAINER_NAME, true)
   }
 
   let services: k8s.V1Container[] = []
   if (args.services?.length) {
     services = args.services.map(service => {
       core.debug(`Adding service '${service.image}' to pod definition`)
-      return createPodSpec(service, service.image.split(':')[0])
+      return createContainerSpec(service, generateContainerName(service.image))
     })
   }
   if (!container && !services?.length) {
@@ -152,7 +153,7 @@ async function copyExternalsToRoot(): Promise<void> {
   }
 }
 
-function createPodSpec(
+export function createContainerSpec(
   container,
   name: string,
   jobContainer = false
@@ -165,12 +166,18 @@ function createPodSpec(
   const podContainer = {
     name,
     image: container.image,
-    command: [container.entryPoint],
-    args: container.entryPointArgs,
     ports: containerPorts(container)
   } as k8s.V1Container
   if (container.workingDirectory) {
     podContainer.workingDir = container.workingDirectory
+  }
+
+  if (container.entryPoint) {
+    podContainer.command = [container.entryPoint]
+  }
+
+  if (container.entryPointArgs?.length > 0) {
+    podContainer.args = container.entryPointArgs
   }
 
   podContainer.env = []
