@@ -82,4 +82,18 @@ describe('Prepare job', () => {
     expect(services[0].command).toBe(undefined)
     expect(services[0].args).toBe(undefined)
   })
+
+  test.each([undefined, null, []])(
+    'should not throw exception when portMapping=%p',
+    async pm => {
+      prepareJobData.args.services.forEach(s => {
+        s.portMappings = pm
+      })
+      await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+      const content = JSON.parse(
+        fs.readFileSync(prepareJobOutputFilePath).toString()
+      )
+      expect(() => content.context.services[0].image).not.toThrow()
+    }
+  )
 })
