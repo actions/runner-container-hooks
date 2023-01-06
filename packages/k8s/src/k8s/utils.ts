@@ -137,6 +137,17 @@ exec ${environmentPrefix} ${entryPoint} ${
   }
 }
 
+export function generateContainerName(image: string): string {
+  const nameWithTag = image.split('/').pop()
+  const name = nameWithTag?.split(':').at(0)
+
+  if (!name) {
+    throw new Error(`Image definition '${image}' is invalid`)
+  }
+
+  return name
+}
+
 export enum PodPhase {
   PENDING = 'Pending',
   RUNNING = 'Running',
