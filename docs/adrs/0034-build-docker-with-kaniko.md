@@ -1,45 +1,47 @@
 # ADR 0034: Build container-action Dockerfiles with Kaniko
 
-**Date**: 2022-09-29
+**Date**: 2023-01-09
 
 **Status**: In Progress
 
 # Background
 
 [Building Dockerfiles in k8s using Kaniko](https://github.com/actions/runner-container-hooks/issues/23) has been on the radar since the beginning of container hooks.
-Currently, it is only possible in ARC using a [dind/docker-in-docker](https://github.com/actions-runner-controller/actions-runner-controller/blob/master/runner/actions-runner-dind.dockerfile) sidecar container. This container needs to be launched using `--privileged`, which presents a security vulnerability.
+Currently, it is only possible in ARC using a [dind/docker-in-docker](https://github.com/actions-runner-controller/actions-runner-controller/blob/master/runner/actions-runner-dind.dockerfile) sidecar container.
+This container needs to be launched using `--privileged`, which presents a security vulnerability.
 
 As an alternative tool, a container running [Kaniko](https://github.com/GoogleContainerTools/kaniko) can be used to build these files instead.
+Kaniko doesn't need to be `--privileged`.
 Whether using dind/docker-in-docker sidecar or Kaniko, in this ADR I will refer to these containers as '**builder containers**'
 
 # Guiding Principles
 - **Security:** running a Kaniko builder container should be possible without the `--privileged` flag
 - **Feature parity with Docker:** Any 'Dockerfile' that can be built with vanilla Docker should also be possible to build using a Kaniko build container
-- **Function over form:** a limitation we have found with this approach is that in order for a container-action to be run as a k8s job 
-(which is how it works today with container-actions that specify a registry/image instead of a local Dockerfile that we need to build),
-**the k8s job needs to pull the image to be executed from a registry**. In the initial iteration, we assume a user-configured registry that is either exposed as a k8s _service_ through a nodePort OR a public registry (dockerhub, ghcr).
+- **Ease of Use:** The customer should be able to build and push Docker images with minimal configuration
 
 ## Interface
-The user will set `containerMode:kubernetes` since this is a change to the behaviour of our k8s hooks
-The user will 
-EITHER
-- Provide a set of ENVs to a (cluster-local) docker registry into which the Kaniko builder container can push the image
-    - `ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_HOST` # Registry (service) name for kaniko where to push, e.g. 'docker-registry', kaniko pushes to this domain
-    - `ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_PORT` # Container (service) port of the registry, e.g. 5000, kaniko pushes through this port
-    - `ACTIONS_RUNNER_CONTAINER_HOOKS_REGISTRY_NODE_PORT` # NodePort - the K8S job will pull the image from here
-    - The hooks then build up a URI like `localhost:${registryNodePort()}/${generated-random-string-handle-image}` for the k8s job to pull from
-    - `localhost` is the current limitation enforcing the existence of a docker registry exposed through the `nodePort` of a k8s service
+The user will set `containerMode:kubernetes`, because this is a change to the behaviour of our k8s hooks
 
-OR
+The user will set two ENVs:
+- `ACTIONS_RUNNER_CONTAINER_HOOKS_K8S_REGISTRY_HOST`: e.g. `ghcr.io/OWNER` or `dockerhandle`.
+- `ACTIONS_RUNNER_CONTAINER_HOOKS_K8S_REGISTRY_SECRET_NAME`: e.g. `docker-secret`: the name of the `k8s` secret resource that allows you to authenticate against the registry with the given handle above 
 
-- Define a remote docker registry (dockerhub, ghcr) and its secrets (WIP)
+The workspace is used as the image name.
 
-To execute a container-action, we run a k8s job by loading the image from the specified registry
-(TBD) Our hooks will then remove the image from the registry
+The image tag is a random generated string.
 
+To execute a container-action, we then run a k8s job by loading the image from the specified registry
+
+ENVs `ACTIONS_RUNNER_CONTAINER_HOOKS_K8S_REGISTRY_HOST_PUSH` and `ACTIONS_RUNNER_CONTAINER_HOOKS_K8S_REGISTRY_HOST_PULL` will be preferred if set. 
+Users may want to use different URLs for push and pull as they will be invoked by different machines on different networks.
+
+- The Kaniko build container pushes the image after building is a pod that belongs to the runner pod.
+- The kubelet then pulls the image.
+
+The above two might not resolve all host names 100% the same (k8s services, nodeports etc) so it makes sense to allow different push and pull URLs.
 
 ## Limitations
-- The user needs to provide a local Docker Registry or config for a remote registry (like ghcr or dockerhub)
+- The user needs to provide a local Docker Registry within the k8s cluster or config for a remote registry (like ghcr or dockerhub)
 - Potential incompatibilities / inconsistencies between Docker and Kaniko, none is known at this time
 
 ## Consequences
