@@ -7,8 +7,8 @@
 # Background
 
 [Building Dockerfiles in k8s using Kaniko](https://github.com/actions/runner-container-hooks/issues/23) has been on the radar since the beginning of container hooks.
-Currently, it is only possible in ARC using a [dind/docker-in-docker](https://github.com/actions-runner-controller/actions-runner-controller/blob/master/runner/actions-runner-dind.dockerfile) sidecar container.
-This container needs to be launched using `--privileged`, which presents a security vulnerability.
+Currently, this is possible in ARC using a [dind/docker-in-docker](https://github.com/actions-runner-controller/actions-runner-controller/blob/master/runner/actions-runner-dind.dockerfile) sidecar container.
+This container needs to be launched using `--privileged`, which presents a security concern.
 
 As an alternative tool, a container running [Kaniko](https://github.com/GoogleContainerTools/kaniko) can be used to build these files instead.
 Kaniko doesn't need to be `--privileged`.
@@ -32,13 +32,23 @@ The image tag is a random generated string.
 
 To execute a container-action, we then run a k8s job by loading the image from the specified registry
 
+## Additional configuration
+
+Users may want to use different URLs for the registry when pushing and pulling an image as they will be invoked by different machines on different networks.
+
+- The **Kaniko build container pushes the image** after building is a pod that belongs to the runner pod.
+- The **kubelet pulls the image** before starting a pod.
+
+The above two might not resolve all host names 100% the same so it makes sense to allow different push and pull URLs.
+
 ENVs `ACTIONS_RUNNER_CONTAINER_HOOKS_K8S_REGISTRY_HOST_PUSH` and `ACTIONS_RUNNER_CONTAINER_HOOKS_K8S_REGISTRY_HOST_PULL` will be preferred if set. 
-Users may want to use different URLs for push and pull as they will be invoked by different machines on different networks.
 
-- The Kaniko build container pushes the image after building is a pod that belongs to the runner pod.
-- The kubelet then pulls the image.
+### Example
 
-The above two might not resolve all host names 100% the same (k8s services, nodeports etc) so it makes sense to allow different push and pull URLs.
+As an example, a cluster local docker registry could be a long running pod exposed as a service _and_ as a NodePort.
+
+The Kaniko builder pod would push to `my-local-registry.default.svc.cluster.local:12345/foohandle`. (`ACTIONS_RUNNER_CONTAINER_HOOKS_K8S_REGISTRY_HOST_PUSH`)
+This URL cannot be resolved by the kubelet to pull the image, so we need a secondary URL to pull it - in this case, using the NodePort, this URL is localhost:NODEPORT/foohandle. (`ACTIONS_RUNNER_CONTAINER_HOOKS_K8S_REGISTRY_HOST_PULL)
 
 ## Limitations
 - The user needs to provide a local Docker Registry within the k8s cluster or config for a remote registry (like ghcr or dockerhub)
