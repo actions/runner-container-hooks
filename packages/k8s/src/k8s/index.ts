@@ -517,6 +517,9 @@ export function containerPorts(
   container: ContainerInfo
 ): k8s.V1ContainerPort[] {
   const ports: k8s.V1ContainerPort[] = []
+  if (!container.portMappings?.length) {
+    return ports
+  }
   for (const portDefinition of container.portMappings) {
     const portProtoSplit = portDefinition.split('/')
     if (portProtoSplit.length > 2) {

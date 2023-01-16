@@ -1,8 +1,10 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { cleanupJob } from '../src/hooks'
-import { prepareJob } from '../src/hooks/prepare-job'
+import { createContainerSpec, prepareJob } from '../src/hooks/prepare-job'
 import { TestHelper } from './test-setup'
+import { generateContainerName } from '../src/k8s/utils'
+import { V1Container } from '@kubernetes/client-node'
 
 jest.useRealTimers()
 
@@ -71,4 +73,27 @@ describe('Prepare job', () => {
       prepareJob(prepareJobData.args, prepareJobOutputFilePath)
     ).rejects.toThrow()
   })
+
+  it('should not set command + args for service container if not passed in args', async () => {
+    const services = prepareJobData.args.services.map(service => {
+      return createContainerSpec(service, generateContainerName(service.image))
+    }) as [V1Container]
+
+    expect(services[0].command).toBe(undefined)
+    expect(services[0].args).toBe(undefined)
+  })
+
+  test.each([undefined, null, []])(
+    'should not throw exception when portMapping=%p',
+    async pm => {
+      prepareJobData.args.services.forEach(s => {
+        s.portMappings = pm
+      })
+      await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+      const content = JSON.parse(
+        fs.readFileSync(prepareJobOutputFilePath).toString()
+      )
+      expect(() => content.context.services[0].image).not.toThrow()
+    }
+  )
 })
