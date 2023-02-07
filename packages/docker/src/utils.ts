@@ -9,7 +9,7 @@ const exec = require('@actions/exec')
 export interface RunDockerCommandOptions {
   workingDir?: string
   input?: Buffer
-  env?: { [key: string]: string }
+  env?: { [key: string]: string | undefined }
 }
 
 export async function runDockerCommand(
