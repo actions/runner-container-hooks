@@ -99,7 +99,7 @@ export async function containerPull(
   dockerArgs.push(image)
   for (let i = 0; i < 3; i++) {
     try {
-      await runDockerCommand(dockerArgs, { env: process.env })
+      await runDockerCommand(dockerArgs)
       return
     } catch {
       core.info(`docker pull failed on attempt: ${i + 1}`)
