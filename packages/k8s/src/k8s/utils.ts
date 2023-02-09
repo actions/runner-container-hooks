@@ -112,7 +112,9 @@ export function writeEntryPointScript(
     const envBuffer: string[] = []
     for (const [key, value] of Object.entries(environmentVariables)) {
       if (key.includes(`=`) || key.includes(`'`) || key.includes(`"`)) {
-        throw new Error(`environment key ${key} is invalid - the key must not contain =, ' or "`)
+        throw new Error(
+          `environment key ${key} is invalid - the key must not contain =, ' or "`
+        )
       }
       envBuffer.push(
         `"${key}=${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
