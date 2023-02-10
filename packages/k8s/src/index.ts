@@ -38,7 +38,6 @@ async function run(): Promise<void> {
       case Command.RunContainerStep:
         exitCode = await runContainerStep(args)
         return process.exit(exitCode)
-      case Command.runContainerStep:
       default:
         throw new Error(`Command not recognized: ${command}`)
     }
