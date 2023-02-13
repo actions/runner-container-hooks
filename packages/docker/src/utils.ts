@@ -9,7 +9,7 @@ const exec = require('@actions/exec')
 export interface RunDockerCommandOptions {
   workingDir?: string
   input?: Buffer
-  env?: { [key: string]: string }
+  env?: { [key: string]: string | undefined }
 }
 
 export async function runDockerCommand(
@@ -41,8 +41,7 @@ export function optionsWithDockerEnvs(
     'DOCKER_HOST',
     'DOCKER_STACK_ORCHESTRATOR',
     'DOCKER_TLS_VERIFY',
-    'BUILDKIT_PROGRESS',
-    'PATH'
+    'BUILDKIT_PROGRESS'
   ])
   const dockerEnvs = {}
   for (const key in process.env) {
@@ -61,6 +60,8 @@ export function optionsWithDockerEnvs(
   for (const [key, value] of Object.entries(dockerEnvs)) {
     newOptions.env[key] = value as string
   }
+
+  newOptions.env["PATH"] = process.env.PATH
 
   return newOptions
 }
