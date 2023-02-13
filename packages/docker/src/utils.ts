@@ -9,7 +9,7 @@ const exec = require('@actions/exec')
 export interface RunDockerCommandOptions {
   workingDir?: string
   input?: Buffer
-  env?: { [key: string]: string | undefined }
+  env?: { [key: string]: string }
 }
 
 export async function runDockerCommand(
@@ -61,7 +61,9 @@ export function optionsWithDockerEnvs(
     newOptions.env[key] = value as string
   }
 
-  newOptions.env["PATH"] = process.env.PATH
+  if (process.env.PATH) {
+    newOptions.env['PATH'] = process.env.PATH
+  }
 
   return newOptions
 }
