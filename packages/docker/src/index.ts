@@ -14,11 +14,12 @@ import {
   runScriptStep
 } from './hooks'
 import { checkEnvironment } from './utils'
+import { applyCkoCustomisations } from './cko-customisations'
 
 async function run(): Promise<void> {
   try {
     checkEnvironment()
-    const input = await getInputFromStdin()
+    const input = applyCkoCustomisations(await getInputFromStdin())
 
     const args = input['args']
     const command = input['command']
