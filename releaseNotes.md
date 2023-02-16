@@ -1,9 +1,5 @@
-## Features
-- Always use the Docker related ENVs from the host machine instead of ENVs from the runner job [#40]
-- Use user defined entrypoints for service containers (instead of `tail -f /dev/null`)
+v<HOOK_VERSION>
 
-## Bugs
-- Fixed substring issue with /github/workspace and /github/file_commands [#35]
-- Fixed issue related to setting hostPort and containerPort when formatting is not recognized by k8s default [#38]
+## Changes
 
-<!-- ## Misc 
+1. Added CKO customisations that propagate AWS credentials down to containerised job steps from the runner environment. Solves CIC-

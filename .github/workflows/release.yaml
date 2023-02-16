@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, cko-core-platform-default-runners-github-runners]
     steps:
       - uses: actions/checkout@v3
       - run: npm install
@@ -26,7 +26,6 @@ jobs:
       - name: Zip up releases
         run: |
           zip -r -j actions-runner-hooks-docker-${{ steps.releaseNotes.outputs.version }}.zip packages/docker/dist
-          zip -r -j actions-runner-hooks-k8s-${{ steps.releaseNotes.outputs.version }}.zip packages/k8s/dist
       - uses: actions/create-release@v1
         id: createRelease
         name: Create ${{ steps.releaseNotes.outputs.version }} Hook Release
@@ -37,15 +36,6 @@ jobs:
           release_name: "v${{ steps.releaseNotes.outputs.version }}"
           body: |
             ${{ steps.releaseNotes.outputs.note }}
-      - name: Upload K8s hooks
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.createRelease.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/actions-runner-hooks-k8s-${{ steps.releaseNotes.outputs.version }}.zip
-          asset_name: actions-runner-hooks-k8s-${{ steps.releaseNotes.outputs.version }}.zip
-          asset_content_type: application/octet-stream
       - name: Upload docker hooks
         uses: actions/upload-release-asset@v1
         env:
