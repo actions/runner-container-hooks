@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
 jobs:
   build:
-    runs-on: cko-core-platform-default-runners-github-runners
+    runs-on: [self-hosted, cko-core-platform-default-runners-github-runners]
     steps:
       - uses: actions/checkout@v3
       - run: npm install
