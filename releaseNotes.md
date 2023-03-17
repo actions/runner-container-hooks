@@ -1,5 +1,5 @@
 ## Features
-- User service container entrypoint if no entrypoint is specified [#53]
+- Use service container entrypoint if no entrypoint is specified [#53]
 
 ## Bugs
 - Fixed issue caused by promise rejection in kubernetes hook [#65]
