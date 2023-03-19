@@ -126,7 +126,7 @@ function generateResponseFile(
   if (serviceContainers?.length) {
     response.context['services'] = serviceContainers.map(c => {
       const ctxPorts: ContextPorts = {}
-      if (c.ports) {
+      if (c.ports?.length) {
         for (const port of c.ports) {
           ctxPorts[port.containerPort] = port.hostPort
         }
