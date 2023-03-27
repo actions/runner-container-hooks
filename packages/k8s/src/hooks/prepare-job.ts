@@ -204,6 +204,7 @@ export function createContainerSpec(
   const limit_memory = process.env.ACTIONS_POD_RESOURCE_LIMIT_MEMORY
   const request_memory = process.env.ACTIONS_POD_RESOURCE_REQUEST_MEMORY
   const request_cpu = process.env.ACTIONS_POD_RESOURCE_REQUEST_CPU
+  const imagePullPolicy = process.env.ACTIONS_POD_IMAGE_PULL_POLICY
   resources.requests = {
     ...(request_cpu != undefined) && {cpu: request_cpu},
     ...(request_memory != undefined) && {memory: request_memory},
@@ -215,6 +216,7 @@ export function createContainerSpec(
   const podContainer = {
     name,
     image: container.image,
+    imagePullPolicy: imagePullPolicy ? imagePullPolicy : "Always",
     ports: containerPorts(container),
     resources: resources
   } as k8s.V1Container
