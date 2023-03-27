@@ -1,7 +1,7 @@
-# ADR 0000: Using Ephemeral Containers
+# ADR 0072: Using Ephemeral Containers
 
 **Date:** 27 March 2023
-**Status**: (Proposed|Accepted|Rejected|Superceded|Deprecated)
+**Status**: Proposed <!--Accepted|Rejected|Superceded|Deprecated-->
 
 ## Context
 
