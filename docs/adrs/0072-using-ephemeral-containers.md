@@ -22,8 +22,6 @@ The criteria that we are using to evaluate whether ephemeral containers are fit 
 - Security
 - Resource limits
 - Logs
-- Metrics
-- Compatibility
 - Customizability
 
 ### Networking
@@ -137,13 +135,37 @@ curl -v "https://<IP>:<PORT>/api/v1/namespaces/$NAMESPACE/pods/$POD_NAME/ephemer
 
 <details>
 
+### Security
+
+According to the [ephemeral containers API specification](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.26/#ephemeralcontainer-v1-core) the configuration of the `securityContext` field is possible.
+
+### Resource limits
+
+Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources already allocated to the pod. [^1]
+
+This is a major drawback as it means that ephemeral containers cannot be configured to have resource limits.
+
+### Logs
+
+Since ephemeral containers can share volumes with the runner container, it's possible to write logs to the same volume and have them available to the runner container.
+
+### Customizability
+
+Ephemeral containers can run any image and tag provided, they can be customized to run any arbitrary job. However, it's important to note that the following are not feasible:
+
+- Lifecycle is not allowed for ephemeral containers
+- Probes are not allowed for ephemeral containers.
+- Ports are not allowed for ephemeral containers.
+
 ## Decision
 
-_**What** is the change being proposed? **How** will it be implemented?_
+TBD
 
 ## Consequences
 
-_What becomes easier or more difficult to do because of this change?_
+TBD
+
+## References
 
 [^1]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.26/#ephemeralcontainer-v1-core
 
