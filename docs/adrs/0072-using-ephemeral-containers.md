@@ -1,6 +1,7 @@
 # ADR 0072: Using Ephemeral Containers
 
 **Date:** 27 March 2023
+
 **Status**: Proposed <!--Accepted|Rejected|Superceded|Deprecated-->
 
 ## Context
@@ -133,7 +134,7 @@ curl -v "https://<IP>:<PORT>/api/v1/namespaces/$NAMESPACE/pods/$POD_NAME/ephemer
 
 ![emptyDir volume mount](./images/emptyDir_volume.png)
 
-<details>
+</details>
 
 ### Security
 
