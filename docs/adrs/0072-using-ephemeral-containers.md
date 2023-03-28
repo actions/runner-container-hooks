@@ -28,7 +28,7 @@ The criteria that we are using to evaluate whether ephemeral containers are fit 
 
 ### Networking
 
-Ephemeral containers share the networking namespace of the pod they are attached to. This means that ephemeral containers can access the same network interfaces as the pod and can communicate with other containers in the same pod. However, ephemeral containers cannot have ports configured and as such the fields ports, livenessProbe, and readinessProbe are not available.
+Ephemeral containers share the networking namespace of the pod they are attached to. This means that ephemeral containers can access the same network interfaces as the pod and can communicate with other containers in the same pod. However, ephemeral containers cannot have ports configured and as such the fields ports, livenessProbe, and readinessProbe are not available [^1][^2]
 
 In this scenario we have 3 containers in a pod:
 
@@ -58,7 +58,84 @@ By sequentially opening ports on each of these containers and connecting to them
 
 ### Storage
 
+An emptyDir volume can be successfully mounted (read/write) by the runner as well as the ephemeral containers. This means that ephemeral containers can share data with the runner and other ephemeral containers.
 
+<details>
+<summary>Configuration</summary>
+
+```yaml
+# Extracted from the values.yaml for the gha-runner-scale-set helm chart
+  spec:
+    containers:
+    - name: runner
+      image: ghcr.io/actions/actions-runner:latest
+      command: ["/home/runner/run.sh"]
+      volumeMounts:
+      - mountPath: /workspace
+        name: work-volume
+    volumes:
+      - name: work-volume
+        emptyDir:
+          sizeLimit: 1Gi
+```
+
+```bash
+# The API call to the Kubernetes API used to create the ephemeral containers
+
+POD_NAME="arc-runner-set-6sfwd-runner-k7qq6"
+NAMESPACE="arc-runners"
+
+curl -v "https://<IP>:<PORT>/api/v1/namespaces/$NAMESPACE/pods/$POD_NAME/ephemeralcontainers" \
+  -X PATCH \
+  -H 'Content-Type: application/strategic-merge-patch+json' \
+  --cacert <PATH_TO_CACERT> \
+  --cert <PATH_TO_CERT> \
+  --key <PATH_TO_CLIENT_KEY> \
+  -d '
+{
+    "spec":
+    {
+        "ephemeralContainers":
+        [
+            {
+                "name": "debugger",
+                "command": ["sh"],
+                "image": "ghcr.io/actions/actions-runner:latest",
+                "targetContainerName": "runner",
+                "stdin": true,
+                "tty": true,
+                "volumeMounts": [{
+                    "mountPath": "/workspace",
+                    "name": "work-volume",
+                    "readOnly": false
+                }]
+            },
+            {
+                "name": "debugger2",
+                "command": ["sh"],
+                "image": "ghcr.io/actions/actions-runner:latest",
+                "targetContainerName": "runner",
+                "stdin": true,
+                "tty": true,
+                "volumeMounts": [{
+                    "mountPath": "/workspace",
+                    "name": "work-volume",
+                    "readOnly": false
+                }]
+            }
+        ]
+    }
+}'
+```
+
+</details>
+
+<details>
+<summary>emptyDir volume mount</summary>
+
+![emptyDir volume mount](./images/emptyDir_volume.png)
+
+<details>
 
 ## Decision
 
@@ -67,3 +144,7 @@ _**What** is the change being proposed? **How** will it be implemented?_
 ## Consequences
 
 _What becomes easier or more difficult to do because of this change?_
+
+[^1]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.26/#ephemeralcontainer-v1-core
+
+[^2]: https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/
