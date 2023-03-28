@@ -2,7 +2,7 @@
 
 **Date:** 27 March 2023
 
-**Status**: Proposed <!--Accepted|Rejected|Superceded|Deprecated-->
+**Status**: Rejected <!--Accepted|Rejected|Superceded|Deprecated-->
 
 ## Context
 
@@ -169,12 +169,11 @@ Ephemeral containers can run any image and tag provided, they can be customized 
 
 While the evaluation shows that ephemeral containers can be used to run jobs in containers, it's important to acknowledge that ephemeral containers were not designed to handle workloads but rather provide a mechanism to inspect running containers for debugging and troubleshooting purposes.
 
-TBD
+Given the limitations of ephemeral containers, we decided not to use them outside of their intended purpose.
 
 ## Consequences
 
-TBD
-
+Proposal rejected, no further action required. This document will be used as a reference for future discussions.
 
 [^1]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.26/#ephemeralcontainer-v1-core
 
