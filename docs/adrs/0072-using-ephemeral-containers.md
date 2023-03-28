@@ -140,11 +140,17 @@ curl -v "https://<IP>:<PORT>/api/v1/namespaces/$NAMESPACE/pods/$POD_NAME/ephemer
 
 According to the [ephemeral containers API specification](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.26/#ephemeralcontainer-v1-core) the configuration of the `securityContext` field is possible.
 
+Ephemeral containers share the same network namespace as the pod they are attached to. This means that ephemeral containers can access the same network interfaces as the pod and can communicate with other containers in the same pod.
+
+It is also possible for ephemeral containers to [share the process namespace](https://kubernetes.io/docs/tasks/configure-pod-container/share-process-namespace/) with the other containers in the pod. This is disabled by default.
+
+The above could have unpredictable security implications.
+
 ### Resource limits
 
-Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources already allocated to the pod. [^1]
+Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources already allocated to the pod. [^1] This is a major drawback as it means that ephemeral containers cannot be configured to have resource limits.
 
-This is a major drawback as it means that ephemeral containers cannot be configured to have resource limits.
+There are no guaranteed resources for ad-hoc troubleshooting. If troubleshooting causes a pod to exceed its resource limit it may be evicted. [^3]
 
 ### Logs
 
@@ -155,10 +161,13 @@ Since ephemeral containers can share volumes with the runner container, it's pos
 Ephemeral containers can run any image and tag provided, they can be customized to run any arbitrary job. However, it's important to note that the following are not feasible:
 
 - Lifecycle is not allowed for ephemeral containers
+    - Ephemeral containers will stop when their command exits, such as exiting a shell, and they will not be restarted. Unlike `kubectl exec`, processes in Ephemeral Containers will not receive an `EOF` if their connections are interrupted, so shells won't automatically exit on disconnect. There is no API support for killing or restarting an ephemeral container. The only way to exit the container is to send it an OS signal. [^4]
 - Probes are not allowed for ephemeral containers.
 - Ports are not allowed for ephemeral containers.
 
 ## Decision
+
+While the evaluation shows that ephemeral containers can be used to run jobs in containers, it's important to acknowledge that ephemeral containers were not designed to handle workloads but rather provide a mechanism to inspect running containers for debugging and troubleshooting purposes.
 
 TBD
 
@@ -166,8 +175,11 @@ TBD
 
 TBD
 
-## References
 
 [^1]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.26/#ephemeralcontainer-v1-core
 
 [^2]: https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/
+
+[^3]: https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/277-ephemeral-containers/README.md#notesconstraintscaveats
+
+[^4]: https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/277-ephemeral-containers/README.md#ephemeral-container-lifecycle
