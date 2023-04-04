@@ -205,6 +205,7 @@ export function createContainerSpec(
   const request_memory = process.env.ACTIONS_POD_RESOURCE_REQUEST_MEMORY
   const request_cpu = process.env.ACTIONS_POD_RESOURCE_REQUEST_CPU
   const imagePullPolicy = process.env.ACTIONS_POD_IMAGE_PULL_POLICY
+  const tailscaleAuthSecret = process.env.ACTIONS_POD_TAILSCALE_SECRET
   resources.requests = {
     ...(request_cpu != undefined) && {cpu: request_cpu},
     ...(request_memory != undefined) && {memory: request_memory},
@@ -239,6 +240,9 @@ export function createContainerSpec(
     if (value && key !== 'HOME') {
       podContainer.env.push({ name: key, value: value as string })
     }
+  }
+  if (tailscaleAuthSecret != undefined){
+    podContainer.env.push({ name: "AUTH_KEY", value: tailscaleAuthSecret })
   }
 
   podContainer.volumeMounts = containerVolumes(
