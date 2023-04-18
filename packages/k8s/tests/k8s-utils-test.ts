@@ -49,6 +49,81 @@ describe('k8s utils', () => {
       ).toThrow()
     })
 
+    it('should throw if environment variable name contains double quote', () => {
+      expect(() =>
+        writeEntryPointScript(
+          '/test',
+          'sh',
+          ['-e', 'script.sh'],
+          ['/prepend/path'],
+          {
+            'SOME"_ENV': 'SOME_VALUE'
+          }
+        )
+      ).toThrow()
+    })
+
+    it('should throw if environment variable name contains =', () => {
+      expect(() =>
+        writeEntryPointScript(
+          '/test',
+          'sh',
+          ['-e', 'script.sh'],
+          ['/prepend/path'],
+          {
+            'SOME=ENV': 'SOME_VALUE'
+          }
+        )
+      ).toThrow()
+    })
+
+    it('should throw if environment variable name contains single quote', () => {
+      expect(() =>
+        writeEntryPointScript(
+          '/test',
+          'sh',
+          ['-e', 'script.sh'],
+          ['/prepend/path'],
+          {
+            "SOME'_ENV": 'SOME_VALUE'
+          }
+        )
+      ).toThrow()
+    })
+
+    it('should throw if environment variable name contains dollar', () => {
+      expect(() =>
+        writeEntryPointScript(
+          '/test',
+          'sh',
+          ['-e', 'script.sh'],
+          ['/prepend/path'],
+          {
+            SOME_$_ENV: 'SOME_VALUE'
+          }
+        )
+      ).toThrow()
+    })
+
+    it('should escape double quote, dollar and backslash in environment variable values', () => {
+      const { runnerPath } = writeEntryPointScript(
+        '/test',
+        'sh',
+        ['-e', 'script.sh'],
+        ['/prepend/path'],
+        {
+          DQUOTE: '"',
+          BACK_SLASH: '\\',
+          DOLLAR: '$'
+        }
+      )
+      expect(fs.existsSync(runnerPath)).toBe(true)
+      const script = fs.readFileSync(runnerPath, 'utf8')
+      expect(script).toContain('"DQUOTE=\\"')
+      expect(script).toContain('"BACK_SLASH=\\\\"')
+      expect(script).toContain('"DOLLAR=\\$"')
+    })
+
     it('should return object with containerPath and runnerPath', () => {
       const { containerPath, runnerPath } = writeEntryPointScript(
         '/test',

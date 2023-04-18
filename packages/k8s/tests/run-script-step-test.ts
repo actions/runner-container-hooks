@@ -89,6 +89,28 @@ describe('Run script step', () => {
     ).resolves.not.toThrow()
   })
 
+  it('Dollar symbols in environment variables should not be expanded', async () => {
+    runScriptStepDefinition.args.environmentVariables = {
+      VARIABLE1: '$VAR',
+      VARIABLE2: '${VAR}',
+      VARIABLE3: '$(VAR)'
+    }
+    runScriptStepDefinition.args.entryPointArgs = [
+      '-c',
+      '\'if [[ -z "$VARIABLE1" ]]; then exit 1; fi\'',
+      '\'if [[ -z "$VARIABLE2" ]]; then exit 2; fi\'',
+      '\'if [[ -z "$VARIABLE3" ]]; then exit 3; fi\''
+    ]
+
+    await expect(
+      runScriptStep(
+        runScriptStepDefinition.args,
+        prepareJobOutputData.state,
+        null
+      )
+    ).resolves.not.toThrow()
+  })
+
   it('Should have path variable changed in container with prepend path string array', async () => {
     runScriptStepDefinition.args.prependPath = ['/some/other/path']
     runScriptStepDefinition.args.entryPoint = '/bin/bash'
