@@ -37,7 +37,7 @@ export async function createContainer(
       dockerArgs.push('-p', portMapping)
     }
   }
-  if (args.createOptions) {
+  if (args.createOptions && typeof args.createOptions === 'string') {
     dockerArgs.push(...args.createOptions.split(' '))
   }
 
@@ -397,7 +397,7 @@ export async function containerRun(
     dockerArgs.push(`--network=${network}`)
   }
 
-  if (args.createOptions) {
+  if (args.createOptions && typeof args.createOptions === 'string') {
     dockerArgs.push(...args.createOptions.split(' '))
   }
   if (args.environmentVariables) {

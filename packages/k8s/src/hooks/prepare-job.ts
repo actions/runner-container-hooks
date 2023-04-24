@@ -1,7 +1,13 @@
 import * as core from '@actions/core'
 import * as io from '@actions/io'
 import * as k8s from '@kubernetes/client-node'
-import { ContextPorts, prepareJobArgs, writeToResponseFile } from 'hooklib'
+import {
+  KubernetesJobPodOptions,
+  JobContainerInfo,
+  ContextPorts,
+  PrepareJobArgs,
+  writeToResponseFile
+} from 'hooklib'
 import path from 'path'
 import {
   containerPorts,
@@ -20,7 +26,7 @@ import {
 import { JOB_CONTAINER_NAME } from './constants'
 
 export async function prepareJob(
-  args: prepareJobArgs,
+  args: PrepareJobArgs,
   responseFile
 ): Promise<void> {
   if (!args.container) {
@@ -45,9 +51,22 @@ export async function prepareJob(
   if (!container && !services?.length) {
     throw new Error('No containers exist, skipping hook invocation')
   }
+
   let createdPod: k8s.V1Pod | undefined = undefined
   try {
-    createdPod = await createPod(container, services, args.container.registry)
+    let options: KubernetesJobPodOptions = {}
+    if (
+      args.container?.createOptions &&
+      typeof args.container?.createOptions === 'object'
+    ) {
+      options = args.container.createOptions
+    }
+    createdPod = await createPod(
+      container,
+      services,
+      args.container.registry,
+      options
+    )
   } catch (err) {
     await prunePods()
     throw new Error(`failed to create job pod: ${err}`)
@@ -153,7 +172,7 @@ async function copyExternalsToRoot(): Promise<void> {
 }
 
 export function createContainerSpec(
-  container,
+  container: JobContainerInfo,
   name: string,
   jobContainer = false
 ): k8s.V1Container {
@@ -192,6 +211,47 @@ export function createContainerSpec(
     container.userMountVolumes,
     jobContainer
   )
+
+  if (
+    !container.createOptions?.container ||
+    typeof container.createOptions?.container !== 'object'
+  ) {
+    return podContainer
+  }
+
+  // Overwrite or append based on container options
+  //
+  // Keep in mind, envs and volumes could be passed as fields in container definition
+  // so default volume mounts and envs are appended first, and then create options are used
+  // to append more values
+  //
+  // Rest of the fields are just applied
+  // For example, container.createOptions.container.image is going to overwrite container.image field
+  for (const [key, value] of Object.entries(
+    container.createOptions.container
+  )) {
+    if (key === 'name' && jobContainer) {
+      continue
+    } else if (key === 'env') {
+      const envs = value as k8s.V1EnvVar[]
+      if (!envs?.length) {
+        continue
+      }
+      for (const env of envs) {
+        podContainer.env.push(env)
+      }
+    } else if (key === 'volumeMounts' && value) {
+      const volumeMounts = value as k8s.V1VolumeMount[]
+      if (!volumeMounts?.length) {
+        continue
+      }
+      for (const vm of volumeMounts) {
+        podContainer.volumeMounts.push(vm)
+      }
+    } else {
+      podContainer[key] = value
+    }
+  }
 
   return podContainer
 }

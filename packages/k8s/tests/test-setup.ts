@@ -31,7 +31,7 @@ export class TestHelper {
     fs.mkdirSync(process.env.RUNNER_TEMP, { recursive: true })
 
     fs.copyFileSync(
-      path.resolve(`${__dirname}/../../../examples/example-script.sh`),
+      path.resolve(`${__dirname}/../../../examples/k8s/example-script.sh`),
       `${process.env.RUNNER_TEMP}/example-script.sh`
     )
 
@@ -154,7 +154,7 @@ export class TestHelper {
   public getPrepareJobDefinition(): HookData {
     const prepareJob = JSON.parse(
       fs.readFileSync(
-        path.resolve(__dirname + '/../../../examples/prepare-job.json'),
+        path.resolve(__dirname + '/../../../examples/k8s/prepare-job.json'),
         'utf8'
       )
     )
@@ -171,7 +171,7 @@ export class TestHelper {
   public getRunScriptStepDefinition(): HookData {
     const runScriptStep = JSON.parse(
       fs.readFileSync(
-        path.resolve(__dirname + '/../../../examples/run-script-step.json'),
+        path.resolve(__dirname + '/../../../examples/k8s/run-script-step.json'),
         'utf8'
       )
     )
@@ -183,7 +183,7 @@ export class TestHelper {
   public getRunContainerStepDefinition(): HookData {
     const runContainerStep = JSON.parse(
       fs.readFileSync(
-        path.resolve(__dirname + '/../../../examples/run-container-step.json'),
+        path.resolve(__dirname + '/../../../examples/k8s/run-container-step.json'),
         'utf8'
       )
     )

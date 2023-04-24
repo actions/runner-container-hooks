@@ -1,0 +1,77 @@
+{
+  "command": "run_container_step",
+  "responseFile": null,
+  "state": {
+    "network": "github_network_53269bd575974817b43f4733536b200c",
+    "container": "82e8219701fe096a35941d869cf8d71af1d943b5d3bdd718850fb87ac3042480",
+    "services": {
+      "redis": "60972d9aa486605e66b0dad4abb638dc3d9116f566579e418166eedb8abb9105"
+    }
+  },
+  "args": {
+    "image": "node:14.16",
+    "dockerfile": null,
+    "entryPointArgs": [
+      "-e",
+      "example-script.sh"
+    ],
+    "entryPoint": "bash",
+    "workingDirectory": "/__w/repo/repo",
+    "createOptions": "--cpus 1",
+    "environmentVariables": {
+      "NODE_ENV": "development"
+    },
+    "prependPath": [
+      "/foo/bar",
+      "bar/foo"
+    ],
+    "userMountVolumes": [
+      {
+        "sourceVolumePath": "my_docker_volume",
+        "targetVolumePath": "/volume_mount",
+        "readOnly": false
+      }
+    ],
+    "systemMountVolumes": [
+      {
+        "sourceVolumePath": "/Users/thomas/git/runner/_layout/_work",
+        "targetVolumePath": "/__w",
+        "readOnly": false
+      },
+      {
+        "sourceVolumePath": "/Users/thomas/git/runner/_layout/externals",
+        "targetVolumePath": "/__e",
+        "readOnly": true
+      },
+      {
+        "sourceVolumePath": "/Users/thomas/git/runner/_layout/_work/_temp",
+        "targetVolumePath": "/__w/_temp",
+        "readOnly": false
+      },
+      {
+        "sourceVolumePath": "/Users/thomas/git/runner/_layout/_work/_actions",
+        "targetVolumePath": "/__w/_actions",
+        "readOnly": false
+      },
+      {
+        "sourceVolumePath": "/Users/thomas/git/runner/_layout/_work/_tool",
+        "targetVolumePath": "/__w/_tool",
+        "readOnly": false
+      },
+      {
+        "sourceVolumePath": "//Users/thomas/git/runner/_layout/_work/_temp/_github_home",
+        "targetVolumePath": "/github/home",
+        "readOnly": false
+      },
+      {
+        "sourceVolumePath": "/Users/thomas/git/runner/_layout/_work/_temp/_github_workflow",
+        "targetVolumePath": "/github/workflow",
+        "readOnly": false
+      }
+    ],
+    "registry": null,
+    "portMappings": [
+      "8080:8080"
+    ]
+  }
+}

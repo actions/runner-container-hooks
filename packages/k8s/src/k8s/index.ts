@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
 import * as k8s from '@kubernetes/client-node'
-import { ContainerInfo, Registry } from 'hooklib'
+import { KubernetesJobPodOptions, ContainerInfo, Registry } from 'hooklib'
 import * as stream from 'stream'
 import {
   getJobPodName,
@@ -58,7 +58,8 @@ export const requiredPermissions = [
 export async function createPod(
   jobContainer?: k8s.V1Container,
   services?: k8s.V1Container[],
-  registry?: Registry
+  registry?: Registry,
+  options?: KubernetesJobPodOptions
 ): Promise<k8s.V1Pod> {
   const containers: k8s.V1Container[] = []
   if (jobContainer) {
@@ -101,6 +102,24 @@ export async function createPod(
     const secretReference = new k8s.V1LocalObjectReference()
     secretReference.name = secret.metadata.name
     appPod.spec.imagePullSecrets = [secretReference]
+  }
+
+  if (options && typeof options === 'object') {
+    for (const [key, value] of Object.entries(options)) {
+      if (key === 'container') {
+        continue
+      } else if (key === 'volumes' && value) {
+        const volumes = value as k8s.V1Volume[]
+        if (!volumes?.length) {
+          continue
+        }
+        for (const volume of volumes) {
+          appPod.spec.volumes.push(volume)
+        }
+      } else {
+        appPod.spec[key] = value
+      }
+    }
   }
 
   const { body } = await k8sApi.createNamespacedPod(namespace(), appPod)
