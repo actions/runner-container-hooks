@@ -183,7 +183,9 @@ export class TestHelper {
   public getRunContainerStepDefinition(): HookData {
     const runContainerStep = JSON.parse(
       fs.readFileSync(
-        path.resolve(__dirname + '/../../../examples/k8s/run-container-step.json'),
+        path.resolve(
+          __dirname + '/../../../examples/k8s/run-container-step.json'
+        ),
         'utf8'
       )
     )

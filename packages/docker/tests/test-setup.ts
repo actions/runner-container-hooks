@@ -169,7 +169,9 @@ echo "::set-output name=time::$time"`
   public getRunScriptStepDefinition(): HookData {
     const runScriptStep = JSON.parse(
       fs.readFileSync(
-        path.resolve(__dirname + '/../../../examples/docker/run-script-step.json'),
+        path.resolve(
+          __dirname + '/../../../examples/docker/run-script-step.json'
+        ),
         'utf8'
       )
     )
@@ -181,7 +183,9 @@ echo "::set-output name=time::$time"`
   public getRunContainerStepDefinition(): HookData {
     const runContainerStep = JSON.parse(
       fs.readFileSync(
-        path.resolve(__dirname + '/../../../examples/docker/run-container-step.json'),
+        path.resolve(
+          __dirname + '/../../../examples/docker/run-container-step.json'
+        ),
         'utf8'
       )
     )
