@@ -1,33 +1,70 @@
 import { PrepareJobArgs } from 'hooklib/lib'
 import { cleanupJob, prepareJob } from '../src/hooks'
-import TestSetup from './test-setup'
+import TestSetup, { TableTest } from './test-setup'
 
 let testSetup: TestSetup
 
 jest.useRealTimers()
 
 describe('cleanup job', () => {
-  beforeEach(async () => {
-    testSetup = new TestSetup()
-    testSetup.initialize()
+  const cases = [] as TableTest[]
 
-    const prepareJobDefinition = testSetup.getPrepareJobDefinition()
-
-    const prepareJobOutput = testSetup.createOutputFile(
-      'prepare-job-output.json'
-    )
-
-    await prepareJob(
-      prepareJobDefinition.args as PrepareJobArgs,
-      prepareJobOutput
-    )
+  cases.push({
+    name: 'should cleanup successfully',
+    fn: async () => {
+      await expect(cleanupJob()).resolves.not.toThrow()
+    }
   })
 
-  afterEach(() => {
-    testSetup.teardown()
+  describe('k8s config', () => {
+    beforeEach(async () => {
+      testSetup = new TestSetup('k8s')
+      testSetup.initialize()
+
+      const prepareJobDefinition = testSetup.getPrepareJobDefinition()
+
+      const prepareJobOutput = testSetup.createOutputFile(
+        'prepare-job-output.json'
+      )
+
+      await prepareJob(
+        prepareJobDefinition.args as PrepareJobArgs,
+        prepareJobOutput
+      )
+    })
+
+    afterEach(() => {
+      testSetup.teardown()
+    })
+
+    cases.forEach(e => {
+      it(e.name, e.fn)
+    })
   })
 
-  it('should cleanup successfully', async () => {
-    await expect(cleanupJob()).resolves.not.toThrow()
+  describe('docker config', () => {
+    beforeEach(async () => {
+      testSetup = new TestSetup('docker')
+      testSetup.initialize()
+
+      const prepareJobDefinition = testSetup.getPrepareJobDefinition()
+
+      const prepareJobOutput = testSetup.createOutputFile(
+        'prepare-job-output.json'
+      )
+
+      await prepareJob(
+        prepareJobDefinition.args as PrepareJobArgs,
+        prepareJobOutput
+      )
+    })
+
+    afterEach(() => {
+      testSetup.teardown()
+    })
+
+    cases.forEach(e => {
+      it(e.name, e.fn)
+    })
   })
 })

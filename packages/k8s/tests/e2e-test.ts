@@ -5,7 +5,7 @@ import {
   runContainerStep,
   runScriptStep
 } from '../src/hooks'
-import { TestHelper } from './test-setup'
+import { TableTest, TestHelper } from './test-setup'
 
 jest.useRealTimers()
 
@@ -15,28 +15,32 @@ let prepareJobData: any
 
 let prepareJobOutputFilePath: string
 describe('e2e', () => {
-  const fn = async () => {
-    await expect(
-      prepareJob(prepareJobData.args, prepareJobOutputFilePath)
-    ).resolves.not.toThrow()
+  const cases = [] as TableTest[]
+  cases.push({
+    name: 'should prepare job, run script step, run container step then cleanup without errors',
+    fn: async () => {
+      await expect(
+        prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+      ).resolves.not.toThrow()
 
-    const scriptStepData = testHelper.getRunScriptStepDefinition()
+      const scriptStepData = testHelper.getRunScriptStepDefinition()
 
-    const prepareJobOutputJson = fs.readFileSync(prepareJobOutputFilePath)
-    const prepareJobOutputData = JSON.parse(prepareJobOutputJson.toString())
+      const prepareJobOutputJson = fs.readFileSync(prepareJobOutputFilePath)
+      const prepareJobOutputData = JSON.parse(prepareJobOutputJson.toString())
 
-    await expect(
-      runScriptStep(scriptStepData.args, prepareJobOutputData.state, null)
-    ).resolves.not.toThrow()
+      await expect(
+        runScriptStep(scriptStepData.args, prepareJobOutputData.state, null)
+      ).resolves.not.toThrow()
 
-    const runContainerStepData = testHelper.getRunContainerStepDefinition()
+      const runContainerStepData = testHelper.getRunContainerStepDefinition()
 
-    await expect(
-      runContainerStep(runContainerStepData.args)
-    ).resolves.not.toThrow()
+      await expect(
+        runContainerStep(runContainerStepData.args)
+      ).resolves.not.toThrow()
 
-    await expect(cleanupJob()).resolves.not.toThrow()
-  }
+      await expect(cleanupJob()).resolves.not.toThrow()
+    }
+  })
   describe('k8s config', () => {
     beforeEach(async () => {
       testHelper = new TestHelper('k8s')
@@ -51,10 +55,9 @@ describe('e2e', () => {
       await testHelper.cleanup()
     })
 
-    it(
-      'should prepare job, run script step, run container step then cleanup without errors',
-      fn
-    )
+    cases.forEach(e => {
+      it(e.name, e.fn)
+    })
   })
 
   describe('docker config', () => {
@@ -71,9 +74,8 @@ describe('e2e', () => {
       await testHelper.cleanup()
     })
 
-    it(
-      'should prepare job, run script step, run container step then cleanup without errors',
-      fn
-    )
+    cases.forEach(e => {
+      it(e.name, e.fn)
+    })
   })
 })

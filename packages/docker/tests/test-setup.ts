@@ -5,10 +5,16 @@ import * as path from 'path'
 import { env } from 'process'
 import { v4 as uuidv4 } from 'uuid'
 
+export interface TableTest {
+  name: string
+  fn: jest.ProvidesCallback
+}
+
 export default class TestSetup {
   private testdir: string
   private runnerMockDir: string
   readonly runnerOutputDir: string
+  private mode: string
 
   private runnerMockSubdirs = {
     work: '_work',
@@ -22,10 +28,11 @@ export default class TestSetup {
 
   private readonly projectName = 'repo'
 
-  constructor() {
+  constructor(mode: 'k8s' | 'docker') {
     this.testdir = `${__dirname}/_temp/${uuidv4()}`
     this.runnerMockDir = `${this.testdir}/runner/_layout`
     this.runnerOutputDir = `${this.testdir}/outputs`
+    this.mode = mode
   }
 
   private get allTestDirectories() {
@@ -54,7 +61,9 @@ export default class TestSetup {
     }
 
     fs.copyFileSync(
-      path.resolve(`${__dirname}/../../../examples/docker/example-script.sh`),
+      path.resolve(
+        `${__dirname}/../../../examples/${this.mode}/example-script.sh`
+      ),
       `${env.RUNNER_TEMP}/example-script.sh`
     )
   }
@@ -150,7 +159,9 @@ echo "::set-output name=time::$time"`
   public getPrepareJobDefinition(): HookData {
     const prepareJob = JSON.parse(
       fs.readFileSync(
-        path.resolve(__dirname + '/../../../examples/docker/prepare-job.json'),
+        path.resolve(
+          `${__dirname}/../../../examples/${this.mode}/prepare-job.json`
+        ),
         'utf8'
       )
     )
@@ -170,7 +181,7 @@ echo "::set-output name=time::$time"`
     const runScriptStep = JSON.parse(
       fs.readFileSync(
         path.resolve(
-          __dirname + '/../../../examples/docker/run-script-step.json'
+          `${__dirname}/../../../examples/${this.mode}/run-script-step.json`
         ),
         'utf8'
       )
@@ -184,7 +195,7 @@ echo "::set-output name=time::$time"`
     const runContainerStep = JSON.parse(
       fs.readFileSync(
         path.resolve(
-          __dirname + '/../../../examples/docker/run-container-step.json'
+          `${__dirname}/../../../examples/${this.mode}/run-container-step.json`
         ),
         'utf8'
       )
