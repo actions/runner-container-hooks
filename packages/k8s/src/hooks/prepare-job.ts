@@ -21,6 +21,7 @@ import {
   DEFAULT_CONTAINER_ENTRY_POINT,
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
   generateContainerName,
+  mergeContainerWithOptions,
   PodPhase
 } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
@@ -219,39 +220,8 @@ export function createContainerSpec(
     return podContainer
   }
 
-  // Overwrite or append based on container options
-  //
-  // Keep in mind, envs and volumes could be passed as fields in container definition
-  // so default volume mounts and envs are appended first, and then create options are used
-  // to append more values
-  //
-  // Rest of the fields are just applied
-  // For example, container.createOptions.container.image is going to overwrite container.image field
-  for (const [key, value] of Object.entries(
+  return mergeContainerWithOptions(
+    podContainer,
     container.createOptions.container
-  )) {
-    if (key === 'name' && jobContainer) {
-      continue
-    } else if (key === 'env') {
-      const envs = value as k8s.V1EnvVar[]
-      if (!envs?.length) {
-        continue
-      }
-      for (const env of envs) {
-        podContainer.env.push(env)
-      }
-    } else if (key === 'volumeMounts' && value) {
-      const volumeMounts = value as k8s.V1VolumeMount[]
-      if (!volumeMounts?.length) {
-        continue
-      }
-      for (const vm of volumeMounts) {
-        podContainer.volumeMounts.push(vm)
-      }
-    } else {
-      podContainer[key] = value
-    }
-  }
-
-  return podContainer
+  )
 }

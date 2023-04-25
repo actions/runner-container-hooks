@@ -17,7 +17,21 @@
     ],
     "entryPoint": "bash",
     "workingDirectory": "/__w/repo/repo",
-    "createOptions": "--cpus 1",
+    "createOptions": {
+      "securityContext": {
+        "runAsUser": 1000,
+        "fsGroup": 2000
+      },
+      "container": {
+        "ports": [
+          {
+            "containerPort": 9090,
+            "hostPort": 9090,
+            "protocol": "TCP"
+          }
+        ]
+      }
+    },
     "environmentVariables": {
       "NODE_ENV": "development"
     },

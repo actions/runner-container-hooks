@@ -158,6 +158,91 @@ export function generateContainerName(image: string): string {
   return name
 }
 
+// Overwrite or append based on container options
+//
+// Keep in mind, envs and volumes could be passed as fields in container definition
+// so default volume mounts and envs are appended first, and then create options are used
+// to append more values
+//
+// Rest of the fields are just applied
+// For example, container.createOptions.container.image is going to overwrite container.image field
+export function mergeContainerWithOptions(
+  base: k8s.V1Container,
+  from: k8s.V1Container
+): k8s.V1Container {
+  const newContainer = JSON.parse(JSON.stringify(base)) as k8s.V1Container
+
+  for (const [key, value] of Object.entries(from)) {
+    if (key === 'name') {
+      continue
+    } else if (key === 'env') {
+      const envs = value as k8s.V1EnvVar[]
+      if (!envs?.length) {
+        continue
+      }
+      if (!newContainer.env) {
+        newContainer.env = []
+      }
+      for (const env of envs) {
+        newContainer.env.push(env)
+      }
+    } else if (key === 'volumeMounts' && value) {
+      const volumeMounts = value as k8s.V1VolumeMount[]
+      if (!volumeMounts?.length) {
+        continue
+      }
+      if (!newContainer.volumeMounts) {
+        newContainer.volumeMounts = []
+      }
+      for (const vm of volumeMounts) {
+        newContainer.volumeMounts.push(vm)
+      }
+    } else if (key === 'ports' && value) {
+      const ports = value as k8s.V1ContainerPort[]
+      if (!ports?.length) {
+        continue
+      }
+      if (!newContainer.ports) {
+        newContainer.ports = []
+      }
+      for (const port of ports) {
+        newContainer.ports.push(port)
+      }
+    } else {
+      newContainer[key] = value
+    }
+  }
+  return newContainer
+}
+
+export function mergePodSpecWithOptions(
+  base: k8s.V1PodSpec,
+  from: k8s.V1PodSpec
+): k8s.V1PodSpec {
+  const newPodSpec = JSON.parse(JSON.stringify(base)) as k8s.V1PodSpec
+
+  for (const [key, value] of Object.entries(from)) {
+    if (key === 'container' || key === 'containers') {
+      continue
+    } else if (key === 'volumes' && value) {
+      const volumes = value as k8s.V1Volume[]
+      if (!volumes?.length) {
+        continue
+      }
+      if (!newPodSpec.volumes) {
+        newPodSpec.volumes = []
+      }
+      for (const volume of volumes) {
+        newPodSpec.volumes.push(volume)
+      }
+    } else {
+      newPodSpec[key] = value
+    }
+  }
+
+  return newPodSpec
+}
+
 export enum PodPhase {
   PENDING = 'Pending',
   RUNNING = 'Running',

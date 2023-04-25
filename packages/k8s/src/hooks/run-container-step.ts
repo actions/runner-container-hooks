@@ -15,6 +15,7 @@ import {
   DEFAULT_CONTAINER_ENTRY_POINT,
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
   PodPhase,
+  mergeContainerWithOptions,
   writeEntryPointScript
 } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
@@ -32,7 +33,7 @@ export async function runContainerStep(
   }
 
   core.debug(`Created secret ${secretName} for container job envs`)
-  const container = createPodSpec(stepContainer, secretName)
+  const container = createContainerSpec(stepContainer, secretName)
 
   const job = await createJob(container)
   if (!job.metadata?.name) {
@@ -75,7 +76,7 @@ export async function runContainerStep(
   return Number(exitCode) || 1
 }
 
-function createPodSpec(
+function createContainerSpec(
   container: RunContainerStepArgs,
   secretName?: string
 ): k8s.V1Container {
@@ -106,5 +107,15 @@ function createPodSpec(
   }
   podContainer.volumeMounts = containerVolumes(undefined, false, true)
 
-  return podContainer
+  if (
+    !container.createOptions?.container ||
+    typeof container.createOptions?.container !== 'object'
+  ) {
+    return podContainer
+  }
+
+  return mergeContainerWithOptions(
+    podContainer,
+    container.createOptions.container
+  )
 }

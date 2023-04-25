@@ -11,12 +11,19 @@ kc.loadFromDefault()
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api)
 const k8sStorageApi = kc.makeApiClient(k8s.StorageV1Api)
 
+export interface TableTest {
+  name: string
+  fn: jest.ProvidesCallback
+}
+
 export class TestHelper {
   private tempDirPath: string
   private podName: string
-  constructor() {
+  private mode: string
+  constructor(mode: 'k8s' | 'docker') {
     this.tempDirPath = `${__dirname}/_temp/runner`
     this.podName = uuidv4().replace(/-/g, '')
+    this.mode = mode
   }
 
   public async initialize(): Promise<void> {
@@ -31,7 +38,9 @@ export class TestHelper {
     fs.mkdirSync(process.env.RUNNER_TEMP, { recursive: true })
 
     fs.copyFileSync(
-      path.resolve(`${__dirname}/../../../examples/k8s/example-script.sh`),
+      path.resolve(
+        `${__dirname}/../../../examples/${this.mode}/example-script.sh`
+      ),
       `${process.env.RUNNER_TEMP}/example-script.sh`
     )
 
@@ -154,7 +163,9 @@ export class TestHelper {
   public getPrepareJobDefinition(): HookData {
     const prepareJob = JSON.parse(
       fs.readFileSync(
-        path.resolve(__dirname + '/../../../examples/k8s/prepare-job.json'),
+        path.resolve(
+          `${__dirname}/../../../examples/${this.mode}/prepare-job.json`
+        ),
         'utf8'
       )
     )

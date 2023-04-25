@@ -10,7 +10,7 @@ import {
   getVolumeClaimName,
   RunnerInstanceLabel
 } from '../hooks/constants'
-import { PodPhase } from './utils'
+import { PodPhase, mergePodSpecWithOptions } from './utils'
 
 const kc = new k8s.KubeConfig()
 
@@ -105,21 +105,7 @@ export async function createPod(
   }
 
   if (options && typeof options === 'object') {
-    for (const [key, value] of Object.entries(options)) {
-      if (key === 'container') {
-        continue
-      } else if (key === 'volumes' && value) {
-        const volumes = value as k8s.V1Volume[]
-        if (!volumes?.length) {
-          continue
-        }
-        for (const volume of volumes) {
-          appPod.spec.volumes.push(volume)
-        }
-      } else {
-        appPod.spec[key] = value
-      }
-    }
+    appPod.spec = mergePodSpecWithOptions(appPod.spec, options)
   }
 
   const { body } = await k8sApi.createNamespacedPod(namespace(), appPod)
