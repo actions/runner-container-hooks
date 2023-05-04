@@ -10,13 +10,7 @@ import {
   waitForJobToComplete,
   waitForPodPhases
 } from '../k8s'
-import {
-  containerVolumes,
-  DEFAULT_CONTAINER_ENTRY_POINT,
-  DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
-  PodPhase,
-  writeEntryPointScript
-} from '../k8s/utils'
+import { containerVolumes, PodPhase } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
 
 export async function runContainerStep(
@@ -82,17 +76,13 @@ function createPodSpec(
   const podContainer = new k8s.V1Container()
   podContainer.name = JOB_CONTAINER_NAME
   podContainer.image = container.image
-
-  const { entryPoint, entryPointArgs } = container
-  container.entryPoint = 'sh'
-
-  const { containerPath } = writeEntryPointScript(
-    container.workingDirectory,
-    entryPoint || DEFAULT_CONTAINER_ENTRY_POINT,
-    entryPoint ? entryPointArgs || [] : DEFAULT_CONTAINER_ENTRY_POINT_ARGS
-  )
-  container.entryPointArgs = ['-e', containerPath]
-  podContainer.command = [container.entryPoint, ...container.entryPointArgs]
+  podContainer.workingDir = container.workingDirectory
+  podContainer.command = container.entryPoint
+    ? [container.entryPoint]
+    : undefined
+  podContainer.args = container.entryPointArgs?.length
+    ? container.entryPointArgs
+    : undefined
 
   if (secretName) {
     podContainer.envFrom = [
