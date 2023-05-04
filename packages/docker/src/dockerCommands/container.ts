@@ -1,4 +1,4 @@
-import * as core from '@actions/core'
+﻿import * as core from '@actions/core'
 import * as fs from 'fs'
 import {
   ContainerInfo,
@@ -37,8 +37,14 @@ export async function createContainer(
       dockerArgs.push('-p', portMapping)
     }
   }
-  if (args.createOptions && typeof args.createOptions === 'string') {
-    dockerArgs.push(...args.createOptions.split(' '))
+  if (args.createOptions) {
+    if (typeof args.createOptions === 'string') {
+      dockerArgs.push(...args.createOptions.split(' '))
+    } else {
+      core.warning(
+        'Ignoring create options: docker hook requires createOptions to be of type string'
+      )
+    }
   }
 
   if (args.environmentVariables) {
@@ -397,8 +403,14 @@ export async function containerRun(
     dockerArgs.push(`--network=${network}`)
   }
 
-  if (args.createOptions && typeof args.createOptions === 'string') {
-    dockerArgs.push(...args.createOptions.split(' '))
+  if (args.createOptions) {
+    if (typeof args.createOptions === 'string') {
+      dockerArgs.push(...args.createOptions.split(' '))
+    } else {
+      core.warning(
+        'Ignoring create options: docker hook requires createOptions to be of type string'
+      )
+    }
   }
   if (args.environmentVariables) {
     for (const [key] of Object.entries(args.environmentVariables)) {

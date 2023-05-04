@@ -56,11 +56,14 @@ export async function prepareJob(
   let createdPod: k8s.V1Pod | undefined = undefined
   try {
     let options: KubernetesJobPodOptions = {}
-    if (
-      args.container?.createOptions &&
-      typeof args.container?.createOptions === 'object'
-    ) {
-      options = args.container.createOptions
+    if (args.container?.createOptions) {
+      if (typeof args.container?.createOptions === 'object') {
+        options = args.container.createOptions
+      } else {
+        core.warning(
+          'Ignoring create options: k8s hook requires createOptions to be of type object'
+        )
+      }
     }
     createdPod = await createPod(
       container,

@@ -1,5 +1,6 @@
 import * as k8s from '@kubernetes/client-node'
 import * as fs from 'fs'
+import * as core from '@actions/core'
 import { Mount } from 'hooklib'
 import * as path from 'path'
 import { v1 as uuidv4 } from 'uuid'
@@ -174,40 +175,20 @@ export function mergeContainerWithOptions(
 
   for (const [key, value] of Object.entries(from)) {
     if (key === 'name') {
+      core.warning("Skipping name override: name can't be overwritten")
       continue
     } else if (key === 'env') {
       const envs = value as k8s.V1EnvVar[]
-      if (!envs?.length) {
-        continue
-      }
-      if (!newContainer.env) {
-        newContainer.env = []
-      }
-      for (const env of envs) {
-        newContainer.env.push(env)
-      }
+      newContainer.env = mergeLists(newContainer.env, envs)
     } else if (key === 'volumeMounts' && value) {
       const volumeMounts = value as k8s.V1VolumeMount[]
-      if (!volumeMounts?.length) {
-        continue
-      }
-      if (!newContainer.volumeMounts) {
-        newContainer.volumeMounts = []
-      }
-      for (const vm of volumeMounts) {
-        newContainer.volumeMounts.push(vm)
-      }
+      newContainer.volumeMounts = mergeLists(
+        newContainer.volumeMounts,
+        volumeMounts
+      )
     } else if (key === 'ports' && value) {
       const ports = value as k8s.V1ContainerPort[]
-      if (!ports?.length) {
-        continue
-      }
-      if (!newContainer.ports) {
-        newContainer.ports = []
-      }
-      for (const port of ports) {
-        newContainer.ports.push(port)
-      }
+      newContainer.ports = mergeLists(newContainer.ports, ports)
     } else {
       newContainer[key] = value
     }
@@ -226,15 +207,7 @@ export function mergePodSpecWithOptions(
       continue
     } else if (key === 'volumes' && value) {
       const volumes = value as k8s.V1Volume[]
-      if (!volumes?.length) {
-        continue
-      }
-      if (!newPodSpec.volumes) {
-        newPodSpec.volumes = []
-      }
-      for (const volume of volumes) {
-        newPodSpec.volumes.push(volume)
-      }
+      newPodSpec.volumes = mergeLists(newPodSpec.volumes, volumes)
     } else {
       newPodSpec[key] = value
     }
@@ -250,4 +223,15 @@ export enum PodPhase {
   FAILED = 'Failed',
   UNKNOWN = 'Unknown',
   COMPLETED = 'Completed'
+}
+
+function mergeLists<T>(base?: T[], from?: T[]): T[] {
+  const b: T[] = base || []
+  if (!from?.length) {
+    return b
+  }
+  for (const v of from) {
+    b.push(v)
+  }
+  return b
 }
