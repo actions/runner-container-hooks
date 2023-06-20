@@ -40,7 +40,7 @@ export async function prepareJob(
   if (!container?.image) {
     core.info('No job container provided, skipping')
   } else {
-    setupContainer(container)
+    setupContainer(container, true)
 
     const configLocation = await registryLogin(container.registry)
     try {
@@ -174,9 +174,11 @@ function generateResponseFile(
   writeToResponseFile(responseFile, JSON.stringify(response))
 }
 
-function setupContainer(container): void {
-  container.entryPointArgs = [`-f`, `/dev/null`]
-  container.entryPoint = 'tail'
+function setupContainer(container, jobContainer = false): void {
+  if (!container.entryPoint && jobContainer) {
+    container.entryPointArgs = [`-f`, `/dev/null`]
+    container.entryPoint = 'tail'
+  }
 }
 
 function generateNetworkName(): string {
