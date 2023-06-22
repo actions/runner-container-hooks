@@ -38,7 +38,7 @@ export async function createContainer(
     }
   }
   if (args.createOptions) {
-    dockerArgs.push(...args.createOptions.split(' '))
+    dockerArgs.push(...splitCreateOptions(args.createOptions))
   }
 
   if (args.environmentVariables) {
@@ -308,6 +308,13 @@ export async function registryLogin(registry?: Registry): Promise<string> {
   return configLocation
 }
 
+function splitCreateOptions(createOptions: string): string[] {
+  return Array.from(
+    createOptions.matchAll(/"([^"]+)"|'([^']+)'|(\S+)/g),
+    m => m[1] || m[2] || m[3]
+  )
+}
+
 export async function registryLogout(configLocation: string): Promise<void> {
   if (configLocation) {
     await dockerLogout(configLocation)
@@ -398,7 +405,7 @@ export async function containerRun(
   }
 
   if (args.createOptions) {
-    dockerArgs.push(...args.createOptions.split(' '))
+    dockerArgs.push(...splitCreateOptions(args.createOptions))
   }
   if (args.environmentVariables) {
     for (const [key] of Object.entries(args.environmentVariables)) {
