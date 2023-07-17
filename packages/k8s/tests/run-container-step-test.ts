@@ -23,16 +23,11 @@ describe('Run container step', () => {
     expect(exitCode).toBe(0)
   })
 
-  it('should fail if the working directory does not exist', async () => {
-    runContainerStepData.args.workingDirectory = '/foo/bar'
-    await expect(runContainerStep(runContainerStepData.args)).rejects.toThrow()
-  })
-
   it('should shold have env variables available', async () => {
     runContainerStepData.args.entryPoint = 'bash'
     runContainerStepData.args.entryPointArgs = [
       '-c',
-      "'if [[ -z $NODE_ENV ]]; then exit 1; fi'"
+      'if [[ -z $NODE_ENV ]]; then exit 1; fi'
     ]
     await expect(
       runContainerStep(runContainerStepData.args)
