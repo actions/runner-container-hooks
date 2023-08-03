@@ -1,4 +1,4 @@
-# ADR 0072: Hook extensions
+# ADR 0096: Hook extensions
 
 **Date:** 3 August 2023
 
