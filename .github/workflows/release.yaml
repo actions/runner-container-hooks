@@ -12,6 +12,20 @@ jobs:
         name: Bootstrap the packages
       - run: npm run build-all
         name: Build packages
+      - name: Zip up releases
+        run: |
+          zip -r -j actions-runner-hooks-docker-${{ steps.releaseNotes.outputs.version }}.zip packages/docker/dist
+          zip -r -j actions-runner-hooks-k8s-${{ steps.releaseNotes.outputs.version }}.zip packages/k8s/dist
+      - name: Calculate SHA
+        id: sha
+        shell: bash
+        run: |
+          sha_docker=$(sha256sum actions-runner-hooks-docker-${{ steps.releaseNotes.outputs.version }}.zip | awk '{print $1}')
+          echo "Docker SHA: $sha_docker"
+          echo "docker-sha=$sha_docker" >> $GITHUB_OUTPUT
+          sha_k8s=$(sha256sum actions-runner-hooks-k8s-${{ steps.releaseNotes.outputs.version }}.zip | awk '{print $1}')
+          echo "K8s SHA: $sha_k8s"
+          echo "k8s-sha=$sha_k8s" >> $GITHUB_OUTPUT
       - uses: actions/github-script@v6
         id: releaseNotes
         with:
@@ -20,13 +34,11 @@ jobs:
             const fs = require('fs');
             const hookVersion = require('./package.json').version
             var releaseNotes = fs.readFileSync('${{ github.workspace }}/releaseNotes.md', 'utf8').replace(/<HOOK_VERSION>/g, hookVersion)
+            releaseNotes = releaseNotes.replace(/<DOCKER_SHA>/g, '${{ steps.sha.outputs.docker-sha }}')
+            releaseNotes = releaseNotes.replace(/<K8S_SHA>/g, '${{ steps.sha.outputs.k8s-sha }}')
             console.log(releaseNotes)
             core.setOutput('version', hookVersion);
             core.setOutput('note', releaseNotes);
-      - name: Zip up releases
-        run: |
-          zip -r -j actions-runner-hooks-docker-${{ steps.releaseNotes.outputs.version }}.zip packages/docker/dist
-          zip -r -j actions-runner-hooks-k8s-${{ steps.releaseNotes.outputs.version }}.zip packages/k8s/dist
       - uses: actions/create-release@v1
         id: createRelease
         name: Create ${{ steps.releaseNotes.outputs.version }} Hook Release
