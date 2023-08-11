@@ -12,7 +12,7 @@ The current implementation of container hooks does not allow users to customize 
 
 We have decided to add hook extensions to the container hook implementation. This will allow users to customize the pods created by the hook by specifying additional fields. The hook extensions will be implemented in a way that is backwards-compatible with the existing hook implementation.
 
-To allow customization, the runner executing the hook should have `ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE` environment variable pointing to a yaml file on the runner system. The extension specified in that file will be applied both for job containers, and container steps.
+To allow customization, the runner executing the hook should have `ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE` environment variable pointing to a yaml file on the runner system. The extension specified in that file will be applied both for job pods, and container steps.
 
 If environment variable is set, but the file can't be read, the hook will fail, signaling incorrect configuration.
 
