@@ -1,55 +1,27 @@
 import { containerBuild } from '../src/dockerCommands'
-import TestSetup, { TableTest } from './test-setup'
+import TestSetup from './test-setup'
 
 let testSetup
 let runContainerStepDefinition
 
 describe('container build', () => {
-  const cases = [] as TableTest[]
+  beforeEach(() => {
+    testSetup = new TestSetup()
+    testSetup.initialize()
 
-  cases.push({
-    name: 'should build container',
-    fn: async () => {
-      runContainerStepDefinition.image = ''
-      const actionPath = testSetup.initializeDockerAction()
-      runContainerStepDefinition.dockerfile = `${actionPath}/Dockerfile`
-      await expect(
-        containerBuild(runContainerStepDefinition, 'example-test-tag')
-      ).resolves.not.toThrow()
-    }
+    runContainerStepDefinition = testSetup.getRunContainerStepDefinition()
   })
 
-  describe('k8s config', () => {
-    beforeEach(() => {
-      testSetup = new TestSetup('k8s')
-      testSetup.initialize()
-
-      runContainerStepDefinition = testSetup.getRunContainerStepDefinition()
-    })
-
-    afterEach(() => {
-      testSetup.teardown()
-    })
-
-    cases.forEach(e => {
-      it(e.name, e.fn)
-    })
+  afterEach(() => {
+    testSetup.teardown()
   })
 
-  describe('docker config', () => {
-    beforeEach(() => {
-      testSetup = new TestSetup('docker')
-      testSetup.initialize()
-
-      runContainerStepDefinition = testSetup.getRunContainerStepDefinition()
-    })
-
-    afterEach(() => {
-      testSetup.teardown()
-    })
-
-    cases.forEach(e => {
-      it(e.name, e.fn)
-    })
+  it('should build container', async () => {
+    runContainerStepDefinition.image = ''
+    const actionPath = testSetup.initializeDockerAction()
+    runContainerStepDefinition.dockerfile = `${actionPath}/Dockerfile`
+    await expect(
+      containerBuild(runContainerStepDefinition, 'example-test-tag')
+    ).resolves.not.toThrow()
   })
 })
