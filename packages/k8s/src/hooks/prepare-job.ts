@@ -2,7 +2,6 @@ import * as core from '@actions/core'
 import * as io from '@actions/io'
 import * as k8s from '@kubernetes/client-node'
 import {
-  KubernetesJobPodOptions,
   JobContainerInfo,
   ContextPorts,
   PrepareJobArgs,
@@ -22,6 +21,7 @@ import {
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
   generateContainerName,
   mergeContainerWithOptions,
+  readExtensionFromFile,
   PodPhase
 } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
@@ -54,22 +54,13 @@ export async function prepareJob(
   }
 
   let createdPod: k8s.V1Pod | undefined = undefined
+  const extension = readExtensionFromFile()
   try {
-    let options: KubernetesJobPodOptions = {}
-    if (args.container?.createOptions) {
-      if (typeof args.container?.createOptions === 'object') {
-        options = args.container.createOptions
-      } else {
-        core.warning(
-          'Ignoring create options: k8s hook requires createOptions to be of type object'
-        )
-      }
-    }
     createdPod = await createPod(
       container,
       services,
       args.container.registry,
-      options
+      extension
     )
   } catch (err) {
     await prunePods()
@@ -178,7 +169,8 @@ async function copyExternalsToRoot(): Promise<void> {
 export function createContainerSpec(
   container: JobContainerInfo,
   name: string,
-  jobContainer = false
+  jobContainer = false,
+  extension?: k8s.V1PodTemplateSpec
 ): k8s.V1Container {
   if (!container.entryPoint && jobContainer) {
     container.entryPoint = DEFAULT_CONTAINER_ENTRY_POINT
@@ -223,8 +215,19 @@ export function createContainerSpec(
     return podContainer
   }
 
-  return mergeContainerWithOptions(
-    podContainer,
-    container.createOptions.container
+  if (!extension) {
+    return podContainer
+  }
+
+  const from = extension.spec?.containers?.find(
+    c => c.name === JOB_CONTAINER_NAME
   )
+
+  if (!from) {
+    return podContainer
+  }
+
+  mergeContainerWithOptions(podContainer, container.createOptions.container)
+
+  return podContainer
 }

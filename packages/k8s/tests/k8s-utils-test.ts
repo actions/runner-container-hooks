@@ -6,7 +6,9 @@ import {
   generateContainerName,
   writeEntryPointScript,
   mergeContainerWithOptions,
-  mergePodSpecWithOptions
+  mergePodSpecWithOptions,
+  readExtensionFromFile,
+  ENV_HOOK_TEMPLATE_PATH
 } from '../src/k8s/utils'
 import { TestHelper, TableTest } from './test-setup'
 
@@ -446,6 +448,65 @@ describe('k8s utils', () => {
   })
 
   describe('merge specs', () => {
+    describe('read extension', () => {
+      beforeEach(async () => {
+        testHelper = new TestHelper('k8s')
+        await testHelper.initialize()
+      })
+
+      afterEach(async () => {
+        await testHelper.cleanup()
+      })
+
+      it('should throw if env variable is set but file does not exist', () => {
+        process.env[ENV_HOOK_TEMPLATE_PATH] =
+          '/path/that/does/not/exist/data.yaml'
+        expect(() => readExtensionFromFile()).toThrow()
+      })
+
+      it('should return undefined if env variable is not set', () => {
+        delete process.env[ENV_HOOK_TEMPLATE_PATH]
+        expect(readExtensionFromFile()).toBeUndefined()
+      })
+
+      it('should throw if file is empty', () => {
+        let filePath = testHelper.createFile('data.yaml')
+        process.env[ENV_HOOK_TEMPLATE_PATH] = filePath
+        expect(() => readExtensionFromFile()).toThrow()
+      })
+
+      it('should throw if file is not valid yaml', () => {
+        let filePath = testHelper.createFile('data.yaml')
+        fs.writeFileSync(filePath, 'invalid yaml')
+        process.env[ENV_HOOK_TEMPLATE_PATH] = filePath
+        expect(() => readExtensionFromFile()).toThrow()
+      })
+
+      it('should return object if file is valid', () => {
+        let filePath = testHelper.createFile('data.yaml')
+        fs.writeFileSync(
+          filePath,
+          `
+apiVersion: v1
+metadata:
+  labels:
+    label-name: label-value
+  annotations:
+    annotation-name: annotation-value
+spec:
+  containers:
+    - name: test
+      image: node:14.16
+    - name: job
+      image: ubuntu:latest`
+        )
+
+        process.env[ENV_HOOK_TEMPLATE_PATH] = filePath
+        const extension = readExtensionFromFile()
+        expect(extension).toBeDefined()
+      })
+    })
+
     it('should merge container spec', () => {
       const base = {
         image: 'node:14.16',
@@ -495,10 +556,8 @@ describe('k8s utils', () => {
 
       const expectJobContainer = JSON.parse(JSON.stringify(expectContainer))
       expectJobContainer.name = base.name
-
-      expect(mergeContainerWithOptions(base, from)).toStrictEqual(
-        expectContainer
-      )
+      mergeContainerWithOptions(base, from)
+      expect(base).toStrictEqual(expectContainer)
     })
 
     it('should merge pod spec', () => {
@@ -564,7 +623,9 @@ describe('k8s utils', () => {
       expected.restartPolicy = from.restartPolicy
       expected.volumes = from.volumes
 
-      expect(mergePodSpecWithOptions(base, from)).toStrictEqual(expected)
+      mergePodSpecWithOptions(base, from)
+
+      expect(base).toStrictEqual(expected)
     })
   })
 })

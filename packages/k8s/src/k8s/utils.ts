@@ -1,5 +1,6 @@
 import * as k8s from '@kubernetes/client-node'
 import * as fs from 'fs'
+import * as yaml from 'js-yaml'
 import * as core from '@actions/core'
 import { Mount } from 'hooklib'
 import * as path from 'path'
@@ -8,6 +9,8 @@ import { POD_VOLUME_NAME } from './index'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
+
+export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
 
 export function containerVolumes(
   userMountVolumes: Mount[] = [],
@@ -170,50 +173,80 @@ export function generateContainerName(image: string): string {
 export function mergeContainerWithOptions(
   base: k8s.V1Container,
   from: k8s.V1Container
-): k8s.V1Container {
-  const newContainer = JSON.parse(JSON.stringify(base)) as k8s.V1Container
-
+): void {
   for (const [key, value] of Object.entries(from)) {
     if (key === 'name') {
       core.warning("Skipping name override: name can't be overwritten")
       continue
     } else if (key === 'env') {
       const envs = value as k8s.V1EnvVar[]
-      newContainer.env = mergeLists(newContainer.env, envs)
+      base.env = mergeLists(base.env, envs)
     } else if (key === 'volumeMounts' && value) {
       const volumeMounts = value as k8s.V1VolumeMount[]
-      newContainer.volumeMounts = mergeLists(
-        newContainer.volumeMounts,
-        volumeMounts
-      )
+      base.volumeMounts = mergeLists(base.volumeMounts, volumeMounts)
     } else if (key === 'ports' && value) {
       const ports = value as k8s.V1ContainerPort[]
-      newContainer.ports = mergeLists(newContainer.ports, ports)
+      base.ports = mergeLists(base.ports, ports)
     } else {
-      newContainer[key] = value
+      base[key] = value
     }
   }
-  return newContainer
 }
 
 export function mergePodSpecWithOptions(
   base: k8s.V1PodSpec,
   from: k8s.V1PodSpec
-): k8s.V1PodSpec {
-  const newPodSpec = JSON.parse(JSON.stringify(base)) as k8s.V1PodSpec
-
+): void {
   for (const [key, value] of Object.entries(from)) {
     if (key === 'container' || key === 'containers') {
       continue
     } else if (key === 'volumes' && value) {
       const volumes = value as k8s.V1Volume[]
-      newPodSpec.volumes = mergeLists(newPodSpec.volumes, volumes)
+      base.volumes = mergeLists(base.volumes, volumes)
     } else {
-      newPodSpec[key] = value
+      base[key] = value
+    }
+  }
+}
+
+export function mergePodMetadata(
+  base: k8s.V1Pod,
+  from: k8s.V1ObjectMeta
+): void {
+  if (!base.metadata?.labels || !base.metadata?.annotations) {
+    throw new Error("Can't merge metadata: base.metadata is undefined")
+  }
+  if (from?.labels) {
+    for (const [key, value] of Object.entries(from.labels)) {
+      if (base.metadata?.labels?.[key]) {
+        core.warning(`Label ${key} is already defined and will be overwritten`)
+      }
+      base.metadata.labels[key] = value
     }
   }
 
-  return newPodSpec
+  if (from?.annotations) {
+    for (const [key, value] of Object.entries(from.annotations)) {
+      if (base.metadata?.annotations?.[key]) {
+        core.warning(
+          `Annotation ${key} is already defined and will be overwritten`
+        )
+      }
+      base.metadata.annotations[key] = value
+    }
+  }
+}
+
+export function readExtensionFromFile(): k8s.V1PodTemplateSpec | undefined {
+  const filePath = process.env[ENV_HOOK_TEMPLATE_PATH]
+  if (!filePath) {
+    return undefined
+  }
+  const doc = yaml.load(fs.readFileSync(filePath, 'utf8'))
+  if (!doc || typeof doc !== 'object') {
+    throw new Error(`Failed to parse ${filePath}`)
+  }
+  return doc as k8s.V1PodTemplateSpec
 }
 
 export enum PodPhase {

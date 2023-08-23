@@ -16,7 +16,8 @@ import {
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
   PodPhase,
   mergeContainerWithOptions,
-  writeEntryPointScript
+  writeEntryPointScript,
+  readExtensionFromFile
 } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
 
@@ -32,10 +33,12 @@ export async function runContainerStep(
     secretName = await createSecretForEnvs(stepContainer.environmentVariables)
   }
 
-  core.debug(`Created secret ${secretName} for container job envs`)
-  const container = createContainerSpec(stepContainer, secretName)
+  const extension = readExtensionFromFile()
 
-  const job = await createJob(container)
+  core.debug(`Created secret ${secretName} for container job envs`)
+  const container = createContainerSpec(stepContainer, secretName, extension)
+
+  const job = await createJob(container, extension)
   if (!job.metadata?.name) {
     throw new Error(
       `Expected job ${JSON.stringify(
@@ -78,7 +81,8 @@ export async function runContainerStep(
 
 function createContainerSpec(
   container: RunContainerStepArgs,
-  secretName?: string
+  secretName?: string,
+  extension?: k8s.V1PodTemplateSpec
 ): k8s.V1Container {
   const podContainer = new k8s.V1Container()
   podContainer.name = JOB_CONTAINER_NAME
@@ -107,15 +111,16 @@ function createContainerSpec(
   }
   podContainer.volumeMounts = containerVolumes(undefined, false, true)
 
-  if (
-    !container.createOptions?.container ||
-    typeof container.createOptions?.container !== 'object'
-  ) {
+  if (!extension) {
     return podContainer
   }
 
-  return mergeContainerWithOptions(
-    podContainer,
-    container.createOptions.container
+  const from = extension.spec?.containers?.find(
+    c => c.name === JOB_CONTAINER_NAME
   )
+  if (from) {
+    mergeContainerWithOptions(podContainer, from)
+  }
+
+  return podContainer
 }

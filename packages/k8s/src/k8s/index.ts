@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
 import * as k8s from '@kubernetes/client-node'
-import { KubernetesJobPodOptions, ContainerInfo, Registry } from 'hooklib'
+import { ContainerInfo, Registry } from 'hooklib'
 import * as stream from 'stream'
 import {
   getJobPodName,
@@ -10,7 +10,7 @@ import {
   getVolumeClaimName,
   RunnerInstanceLabel
 } from '../hooks/constants'
-import { PodPhase, mergePodSpecWithOptions } from './utils'
+import { PodPhase, mergePodSpecWithOptions, mergePodMetadata } from './utils'
 
 const kc = new k8s.KubeConfig()
 
@@ -59,7 +59,7 @@ export async function createPod(
   jobContainer?: k8s.V1Container,
   services?: k8s.V1Container[],
   registry?: Registry,
-  options?: KubernetesJobPodOptions
+  extension?: k8s.V1PodTemplateSpec
 ): Promise<k8s.V1Pod> {
   const containers: k8s.V1Container[] = []
   if (jobContainer) {
@@ -104,8 +104,11 @@ export async function createPod(
     appPod.spec.imagePullSecrets = [secretReference]
   }
 
-  if (options && typeof options === 'object') {
-    appPod.spec = mergePodSpecWithOptions(appPod.spec, options)
+  if (extension?.metadata) {
+    mergePodMetadata(appPod, extension.metadata)
+  }
+  if (extension?.spec) {
+    mergePodSpecWithOptions(appPod.spec, extension.spec)
   }
 
   const { body } = await k8sApi.createNamespacedPod(namespace(), appPod)
@@ -113,7 +116,8 @@ export async function createPod(
 }
 
 export async function createJob(
-  container: k8s.V1Container
+  container: k8s.V1Container,
+  extension?: k8s.V1PodTemplateSpec
 ): Promise<k8s.V1Job> {
   const runnerInstanceLabel = new RunnerInstanceLabel()
 
@@ -141,6 +145,15 @@ export async function createJob(
       persistentVolumeClaim: { claimName }
     }
   ]
+
+  if (extension) {
+    if (extension.metadata) {
+      mergePodMetadata(job.spec.template, extension.metadata)
+    }
+    if (extension.spec) {
+      mergePodSpecWithOptions(job.spec.template.spec, extension.spec)
+    }
+  }
 
   const { body } = await k8sBatchV1Api.createNamespacedJob(namespace(), job)
   return body
