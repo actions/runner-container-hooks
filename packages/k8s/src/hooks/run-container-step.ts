@@ -14,7 +14,6 @@ import {
   containerVolumes,
   PodPhase,
   mergeContainerWithOptions,
-  writeEntryPointScript,
   readExtensionFromFile
 } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
