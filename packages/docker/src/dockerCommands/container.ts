@@ -97,11 +97,12 @@ export async function containerPull(
   image: string,
   configLocation: string
 ): Promise<void> {
-  const dockerArgs: string[] = ['pull']
+  const dockerArgs: string[] = []
   if (configLocation) {
     dockerArgs.push('--config')
     dockerArgs.push(configLocation)
   }
+  dockerArgs.push('pull')
   dockerArgs.push(image)
   for (let i = 0; i < 3; i++) {
     try {
