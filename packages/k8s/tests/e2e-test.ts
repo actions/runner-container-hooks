@@ -5,7 +5,7 @@ import {
   runContainerStep,
   runScriptStep
 } from '../src/hooks'
-import { TableTest, TestHelper } from './test-setup'
+import { TestHelper } from './test-setup'
 
 jest.useRealTimers()
 
@@ -15,67 +15,36 @@ let prepareJobData: any
 
 let prepareJobOutputFilePath: string
 describe('e2e', () => {
-  const cases = [] as TableTest[]
-  cases.push({
-    name: 'should prepare job, run script step, run container step then cleanup without errors',
-    fn: async () => {
-      await expect(
-        prepareJob(prepareJobData.args, prepareJobOutputFilePath)
-      ).resolves.not.toThrow()
+  beforeEach(async () => {
+    testHelper = new TestHelper()
+    await testHelper.initialize()
 
-      const scriptStepData = testHelper.getRunScriptStepDefinition()
-
-      const prepareJobOutputJson = fs.readFileSync(prepareJobOutputFilePath)
-      const prepareJobOutputData = JSON.parse(prepareJobOutputJson.toString())
-
-      await expect(
-        runScriptStep(scriptStepData.args, prepareJobOutputData.state, null)
-      ).resolves.not.toThrow()
-
-      const runContainerStepData = testHelper.getRunContainerStepDefinition()
-
-      await expect(
-        runContainerStep(runContainerStepData.args)
-      ).resolves.not.toThrow()
-
-      await expect(cleanupJob()).resolves.not.toThrow()
-    }
+    prepareJobData = testHelper.getPrepareJobDefinition()
+    prepareJobOutputFilePath = testHelper.createFile('prepare-job-output.json')
   })
-  describe('k8s config', () => {
-    beforeEach(async () => {
-      testHelper = new TestHelper('k8s')
-      await testHelper.initialize()
-
-      prepareJobData = testHelper.getPrepareJobDefinition()
-      prepareJobOutputFilePath = testHelper.createFile(
-        'prepare-job-output.json'
-      )
-    })
-    afterEach(async () => {
-      await testHelper.cleanup()
-    })
-
-    cases.forEach(e => {
-      it(e.name, e.fn)
-    })
+  afterEach(async () => {
+    await testHelper.cleanup()
   })
+  it('should prepare job, run script step, run container step then cleanup without errors', async () => {
+    await expect(
+      prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+    ).resolves.not.toThrow()
 
-  describe('docker config', () => {
-    beforeEach(async () => {
-      testHelper = new TestHelper('docker')
-      await testHelper.initialize()
+    const scriptStepData = testHelper.getRunScriptStepDefinition()
 
-      prepareJobData = testHelper.getPrepareJobDefinition()
-      prepareJobOutputFilePath = testHelper.createFile(
-        'prepare-job-output.json'
-      )
-    })
-    afterEach(async () => {
-      await testHelper.cleanup()
-    })
+    const prepareJobOutputJson = fs.readFileSync(prepareJobOutputFilePath)
+    const prepareJobOutputData = JSON.parse(prepareJobOutputJson.toString())
 
-    cases.forEach(e => {
-      it(e.name, e.fn)
-    })
+    await expect(
+      runScriptStep(scriptStepData.args, prepareJobOutputData.state, null)
+    ).resolves.not.toThrow()
+
+    const runContainerStepData = testHelper.getRunContainerStepDefinition()
+
+    await expect(
+      runContainerStep(runContainerStepData.args)
+    ).resolves.not.toThrow()
+
+    await expect(cleanupJob()).resolves.not.toThrow()
   })
 })

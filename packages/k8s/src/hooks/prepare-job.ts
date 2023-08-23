@@ -35,18 +35,31 @@ export async function prepareJob(
   }
 
   await prunePods()
+
+  const extension = readExtensionFromFile()
   await copyExternalsToRoot()
+
   let container: k8s.V1Container | undefined = undefined
   if (args.container?.image) {
     core.debug(`Using image '${args.container.image}' for job image`)
-    container = createContainerSpec(args.container, JOB_CONTAINER_NAME, true)
+    container = createContainerSpec(
+      args.container,
+      JOB_CONTAINER_NAME,
+      true,
+      extension
+    )
   }
 
   let services: k8s.V1Container[] = []
   if (args.services?.length) {
     services = args.services.map(service => {
       core.debug(`Adding service '${service.image}' to pod definition`)
-      return createContainerSpec(service, generateContainerName(service.image))
+      return createContainerSpec(
+        service,
+        generateContainerName(service.image),
+        false,
+        extension
+      )
     })
   }
   if (!container && !services?.length) {
@@ -54,7 +67,6 @@ export async function prepareJob(
   }
 
   let createdPod: k8s.V1Pod | undefined = undefined
-  const extension = readExtensionFromFile()
   try {
     createdPod = await createPod(
       container,
