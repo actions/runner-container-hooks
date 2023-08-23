@@ -1,10 +1,15 @@
-import * as fs from 'fs'
+﻿import * as fs from 'fs'
 import { containerPorts, POD_VOLUME_NAME } from '../src/k8s'
 import {
   containerVolumes,
   generateContainerName,
-  writeEntryPointScript
+  writeEntryPointScript,
+  mergePodSpecWithOptions,
+  mergeContainerWithOptions,
+  readExtensionFromFile,
+  ENV_HOOK_TEMPLATE_PATH
 } from '../src/k8s/utils'
+import * as k8s from '@kubernetes/client-node'
 import { TestHelper } from './test-setup'
 
 let testHelper: TestHelper
@@ -327,5 +332,185 @@ describe('k8s utils', () => {
       ).toThrow()
       expect(() => generateContainerName(':latest')).toThrow()
     })
+  })
+
+  describe('read extension', () => {
+    beforeEach(async () => {
+      testHelper = new TestHelper()
+      await testHelper.initialize()
+    })
+
+    afterEach(async () => {
+      await testHelper.cleanup()
+    })
+
+    it('should throw if env variable is set but file does not exist', () => {
+      process.env[ENV_HOOK_TEMPLATE_PATH] =
+        '/path/that/does/not/exist/data.yaml'
+      expect(() => readExtensionFromFile()).toThrow()
+    })
+
+    it('should return undefined if env variable is not set', () => {
+      delete process.env[ENV_HOOK_TEMPLATE_PATH]
+      expect(readExtensionFromFile()).toBeUndefined()
+    })
+
+    it('should throw if file is empty', () => {
+      let filePath = testHelper.createFile('data.yaml')
+      process.env[ENV_HOOK_TEMPLATE_PATH] = filePath
+      expect(() => readExtensionFromFile()).toThrow()
+    })
+
+    it('should throw if file is not valid yaml', () => {
+      let filePath = testHelper.createFile('data.yaml')
+      fs.writeFileSync(filePath, 'invalid yaml')
+      process.env[ENV_HOOK_TEMPLATE_PATH] = filePath
+      expect(() => readExtensionFromFile()).toThrow()
+    })
+
+    it('should return object if file is valid', () => {
+      let filePath = testHelper.createFile('data.yaml')
+      fs.writeFileSync(
+        filePath,
+        `
+apiVersion: v1
+metadata:
+  labels:
+    label-name: label-value
+  annotations:
+    annotation-name: annotation-value
+spec:
+  containers:
+    - name: test
+      image: node:14.16
+    - name: job
+      image: ubuntu:latest`
+      )
+
+      process.env[ENV_HOOK_TEMPLATE_PATH] = filePath
+      const extension = readExtensionFromFile()
+      expect(extension).toBeDefined()
+    })
+  })
+
+  it('should merge container spec', () => {
+    const base = {
+      image: 'node:14.16',
+      name: 'test',
+      env: [
+        {
+          name: 'TEST',
+          value: 'TEST'
+        }
+      ],
+      ports: [
+        {
+          containerPort: 8080,
+          hostPort: 8080,
+          protocol: 'TCP'
+        }
+      ]
+    } as k8s.V1Container
+
+    const from = {
+      ports: [
+        {
+          containerPort: 9090,
+          hostPort: 9090,
+          protocol: 'TCP'
+        }
+      ],
+      env: [
+        {
+          name: 'TEST_TWO',
+          value: 'TEST_TWO'
+        }
+      ],
+      image: 'ubuntu:latest',
+      name: 'overwrite'
+    } as k8s.V1Container
+
+    const expectContainer = {
+      name: base.name,
+      image: from.image,
+      ports: [
+        ...(base.ports as k8s.V1ContainerPort[]),
+        ...(from.ports as k8s.V1ContainerPort[])
+      ],
+      env: [...(base.env as k8s.V1EnvVar[]), ...(from.env as k8s.V1EnvVar[])]
+    }
+
+    const expectJobContainer = JSON.parse(JSON.stringify(expectContainer))
+    expectJobContainer.name = base.name
+    mergeContainerWithOptions(base, from)
+    expect(base).toStrictEqual(expectContainer)
+  })
+
+  it('should merge pod spec', () => {
+    const base = {
+      containers: [
+        {
+          image: 'node:14.16',
+          name: 'test',
+          env: [
+            {
+              name: 'TEST',
+              value: 'TEST'
+            }
+          ],
+          ports: [
+            {
+              containerPort: 8080,
+              hostPort: 8080,
+              protocol: 'TCP'
+            }
+          ]
+        }
+      ],
+      restartPolicy: 'Never'
+    } as k8s.V1PodSpec
+
+    const from = {
+      securityContext: {
+        runAsUser: 1000,
+        fsGroup: 2000
+      },
+      restartPolicy: 'Always',
+      volumes: [
+        {
+          name: 'work',
+          emptyDir: {}
+        }
+      ],
+      containers: [
+        {
+          image: 'ignore:14.16',
+          name: 'ignore',
+          env: [
+            {
+              name: 'TEST',
+              value: 'TEST'
+            }
+          ],
+          ports: [
+            {
+              containerPort: 8080,
+              hostPort: 8080,
+              protocol: 'TCP'
+            }
+          ]
+        }
+      ],
+      container: {} // field does not exist on v1PodSpec but will be passed by the runner
+    } as k8s.V1PodSpec
+
+    const expected = JSON.parse(JSON.stringify(base))
+    expected.securityContext = from.securityContext
+    expected.restartPolicy = from.restartPolicy
+    expected.volumes = from.volumes
+
+    mergePodSpecWithOptions(base, from)
+
+    expect(base).toStrictEqual(expected)
   })
 })

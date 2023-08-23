@@ -3,8 +3,10 @@ import * as path from 'path'
 import { cleanupJob } from '../src/hooks'
 import { createContainerSpec, prepareJob } from '../src/hooks/prepare-job'
 import { TestHelper } from './test-setup'
-import { generateContainerName } from '../src/k8s/utils'
+import { ENV_HOOK_TEMPLATE_PATH, generateContainerName } from '../src/k8s/utils'
+import { getPodByName } from '../src/k8s'
 import { V1Container } from '@kubernetes/client-node'
+import * as yaml from 'js-yaml'
 
 jest.useRealTimers()
 
@@ -81,6 +83,63 @@ describe('Prepare job', () => {
 
     expect(services[0].command).toBe(undefined)
     expect(services[0].args).toBe(undefined)
+  })
+
+  it('should run pod with extensions applied', async () => {
+    const extension = {
+      metadata: {
+        annotations: {
+          foo: 'bar'
+        },
+        labels: {
+          bar: 'baz'
+        }
+      },
+      spec: {
+        containers: [
+          {
+            name: 'job',
+            command: ['sh'],
+            args: ['-c', 'sleep 50']
+          },
+          {
+            name: 'side-container',
+            command: ['sh'],
+            args: ['-c', 'sleep 50']
+          }
+        ],
+        restartPolicy: 'Never',
+        securityContext: {
+          runAsUser: 1000,
+          runAsGroup: 3000
+        }
+      }
+    }
+
+    let filePath = testHelper.createFile()
+    fs.writeFileSync(filePath, yaml.dump(extension))
+    process.env[ENV_HOOK_TEMPLATE_PATH] = filePath
+
+    await expect(
+      prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+    ).resolves.not.toThrow()
+
+    delete process.env[ENV_HOOK_TEMPLATE_PATH]
+
+    const content = JSON.parse(
+      fs.readFileSync(prepareJobOutputFilePath).toString()
+    )
+
+    const got = await getPodByName(content.state.jobPod)
+
+    expect(got.metadata?.annotations?.foo).toBe('bar')
+    expect(got.metadata?.labels?.bar).toBe('baz')
+    expect(got.spec?.securityContext?.runAsUser).toBe(1000)
+    expect(got.spec?.securityContext?.runAsGroup).toBe(3000)
+    expect(got.spec?.containers[0].command).toEqual(['sh'])
+    expect(got.spec?.containers[0].args).toEqual(['-c', 'sleep 50'])
+    expect(got.spec?.containers[1].command).toEqual(['sh'])
+    expect(got.spec?.containers[1].args).toEqual(['-c', 'sleep 50'])
   })
 
   test.each([undefined, null, []])(

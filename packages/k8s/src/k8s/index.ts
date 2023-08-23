@@ -81,6 +81,7 @@ export async function createPod(
   appPod.metadata.labels = {
     [instanceLabel.key]: instanceLabel.value
   }
+  appPod.metadata.annotations = {}
 
   appPod.spec = new k8s.V1PodSpec()
   appPod.spec.containers = containers
@@ -571,4 +572,9 @@ export function containerPorts(
     ports.push(port)
   }
   return ports
+}
+
+export async function getPodByName(name): Promise<k8s.V1Pod> {
+  const { body } = await k8sApi.readNamespacedPod(name, namespace())
+  return body
 }

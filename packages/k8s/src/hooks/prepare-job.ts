@@ -220,13 +220,6 @@ export function createContainerSpec(
     jobContainer
   )
 
-  if (
-    !container.createOptions?.container ||
-    typeof container.createOptions?.container !== 'object'
-  ) {
-    return podContainer
-  }
-
   if (!extension) {
     return podContainer
   }
@@ -235,11 +228,9 @@ export function createContainerSpec(
     c => c.name === JOB_CONTAINER_NAME
   )
 
-  if (!from) {
-    return podContainer
+  if (from) {
+    mergeContainerWithOptions(podContainer, from)
   }
-
-  mergeContainerWithOptions(podContainer, container.createOptions.container)
 
   return podContainer
 }

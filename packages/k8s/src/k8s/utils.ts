@@ -214,7 +214,9 @@ export function mergePodMetadata(
   from: k8s.V1ObjectMeta
 ): void {
   if (!base.metadata?.labels || !base.metadata?.annotations) {
-    throw new Error("Can't merge metadata: base.metadata is undefined")
+    throw new Error(
+      "Can't merge metadata: base.metadata or base.annotations field is undefined"
+    )
   }
   if (from?.labels) {
     for (const [key, value] of Object.entries(from.labels)) {
@@ -263,8 +265,6 @@ function mergeLists<T>(base?: T[], from?: T[]): T[] {
   if (!from?.length) {
     return b
   }
-  for (const v of from) {
-    b.push(v)
-  }
+  b.push(...from)
   return b
 }
