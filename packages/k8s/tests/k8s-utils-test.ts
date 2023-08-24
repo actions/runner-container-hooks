@@ -373,7 +373,6 @@ describe('k8s utils', () => {
       fs.writeFileSync(
         filePath,
         `
-apiVersion: v1
 metadata:
   labels:
     label-name: label-value

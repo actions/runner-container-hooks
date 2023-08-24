@@ -10,7 +10,7 @@ import {
   getVolumeClaimName,
   RunnerInstanceLabel
 } from '../hooks/constants'
-import { PodPhase, mergePodSpecWithOptions, mergePodMetadata } from './utils'
+import { PodPhase, mergePodSpecWithOptions, mergeObjectMeta } from './utils'
 
 const kc = new k8s.KubeConfig()
 
@@ -106,8 +106,9 @@ export async function createPod(
   }
 
   if (extension?.metadata) {
-    mergePodMetadata(appPod, extension.metadata)
+    mergeObjectMeta(appPod, extension.metadata)
   }
+
   if (extension?.spec) {
     mergePodSpecWithOptions(appPod.spec, extension.spec)
   }
@@ -128,6 +129,7 @@ export async function createJob(
   job.metadata = new k8s.V1ObjectMeta()
   job.metadata.name = getStepPodName()
   job.metadata.labels = { [runnerInstanceLabel.key]: runnerInstanceLabel.value }
+  job.metadata.annotations = {}
 
   job.spec = new k8s.V1JobSpec()
   job.spec.ttlSecondsAfterFinished = 300
@@ -135,6 +137,9 @@ export async function createJob(
   job.spec.template = new k8s.V1PodTemplateSpec()
 
   job.spec.template.spec = new k8s.V1PodSpec()
+  job.spec.template.metadata = new k8s.V1ObjectMeta()
+  job.spec.template.metadata.labels = {}
+  job.spec.template.metadata.annotations = {}
   job.spec.template.spec.containers = [container]
   job.spec.template.spec.restartPolicy = 'Never'
   job.spec.template.spec.nodeName = await getCurrentNodeName()
@@ -149,7 +154,8 @@ export async function createJob(
 
   if (extension) {
     if (extension.metadata) {
-      mergePodMetadata(job.spec.template, extension.metadata)
+      mergeObjectMeta(job, extension.metadata)
+      mergeObjectMeta(job.spec.template, extension.metadata)
     }
     if (extension.spec) {
       mergePodSpecWithOptions(job.spec.template.spec, extension.spec)

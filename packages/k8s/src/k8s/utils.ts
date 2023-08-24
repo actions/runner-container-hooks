@@ -209,8 +209,8 @@ export function mergePodSpecWithOptions(
   }
 }
 
-export function mergePodMetadata(
-  base: k8s.V1Pod,
+export function mergeObjectMeta(
+  base: { metadata?: k8s.V1ObjectMeta },
   from: k8s.V1ObjectMeta
 ): void {
   if (!base.metadata?.labels || !base.metadata?.annotations) {
