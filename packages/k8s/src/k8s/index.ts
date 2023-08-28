@@ -473,6 +473,7 @@ async function getCurrentNodeName(): Promise<string> {
   }
   return nodeName
 }
+
 export function namespace(): string {
   if (process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE']) {
     return process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE']

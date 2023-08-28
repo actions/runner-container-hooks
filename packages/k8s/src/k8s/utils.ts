@@ -125,7 +125,8 @@ export function writeEntryPointScript(
         `"${key}=${value
           .replace(/\\/g, '\\\\')
           .replace(/"/g, '\\"')
-          .replace(/\$/g, '\\$')}"`
+          .replace(/\$/g, '\\$')
+          .replace(/`/g, '\\`')}"`
       )
     }
     environmentPrefix = `env ${envBuffer.join(' ')} `
