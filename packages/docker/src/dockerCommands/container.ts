@@ -1,4 +1,4 @@
-﻿import * as core from '@actions/core'
+import * as core from '@actions/core'
 import * as fs from 'fs'
 import {
   ContainerInfo,
@@ -38,13 +38,7 @@ export async function createContainer(
     }
   }
   if (args.createOptions) {
-    if (typeof args.createOptions === 'string') {
-      dockerArgs.push(...args.createOptions.split(' '))
-    } else {
-      core.warning(
-        'Ignoring create options: docker hook requires createOptions to be of type string'
-      )
-    }
+    dockerArgs.push(...args.createOptions.split(' '))
   }
 
   if (args.environmentVariables) {
@@ -405,13 +399,7 @@ export async function containerRun(
   }
 
   if (args.createOptions) {
-    if (typeof args.createOptions === 'string') {
-      dockerArgs.push(...args.createOptions.split(' '))
-    } else {
-      core.warning(
-        'Ignoring create options: docker hook requires createOptions to be of type string'
-      )
-    }
+    dockerArgs.push(...args.createOptions.split(' '))
   }
   if (args.environmentVariables) {
     for (const [key] of Object.entries(args.environmentVariables)) {
