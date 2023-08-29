@@ -1,5 +1,3 @@
-import * as k8s from '@kubernetes/client-node'
-
 export enum Command {
   PrepareJob = 'prepare_job',
   CleanupJob = 'cleanup_job',
@@ -33,66 +31,12 @@ export interface ContainerInfo {
   image?: string
   entryPoint?: string
   entryPointArgs?: string[]
-  createOptions?:
-    | string
-    | KubernetesJobPodOptions
-    | KubernetesServiceContainerOptions
+  createOptions?: string
   environmentVariables?: { [key: string]: string }
   userMountVolumes?: Mount[]
   systemMountVolumes?: Mount[]
   registry?: Registry
   portMappings?: string[]
-}
-
-export interface KubernetesJobPodOptions {
-  activeDeadlineSeconds?: number
-  affinity?: k8s.V1Affinity
-  automountServiceAccountToken?: boolean
-  /**
-   * container is a singular word. It only affects the job container
-   */
-  container: k8s.V1Container
-  dnsConfig?: k8s.V1PodDNSConfig
-  dnsPolicy?: string
-  enableServiceLinks?: boolean
-  ephemeralContainers?: k8s.V1EphemeralContainer[]
-  hostAliases?: k8s.V1HostAlias[]
-  hostIPC?: boolean
-  hostNetwork?: boolean
-  hostPID?: boolean
-  hostUsers?: boolean
-  hostname?: string
-  imagePullSecrets?: k8s.V1LocalObjectReference[]
-  initContainers?: k8s.V1Container[]
-  nodeName?: string
-  nodeSelector?: {
-    [key: string]: string
-  }
-  os?: k8s.V1PodOS
-  overhead?: {
-    [key: string]: string
-  }
-  preemptionPolicy?: string
-  priority?: number
-  priorityClassName?: string
-  readinessGates?: k8s.V1PodReadinessGate[]
-  restartPolicy?: string
-  runtimeClassName?: string
-  schedulerName?: string
-  securityContext?: k8s.V1PodSecurityContext
-  serviceAccount?: string
-  serviceAccountName?: string
-  setHostnameAsFQDN?: boolean
-  shareProcessNamespace?: boolean
-  subdomain?: string
-  terminationGracePeriodSeconds?: number
-  tolerations?: k8s.V1Toleration[]
-  topologySpreadConstraints?: k8s.V1TopologySpreadConstraint[]
-  volumes?: k8s.V1Volume[]
-}
-
-export interface KubernetesServiceContainerOptions {
-  container: k8s.V1Container
 }
 
 export interface ServiceContainerInfo extends ContainerInfo {
