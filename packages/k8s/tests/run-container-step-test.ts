@@ -45,6 +45,7 @@ describe('Run container step', () => {
           },
           {
             name: 'side-container',
+            image: 'ubuntu:latest',
             command: ['sh'],
             args: ['-c', 'echo test']
           }

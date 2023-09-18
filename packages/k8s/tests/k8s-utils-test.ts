@@ -483,8 +483,8 @@ spec:
       ],
       containers: [
         {
-          image: 'ignore:14.16',
-          name: 'ignore',
+          image: 'ubuntu:latest',
+          name: 'side-car',
           env: [
             {
               name: 'TEST',
@@ -499,14 +499,14 @@ spec:
             }
           ]
         }
-      ],
-      container: {} // field does not exist on v1PodSpec but will be passed by the runner
+      ]
     } as k8s.V1PodSpec
 
     const expected = JSON.parse(JSON.stringify(base))
     expected.securityContext = from.securityContext
     expected.restartPolicy = from.restartPolicy
     expected.volumes = from.volumes
+    expected.containers.push(from.containers[0])
 
     mergePodSpecWithOptions(base, from)
 

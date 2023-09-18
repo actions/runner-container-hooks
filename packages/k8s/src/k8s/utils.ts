@@ -6,6 +6,7 @@ import { Mount } from 'hooklib'
 import * as path from 'path'
 import { v1 as uuidv4 } from 'uuid'
 import { POD_VOLUME_NAME } from './index'
+import { JOB_CONTAINER_NAME } from '../hooks/constants'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
@@ -198,8 +199,10 @@ export function mergePodSpecWithOptions(
   from: k8s.V1PodSpec
 ): void {
   for (const [key, value] of Object.entries(from)) {
-    if (key === 'container' || key === 'containers') {
-      continue
+    if (key === 'containers') {
+      base.containers.push(
+        ...from.containers.filter(e => e.name !== JOB_CONTAINER_NAME)
+      )
     } else if (key === 'volumes' && value) {
       const volumes = value as k8s.V1Volume[]
       base.volumes = mergeLists(base.volumes, volumes)

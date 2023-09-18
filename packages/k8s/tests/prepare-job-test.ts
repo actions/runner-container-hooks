@@ -3,7 +3,11 @@ import * as path from 'path'
 import { cleanupJob } from '../src/hooks'
 import { createContainerSpec, prepareJob } from '../src/hooks/prepare-job'
 import { TestHelper } from './test-setup'
-import { ENV_HOOK_TEMPLATE_PATH, generateContainerName } from '../src/k8s/utils'
+import {
+  ENV_HOOK_TEMPLATE_PATH,
+  generateContainerName,
+  readExtensionFromFile
+} from '../src/k8s/utils'
 import { getPodByName } from '../src/k8s'
 import { V1Container } from '@kubernetes/client-node'
 import * as yaml from 'js-yaml'
@@ -86,39 +90,10 @@ describe('Prepare job', () => {
   })
 
   it('should run pod with extensions applied', async () => {
-    const extension = {
-      metadata: {
-        annotations: {
-          foo: 'bar'
-        },
-        labels: {
-          bar: 'baz'
-        }
-      },
-      spec: {
-        containers: [
-          {
-            name: 'job',
-            command: ['sh'],
-            args: ['-c', 'sleep 50']
-          },
-          {
-            name: 'side-container',
-            command: ['sh'],
-            args: ['-c', 'sleep 50']
-          }
-        ],
-        restartPolicy: 'Never',
-        securityContext: {
-          runAsUser: 1000,
-          runAsGroup: 3000
-        }
-      }
-    }
-
-    let filePath = testHelper.createFile()
-    fs.writeFileSync(filePath, yaml.dump(extension))
-    process.env[ENV_HOOK_TEMPLATE_PATH] = filePath
+    process.env[ENV_HOOK_TEMPLATE_PATH] = path.join(
+      __dirname,
+      '../../../examples/extension.yaml'
+    )
 
     await expect(
       prepareJob(prepareJobData.args, prepareJobOutputFilePath)
@@ -132,8 +107,8 @@ describe('Prepare job', () => {
 
     const got = await getPodByName(content.state.jobPod)
 
-    expect(got.metadata?.annotations?.foo).toBe('bar')
-    expect(got.metadata?.labels?.bar).toBe('baz')
+    expect(got.metadata?.annotations?.['annotated-by']).toBe('extension')
+    expect(got.metadata?.labels?.['labeled-by']).toBe('extension')
     expect(got.spec?.securityContext?.runAsUser).toBe(1000)
     expect(got.spec?.securityContext?.runAsGroup).toBe(3000)
     expect(got.spec?.containers[0].command).toEqual(['sh'])

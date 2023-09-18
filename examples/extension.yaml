@@ -1,0 +1,30 @@
+metadata:
+  annotations:
+    annotated-by: "extension"
+  labels:
+    labeled-by: "extension"
+spec:
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 3000
+  restartPolicy: Never
+  containers:
+  - name: job # overwirtes job container
+    env:
+    - name: ENV1
+      value: "value1"
+    imagePullPolicy: Always
+    image: "busybox:1.28" # Ignored
+    command:
+    - sh
+    args:
+    - -c
+    - sleep 50
+  - name: side-car
+    image: "ubuntu:latest" # required
+    command:
+    - sh
+    args:
+    - -c
+    - sleep 50
+    
