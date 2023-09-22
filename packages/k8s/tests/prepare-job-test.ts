@@ -111,10 +111,20 @@ describe('Prepare job', () => {
     expect(got.metadata?.labels?.['labeled-by']).toBe('extension')
     expect(got.spec?.securityContext?.runAsUser).toBe(1000)
     expect(got.spec?.securityContext?.runAsGroup).toBe(3000)
+
+    // job container
     expect(got.spec?.containers[0].command).toEqual(['sh'])
     expect(got.spec?.containers[0].args).toEqual(['-c', 'sleep 50'])
-    expect(got.spec?.containers[1].command).toEqual(['sh'])
-    expect(got.spec?.containers[1].args).toEqual(['-c', 'sleep 50'])
+
+    // service container
+    expect(got.spec?.containers[1].image).toBe('redis')
+    expect(got.spec?.containers[1].command).toBeFalsy()
+    expect(got.spec?.containers[1].args).toBeFalsy()
+    // side-car
+    expect(got.spec?.containers[2].name).toBe('side-car')
+    expect(got.spec?.containers[2].image).toBe('ubuntu:latest')
+    expect(got.spec?.containers[2].command).toEqual(['sh'])
+    expect(got.spec?.containers[2].args).toEqual(['-c', 'sleep 60'])
   })
 
   test.each([undefined, null, []])(

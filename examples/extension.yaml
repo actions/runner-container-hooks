@@ -9,7 +9,7 @@ spec:
     runAsGroup: 3000
   restartPolicy: Never
   containers:
-  - name: job # overwirtes job container
+  - name: $job # overwirtes job container
     env:
     - name: ENV1
       value: "value1"
@@ -26,5 +26,5 @@ spec:
     - sh
     args:
     - -c
-    - sleep 50
+    - sleep 60
     

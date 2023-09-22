@@ -16,7 +16,7 @@ import {
   mergeContainerWithOptions,
   readExtensionFromFile
 } from '../k8s/utils'
-import { JOB_CONTAINER_NAME } from './constants'
+import { JOB_CONTAINER_EXTENSION_NAME, JOB_CONTAINER_NAME } from './constants'
 
 export async function runContainerStep(
   stepContainer: RunContainerStepArgs
@@ -109,7 +109,7 @@ function createContainerSpec(
   }
 
   const from = extension.spec?.containers?.find(
-    c => c.name === JOB_CONTAINER_NAME
+    c => c.name === JOB_CONTAINER_EXTENSION_NAME
   )
   if (from) {
     mergeContainerWithOptions(podContainer, from)

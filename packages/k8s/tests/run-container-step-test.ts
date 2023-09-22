@@ -3,6 +3,7 @@ import { TestHelper } from './test-setup'
 import { ENV_HOOK_TEMPLATE_PATH } from '../src/k8s/utils'
 import * as fs from 'fs'
 import * as yaml from 'js-yaml'
+import { JOB_CONTAINER_EXTENSION_NAME } from '../src/hooks/constants'
 
 jest.useRealTimers()
 
@@ -39,7 +40,7 @@ describe('Run container step', () => {
       spec: {
         containers: [
           {
-            name: 'job',
+            name: JOB_CONTAINER_EXTENSION_NAME,
             command: ['sh'],
             args: ['-c', 'echo test']
           },

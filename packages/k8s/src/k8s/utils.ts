@@ -201,7 +201,7 @@ export function mergePodSpecWithOptions(
   for (const [key, value] of Object.entries(from)) {
     if (key === 'containers') {
       base.containers.push(
-        ...from.containers.filter(e => e.name !== JOB_CONTAINER_NAME)
+        ...from.containers.filter(e => !e.name?.startsWith('$'))
       )
     } else if (key === 'volumes' && value) {
       const volumes = value as k8s.V1Volume[]

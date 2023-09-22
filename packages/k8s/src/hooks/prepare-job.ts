@@ -24,7 +24,7 @@ import {
   readExtensionFromFile,
   PodPhase
 } from '../k8s/utils'
-import { JOB_CONTAINER_NAME } from './constants'
+import { JOB_CONTAINER_EXTENSION_NAME, JOB_CONTAINER_NAME } from './constants'
 
 export async function prepareJob(
   args: PrepareJobArgs,
@@ -58,10 +58,11 @@ export async function prepareJob(
         service,
         generateContainerName(service.image),
         false,
-        extension
+        undefined
       )
     })
   }
+
   if (!container && !services?.length) {
     throw new Error('No containers exist, skipping hook invocation')
   }
@@ -225,7 +226,7 @@ export function createContainerSpec(
   }
 
   const from = extension.spec?.containers?.find(
-    c => c.name === JOB_CONTAINER_NAME
+    c => c.name === JOB_CONTAINER_EXTENSION_NAME
   )
 
   if (from) {
