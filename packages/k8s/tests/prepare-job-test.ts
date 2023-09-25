@@ -11,6 +11,7 @@ import {
 import { getPodByName } from '../src/k8s'
 import { V1Container } from '@kubernetes/client-node'
 import * as yaml from 'js-yaml'
+import { JOB_CONTAINER_NAME } from '../src/hooks/constants'
 
 jest.useRealTimers()
 
@@ -113,6 +114,8 @@ describe('Prepare job', () => {
     expect(got.spec?.securityContext?.runAsGroup).toBe(3000)
 
     // job container
+    expect(got.spec?.containers[0].name).toBe(JOB_CONTAINER_NAME)
+    expect(got.spec?.containers[0].image).toBe('node:14.16')
     expect(got.spec?.containers[0].command).toEqual(['sh'])
     expect(got.spec?.containers[0].args).toEqual(['-c', 'sleep 50'])
 

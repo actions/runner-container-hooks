@@ -178,6 +178,9 @@ export function mergeContainerWithOptions(
     if (key === 'name') {
       core.warning("Skipping name override: name can't be overwritten")
       continue
+    } else if (key === 'image') {
+      core.warning("Skipping image override: image can't be overwritten")
+      continue
     } else if (key === 'env') {
       const envs = value as k8s.V1EnvVar[]
       base.env = mergeLists(base.env, envs)
