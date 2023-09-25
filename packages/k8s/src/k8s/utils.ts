@@ -6,7 +6,6 @@ import { Mount } from 'hooklib'
 import * as path from 'path'
 import { v1 as uuidv4 } from 'uuid'
 import { POD_VOLUME_NAME } from './index'
-import { JOB_CONTAINER_NAME } from '../hooks/constants'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
