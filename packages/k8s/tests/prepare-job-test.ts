@@ -3,8 +3,15 @@ import * as path from 'path'
 import { cleanupJob } from '../src/hooks'
 import { createContainerSpec, prepareJob } from '../src/hooks/prepare-job'
 import { TestHelper } from './test-setup'
-import { generateContainerName } from '../src/k8s/utils'
+import {
+  ENV_HOOK_TEMPLATE_PATH,
+  generateContainerName,
+  readExtensionFromFile
+} from '../src/k8s/utils'
+import { getPodByName } from '../src/k8s'
 import { V1Container } from '@kubernetes/client-node'
+import * as yaml from 'js-yaml'
+import { JOB_CONTAINER_NAME } from '../src/hooks/constants'
 
 jest.useRealTimers()
 
@@ -81,6 +88,46 @@ describe('Prepare job', () => {
 
     expect(services[0].command).toBe(undefined)
     expect(services[0].args).toBe(undefined)
+  })
+
+  it('should run pod with extensions applied', async () => {
+    process.env[ENV_HOOK_TEMPLATE_PATH] = path.join(
+      __dirname,
+      '../../../examples/extension.yaml'
+    )
+
+    await expect(
+      prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+    ).resolves.not.toThrow()
+
+    delete process.env[ENV_HOOK_TEMPLATE_PATH]
+
+    const content = JSON.parse(
+      fs.readFileSync(prepareJobOutputFilePath).toString()
+    )
+
+    const got = await getPodByName(content.state.jobPod)
+
+    expect(got.metadata?.annotations?.['annotated-by']).toBe('extension')
+    expect(got.metadata?.labels?.['labeled-by']).toBe('extension')
+    expect(got.spec?.securityContext?.runAsUser).toBe(1000)
+    expect(got.spec?.securityContext?.runAsGroup).toBe(3000)
+
+    // job container
+    expect(got.spec?.containers[0].name).toBe(JOB_CONTAINER_NAME)
+    expect(got.spec?.containers[0].image).toBe('node:14.16')
+    expect(got.spec?.containers[0].command).toEqual(['sh'])
+    expect(got.spec?.containers[0].args).toEqual(['-c', 'sleep 50'])
+
+    // service container
+    expect(got.spec?.containers[1].image).toBe('redis')
+    expect(got.spec?.containers[1].command).toBeFalsy()
+    expect(got.spec?.containers[1].args).toBeFalsy()
+    // side-car
+    expect(got.spec?.containers[2].name).toBe('side-car')
+    expect(got.spec?.containers[2].image).toBe('ubuntu:latest')
+    expect(got.spec?.containers[2].command).toEqual(['sh'])
+    expect(got.spec?.containers[2].args).toEqual(['-c', 'sleep 60'])
   })
 
   test.each([undefined, null, []])(

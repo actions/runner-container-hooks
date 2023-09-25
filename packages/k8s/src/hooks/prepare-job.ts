@@ -1,7 +1,12 @@
 import * as core from '@actions/core'
 import * as io from '@actions/io'
 import * as k8s from '@kubernetes/client-node'
-import { ContextPorts, prepareJobArgs, writeToResponseFile } from 'hooklib'
+import {
+  JobContainerInfo,
+  ContextPorts,
+  PrepareJobArgs,
+  writeToResponseFile
+} from 'hooklib'
 import path from 'path'
 import {
   containerPorts,
@@ -15,12 +20,14 @@ import {
   DEFAULT_CONTAINER_ENTRY_POINT,
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
   generateContainerName,
+  mergeContainerWithOptions,
+  readExtensionFromFile,
   PodPhase
 } from '../k8s/utils'
-import { JOB_CONTAINER_NAME } from './constants'
+import { JOB_CONTAINER_EXTENSION_NAME, JOB_CONTAINER_NAME } from './constants'
 
 export async function prepareJob(
-  args: prepareJobArgs,
+  args: PrepareJobArgs,
   responseFile
 ): Promise<void> {
   if (!args.container) {
@@ -28,26 +35,46 @@ export async function prepareJob(
   }
 
   await prunePods()
+
+  const extension = readExtensionFromFile()
   await copyExternalsToRoot()
+
   let container: k8s.V1Container | undefined = undefined
   if (args.container?.image) {
     core.debug(`Using image '${args.container.image}' for job image`)
-    container = createContainerSpec(args.container, JOB_CONTAINER_NAME, true)
+    container = createContainerSpec(
+      args.container,
+      JOB_CONTAINER_NAME,
+      true,
+      extension
+    )
   }
 
   let services: k8s.V1Container[] = []
   if (args.services?.length) {
     services = args.services.map(service => {
       core.debug(`Adding service '${service.image}' to pod definition`)
-      return createContainerSpec(service, generateContainerName(service.image))
+      return createContainerSpec(
+        service,
+        generateContainerName(service.image),
+        false,
+        undefined
+      )
     })
   }
+
   if (!container && !services?.length) {
     throw new Error('No containers exist, skipping hook invocation')
   }
+
   let createdPod: k8s.V1Pod | undefined = undefined
   try {
-    createdPod = await createPod(container, services, args.container.registry)
+    createdPod = await createPod(
+      container,
+      services,
+      args.container.registry,
+      extension
+    )
   } catch (err) {
     await prunePods()
     throw new Error(`failed to create job pod: ${err}`)
@@ -153,9 +180,10 @@ async function copyExternalsToRoot(): Promise<void> {
 }
 
 export function createContainerSpec(
-  container,
+  container: JobContainerInfo,
   name: string,
-  jobContainer = false
+  jobContainer = false,
+  extension?: k8s.V1PodTemplateSpec
 ): k8s.V1Container {
   if (!container.entryPoint && jobContainer) {
     container.entryPoint = DEFAULT_CONTAINER_ENTRY_POINT
@@ -192,6 +220,18 @@ export function createContainerSpec(
     container.userMountVolumes,
     jobContainer
   )
+
+  if (!extension) {
+    return podContainer
+  }
+
+  const from = extension.spec?.containers?.find(
+    c => c.name === JOB_CONTAINER_EXTENSION_NAME
+  )
+
+  if (from) {
+    mergeContainerWithOptions(podContainer, from)
+  }
 
   return podContainer
 }

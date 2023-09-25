@@ -10,7 +10,7 @@ import {
   getVolumeClaimName,
   RunnerInstanceLabel
 } from '../hooks/constants'
-import { PodPhase } from './utils'
+import { PodPhase, mergePodSpecWithOptions, mergeObjectMeta } from './utils'
 
 const kc = new k8s.KubeConfig()
 
@@ -58,7 +58,8 @@ export const requiredPermissions = [
 export async function createPod(
   jobContainer?: k8s.V1Container,
   services?: k8s.V1Container[],
-  registry?: Registry
+  registry?: Registry,
+  extension?: k8s.V1PodTemplateSpec
 ): Promise<k8s.V1Pod> {
   const containers: k8s.V1Container[] = []
   if (jobContainer) {
@@ -80,6 +81,7 @@ export async function createPod(
   appPod.metadata.labels = {
     [instanceLabel.key]: instanceLabel.value
   }
+  appPod.metadata.annotations = {}
 
   appPod.spec = new k8s.V1PodSpec()
   appPod.spec.containers = containers
@@ -103,12 +105,21 @@ export async function createPod(
     appPod.spec.imagePullSecrets = [secretReference]
   }
 
+  if (extension?.metadata) {
+    mergeObjectMeta(appPod, extension.metadata)
+  }
+
+  if (extension?.spec) {
+    mergePodSpecWithOptions(appPod.spec, extension.spec)
+  }
+
   const { body } = await k8sApi.createNamespacedPod(namespace(), appPod)
   return body
 }
 
 export async function createJob(
-  container: k8s.V1Container
+  container: k8s.V1Container,
+  extension?: k8s.V1PodTemplateSpec
 ): Promise<k8s.V1Job> {
   const runnerInstanceLabel = new RunnerInstanceLabel()
 
@@ -118,6 +129,7 @@ export async function createJob(
   job.metadata = new k8s.V1ObjectMeta()
   job.metadata.name = getStepPodName()
   job.metadata.labels = { [runnerInstanceLabel.key]: runnerInstanceLabel.value }
+  job.metadata.annotations = {}
 
   job.spec = new k8s.V1JobSpec()
   job.spec.ttlSecondsAfterFinished = 300
@@ -125,6 +137,9 @@ export async function createJob(
   job.spec.template = new k8s.V1PodTemplateSpec()
 
   job.spec.template.spec = new k8s.V1PodSpec()
+  job.spec.template.metadata = new k8s.V1ObjectMeta()
+  job.spec.template.metadata.labels = {}
+  job.spec.template.metadata.annotations = {}
   job.spec.template.spec.containers = [container]
   job.spec.template.spec.restartPolicy = 'Never'
   job.spec.template.spec.nodeName = await getCurrentNodeName()
@@ -136,6 +151,17 @@ export async function createJob(
       persistentVolumeClaim: { claimName }
     }
   ]
+
+  if (extension) {
+    if (extension.metadata) {
+      // apply metadata both to the job and the pod created by the job
+      mergeObjectMeta(job, extension.metadata)
+      mergeObjectMeta(job.spec.template, extension.metadata)
+    }
+    if (extension.spec) {
+      mergePodSpecWithOptions(job.spec.template.spec, extension.spec)
+    }
+  }
 
   const { body } = await k8sBatchV1Api.createNamespacedJob(namespace(), job)
   return body
@@ -554,4 +580,9 @@ export function containerPorts(
     ports.push(port)
   }
   return ports
+}
+
+export async function getPodByName(name): Promise<k8s.V1Pod> {
+  const { body } = await k8sApi.readNamespacedPod(name, namespace())
+  return body
 }

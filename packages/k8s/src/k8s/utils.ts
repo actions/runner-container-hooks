@@ -1,5 +1,7 @@
 import * as k8s from '@kubernetes/client-node'
 import * as fs from 'fs'
+import * as yaml from 'js-yaml'
+import * as core from '@actions/core'
 import { Mount } from 'hooklib'
 import * as path from 'path'
 import { v1 as uuidv4 } from 'uuid'
@@ -7,6 +9,8 @@ import { POD_VOLUME_NAME } from './index'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
+
+export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
 
 export function containerVolumes(
   userMountVolumes: Mount[] = [],
@@ -159,6 +163,100 @@ export function generateContainerName(image: string): string {
   return name
 }
 
+// Overwrite or append based on container options
+//
+// Keep in mind, envs and volumes could be passed as fields in container definition
+// so default volume mounts and envs are appended first, and then create options are used
+// to append more values
+//
+// Rest of the fields are just applied
+// For example, container.createOptions.container.image is going to overwrite container.image field
+export function mergeContainerWithOptions(
+  base: k8s.V1Container,
+  from: k8s.V1Container
+): void {
+  for (const [key, value] of Object.entries(from)) {
+    if (key === 'name') {
+      core.warning("Skipping name override: name can't be overwritten")
+      continue
+    } else if (key === 'image') {
+      core.warning("Skipping image override: image can't be overwritten")
+      continue
+    } else if (key === 'env') {
+      const envs = value as k8s.V1EnvVar[]
+      base.env = mergeLists(base.env, envs)
+    } else if (key === 'volumeMounts' && value) {
+      const volumeMounts = value as k8s.V1VolumeMount[]
+      base.volumeMounts = mergeLists(base.volumeMounts, volumeMounts)
+    } else if (key === 'ports' && value) {
+      const ports = value as k8s.V1ContainerPort[]
+      base.ports = mergeLists(base.ports, ports)
+    } else {
+      base[key] = value
+    }
+  }
+}
+
+export function mergePodSpecWithOptions(
+  base: k8s.V1PodSpec,
+  from: k8s.V1PodSpec
+): void {
+  for (const [key, value] of Object.entries(from)) {
+    if (key === 'containers') {
+      base.containers.push(
+        ...from.containers.filter(e => !e.name?.startsWith('$'))
+      )
+    } else if (key === 'volumes' && value) {
+      const volumes = value as k8s.V1Volume[]
+      base.volumes = mergeLists(base.volumes, volumes)
+    } else {
+      base[key] = value
+    }
+  }
+}
+
+export function mergeObjectMeta(
+  base: { metadata?: k8s.V1ObjectMeta },
+  from: k8s.V1ObjectMeta
+): void {
+  if (!base.metadata?.labels || !base.metadata?.annotations) {
+    throw new Error(
+      "Can't merge metadata: base.metadata or base.annotations field is undefined"
+    )
+  }
+  if (from?.labels) {
+    for (const [key, value] of Object.entries(from.labels)) {
+      if (base.metadata?.labels?.[key]) {
+        core.warning(`Label ${key} is already defined and will be overwritten`)
+      }
+      base.metadata.labels[key] = value
+    }
+  }
+
+  if (from?.annotations) {
+    for (const [key, value] of Object.entries(from.annotations)) {
+      if (base.metadata?.annotations?.[key]) {
+        core.warning(
+          `Annotation ${key} is already defined and will be overwritten`
+        )
+      }
+      base.metadata.annotations[key] = value
+    }
+  }
+}
+
+export function readExtensionFromFile(): k8s.V1PodTemplateSpec | undefined {
+  const filePath = process.env[ENV_HOOK_TEMPLATE_PATH]
+  if (!filePath) {
+    return undefined
+  }
+  const doc = yaml.load(fs.readFileSync(filePath, 'utf8'))
+  if (!doc || typeof doc !== 'object') {
+    throw new Error(`Failed to parse ${filePath}`)
+  }
+  return doc as k8s.V1PodTemplateSpec
+}
+
 export enum PodPhase {
   PENDING = 'Pending',
   RUNNING = 'Running',
@@ -166,4 +264,13 @@ export enum PodPhase {
   FAILED = 'Failed',
   UNKNOWN = 'Unknown',
   COMPLETED = 'Completed'
+}
+
+function mergeLists<T>(base?: T[], from?: T[]): T[] {
+  const b: T[] = base || []
+  if (!from?.length) {
+    return b
+  }
+  b.push(...from)
+  return b
 }
