@@ -431,7 +431,7 @@ spec:
 
     const expectContainer = {
       name: base.name,
-      image: from.image,
+      image: base.image,
       ports: [
         ...(base.ports as k8s.V1ContainerPort[]),
         ...(from.ports as k8s.V1ContainerPort[])
