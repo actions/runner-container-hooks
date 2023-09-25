@@ -154,6 +154,7 @@ export async function createJob(
 
   if (extension) {
     if (extension.metadata) {
+      // apply metadata both to the job and the pod created by the job
       mergeObjectMeta(job, extension.metadata)
       mergeObjectMeta(job.spec.template, extension.metadata)
     }
