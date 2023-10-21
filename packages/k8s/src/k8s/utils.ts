@@ -11,6 +11,7 @@ export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
+export const ENV_USE_KUBE_SCHEDULER = 'ACTIONS_RUNNER_USE_KUBE_SCHEDULER'
 
 export function containerVolumes(
   userMountVolumes: Mount[] = [],
@@ -255,6 +256,10 @@ export function readExtensionFromFile(): k8s.V1PodTemplateSpec | undefined {
     throw new Error(`Failed to parse ${filePath}`)
   }
   return doc as k8s.V1PodTemplateSpec
+}
+
+export function useKubeScheduler(): boolean {
+  return process.env[ENV_USE_KUBE_SCHEDULER] === 'true'
 }
 
 export enum PodPhase {

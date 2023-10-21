@@ -10,7 +10,12 @@ import {
   getVolumeClaimName,
   RunnerInstanceLabel
 } from '../hooks/constants'
-import { PodPhase, mergePodSpecWithOptions, mergeObjectMeta } from './utils'
+import {
+  PodPhase,
+  mergePodSpecWithOptions,
+  mergeObjectMeta,
+  useKubeScheduler
+} from './utils'
 
 const kc = new k8s.KubeConfig()
 
@@ -86,7 +91,11 @@ export async function createPod(
   appPod.spec = new k8s.V1PodSpec()
   appPod.spec.containers = containers
   appPod.spec.restartPolicy = 'Never'
-  appPod.spec.nodeName = await getCurrentNodeName()
+
+  if (!useKubeScheduler()) {
+    appPod.spec.nodeName = await getCurrentNodeName()
+  }
+
   const claimName = getVolumeClaimName()
   appPod.spec.volumes = [
     {
@@ -142,7 +151,10 @@ export async function createJob(
   job.spec.template.metadata.annotations = {}
   job.spec.template.spec.containers = [container]
   job.spec.template.spec.restartPolicy = 'Never'
-  job.spec.template.spec.nodeName = await getCurrentNodeName()
+
+  if (!useKubeScheduler()) {
+    job.spec.template.spec.nodeName = await getCurrentNodeName()
+  }
 
   const claimName = getVolumeClaimName()
   job.spec.template.spec.volumes = [
