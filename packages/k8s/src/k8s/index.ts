@@ -25,6 +25,8 @@ const k8sApi = kc.makeApiClient(k8s.CoreV1Api)
 const k8sBatchV1Api = kc.makeApiClient(k8s.BatchV1Api)
 const k8sAuthorizationV1Api = kc.makeApiClient(k8s.AuthorizationV1Api)
 
+const DEFAULT_WAIT_FOR_POD_TIME_SECONDS = 10 * 60 // 10 min
+
 export const POD_VOLUME_NAME = 'work'
 
 export const requiredPermissions = [
@@ -358,7 +360,7 @@ export async function waitForPodPhases(
   podName: string,
   awaitingPhases: Set<PodPhase>,
   backOffPhases: Set<PodPhase>,
-  maxTimeSeconds = 10 * 60 // 10 min
+  maxTimeSeconds = DEFAULT_WAIT_FOR_POD_TIME_SECONDS
 ): Promise<void> {
   const backOffManager = new BackOffManager(maxTimeSeconds)
   let phase: PodPhase = PodPhase.UNKNOWN
@@ -379,6 +381,22 @@ export async function waitForPodPhases(
   } catch (error) {
     throw new Error(`Pod ${podName} is unhealthy with phase status ${phase}`)
   }
+}
+
+export function getPrepareJobTimeoutSeconds(): number {
+  const envTimeoutSeconds =
+    process.env['ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS']
+
+  if (!envTimeoutSeconds) {
+    return DEFAULT_WAIT_FOR_POD_TIME_SECONDS
+  }
+
+  const timeoutSeconds = parseInt(envTimeoutSeconds, 10)
+  if (!timeoutSeconds) {
+    return DEFAULT_WAIT_FOR_POD_TIME_SECONDS
+  }
+
+  return timeoutSeconds
 }
 
 async function getPodPhase(podName: string): Promise<PodPhase> {
