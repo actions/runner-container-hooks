@@ -132,7 +132,7 @@ describe('Prepare job', () => {
   })
 
   it('should not throw exception using kube scheduler', async () => {
-    // only for rwx volumes or single node cluster
+    // only for ReadWriteMany volumes or single node cluster
     process.env[ENV_USE_KUBE_SCHEDULER] = 'true'
 
     await expect(
