@@ -392,7 +392,10 @@ export function getPrepareJobTimeoutSeconds(): number {
   }
 
   const timeoutSeconds = parseInt(envTimeoutSeconds, 10)
-  if (!timeoutSeconds) {
+  if (!timeoutSeconds || timeoutSeconds <= 0) {
+    core.warning(
+      `Prepare job timeout is invalid ("${timeoutSeconds}"): use an int > 0`
+    )
     return DEFAULT_WAIT_FOR_POD_TIME_SECONDS
   }
 
