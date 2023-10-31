@@ -5,6 +5,7 @@ import { createContainerSpec, prepareJob } from '../src/hooks/prepare-job'
 import { TestHelper } from './test-setup'
 import {
   ENV_HOOK_TEMPLATE_PATH,
+  ENV_USE_KUBE_SCHEDULER,
   generateContainerName,
   readExtensionFromFile
 } from '../src/k8s/utils'
@@ -128,6 +129,17 @@ describe('Prepare job', () => {
     expect(got.spec?.containers[2].image).toBe('ubuntu:latest')
     expect(got.spec?.containers[2].command).toEqual(['sh'])
     expect(got.spec?.containers[2].args).toEqual(['-c', 'sleep 60'])
+  })
+
+  it('should not throw exception using kube scheduler', async () => {
+    // only for ReadWriteMany volumes or single node cluster
+    process.env[ENV_USE_KUBE_SCHEDULER] = 'true'
+
+    await expect(
+      prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+    ).resolves.not.toThrow()
+
+    delete process.env[ENV_USE_KUBE_SCHEDULER]
   })
 
   test.each([undefined, null, []])(

@@ -6,11 +6,13 @@ import { Mount } from 'hooklib'
 import * as path from 'path'
 import { v1 as uuidv4 } from 'uuid'
 import { POD_VOLUME_NAME } from './index'
+import { JOB_CONTAINER_EXTENSION_NAME } from '../hooks/constants'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
+export const ENV_USE_KUBE_SCHEDULER = 'ACTIONS_RUNNER_USE_KUBE_SCHEDULER'
 
 export function containerVolumes(
   userMountVolumes: Mount[] = [],
@@ -177,7 +179,9 @@ export function mergeContainerWithOptions(
 ): void {
   for (const [key, value] of Object.entries(from)) {
     if (key === 'name') {
-      core.warning("Skipping name override: name can't be overwritten")
+      if (value !== base.name && value !== JOB_CONTAINER_EXTENSION_NAME) {
+        core.warning("Skipping name override: name can't be overwritten")
+      }
       continue
     } else if (key === 'image') {
       core.warning("Skipping image override: image can't be overwritten")
@@ -255,6 +259,10 @@ export function readExtensionFromFile(): k8s.V1PodTemplateSpec | undefined {
     throw new Error(`Failed to parse ${filePath}`)
   }
   return doc as k8s.V1PodTemplateSpec
+}
+
+export function useKubeScheduler(): boolean {
+  return process.env[ENV_USE_KUBE_SCHEDULER] === 'true'
 }
 
 export enum PodPhase {

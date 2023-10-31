@@ -13,7 +13,8 @@ import {
   createPod,
   isPodContainerAlpine,
   prunePods,
-  waitForPodPhases
+  waitForPodPhases,
+  getPrepareJobTimeoutSeconds
 } from '../k8s'
 import {
   containerVolumes,
@@ -91,7 +92,8 @@ export async function prepareJob(
     await waitForPodPhases(
       createdPod.metadata.name,
       new Set([PodPhase.RUNNING]),
-      new Set([PodPhase.PENDING])
+      new Set([PodPhase.PENDING]),
+      getPrepareJobTimeoutSeconds()
     )
   } catch (err) {
     await prunePods()

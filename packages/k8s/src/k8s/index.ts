@@ -10,7 +10,12 @@ import {
   getVolumeClaimName,
   RunnerInstanceLabel
 } from '../hooks/constants'
-import { PodPhase, mergePodSpecWithOptions, mergeObjectMeta } from './utils'
+import {
+  PodPhase,
+  mergePodSpecWithOptions,
+  mergeObjectMeta,
+  useKubeScheduler
+} from './utils'
 
 const kc = new k8s.KubeConfig()
 
@@ -19,6 +24,8 @@ kc.loadFromDefault()
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api)
 const k8sBatchV1Api = kc.makeApiClient(k8s.BatchV1Api)
 const k8sAuthorizationV1Api = kc.makeApiClient(k8s.AuthorizationV1Api)
+
+const DEFAULT_WAIT_FOR_POD_TIME_SECONDS = 10 * 60 // 10 min
 
 export const POD_VOLUME_NAME = 'work'
 
@@ -86,7 +93,11 @@ export async function createPod(
   appPod.spec = new k8s.V1PodSpec()
   appPod.spec.containers = containers
   appPod.spec.restartPolicy = 'Never'
-  appPod.spec.nodeName = await getCurrentNodeName()
+
+  if (!useKubeScheduler()) {
+    appPod.spec.nodeName = await getCurrentNodeName()
+  }
+
   const claimName = getVolumeClaimName()
   appPod.spec.volumes = [
     {
@@ -142,7 +153,10 @@ export async function createJob(
   job.spec.template.metadata.annotations = {}
   job.spec.template.spec.containers = [container]
   job.spec.template.spec.restartPolicy = 'Never'
-  job.spec.template.spec.nodeName = await getCurrentNodeName()
+
+  if (!useKubeScheduler()) {
+    job.spec.template.spec.nodeName = await getCurrentNodeName()
+  }
 
   const claimName = getVolumeClaimName()
   job.spec.template.spec.volumes = [
@@ -346,7 +360,7 @@ export async function waitForPodPhases(
   podName: string,
   awaitingPhases: Set<PodPhase>,
   backOffPhases: Set<PodPhase>,
-  maxTimeSeconds = 10 * 60 // 10 min
+  maxTimeSeconds = DEFAULT_WAIT_FOR_POD_TIME_SECONDS
 ): Promise<void> {
   const backOffManager = new BackOffManager(maxTimeSeconds)
   let phase: PodPhase = PodPhase.UNKNOWN
@@ -367,6 +381,25 @@ export async function waitForPodPhases(
   } catch (error) {
     throw new Error(`Pod ${podName} is unhealthy with phase status ${phase}`)
   }
+}
+
+export function getPrepareJobTimeoutSeconds(): number {
+  const envTimeoutSeconds =
+    process.env['ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS']
+
+  if (!envTimeoutSeconds) {
+    return DEFAULT_WAIT_FOR_POD_TIME_SECONDS
+  }
+
+  const timeoutSeconds = parseInt(envTimeoutSeconds, 10)
+  if (!timeoutSeconds || timeoutSeconds <= 0) {
+    core.warning(
+      `Prepare job timeout is invalid ("${timeoutSeconds}"): use an int > 0`
+    )
+    return DEFAULT_WAIT_FOR_POD_TIME_SECONDS
+  }
+
+  return timeoutSeconds
 }
 
 async function getPodPhase(podName: string): Promise<PodPhase> {
