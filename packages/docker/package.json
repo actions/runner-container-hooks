@@ -13,6 +13,7 @@
     "@actions/core": "^1.9.1",
     "@actions/exec": "^1.1.1",
     "hooklib": "file:../hooklib",
+    "shlex": "^2.1.2",
     "uuid": "^8.3.2"
   },
   "devDependencies": {

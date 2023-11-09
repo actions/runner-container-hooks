@@ -40,11 +40,26 @@ describe('run script step', () => {
     definitions.runScriptStep.args.entryPoint = '/bin/bash'
     definitions.runScriptStep.args.entryPointArgs = [
       '-c',
-      `if [[ ! $(env | grep "^PATH=") = "PATH=${definitions.runScriptStep.args.prependPath}:"* ]]; then exit 1; fi`
+      `'if [[ ! $(env | grep "^PATH=") = "PATH=${definitions.runScriptStep.args.prependPath}:"* ]]; then exit 1; fi'`
     ]
     await expect(
       runScriptStep(definitions.runScriptStep.args, prepareJobResponse.state)
     ).resolves.not.toThrow()
+  })
+
+  it("Should fix expansion and print correctly in container's stdout", async () => {
+    const spy = jest.spyOn(process.stdout, 'write').mockImplementation()
+
+    definitions.runScriptStep.args.entryPoint = 'echo'
+    definitions.runScriptStep.args.entryPointArgs = ['"Mona', 'the', `Octocat"`]
+    await expect(
+      runScriptStep(definitions.runScriptStep.args, prepareJobResponse.state)
+    ).resolves.not.toThrow()
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining('Mona the Octocat')
+    )
+
+    spy.mockRestore()
   })
 
   it('Should have path variable changed in container with prepend path string array', async () => {
@@ -52,9 +67,9 @@ describe('run script step', () => {
     definitions.runScriptStep.args.entryPoint = '/bin/bash'
     definitions.runScriptStep.args.entryPointArgs = [
       '-c',
-      `if [[ ! $(env | grep "^PATH=") = "PATH=${definitions.runScriptStep.args.prependPath.join(
+      `'if [[ ! $(env | grep "^PATH=") = "PATH=${definitions.runScriptStep.args.prependPath.join(
         ':'
-      )}:"* ]]; then exit 1; fi`
+      )}:"* ]]; then exit 1; fi'`
     ]
     await expect(
       runScriptStep(definitions.runScriptStep.args, prepareJobResponse.state)

@@ -1,4 +1,4 @@
-import { optionsWithDockerEnvs, sanitize } from '../src/utils'
+import { optionsWithDockerEnvs, sanitize, fixArgs } from '../src/utils'
 
 describe('Utilities', () => {
   it('should return sanitized image name', () => {
@@ -8,6 +8,37 @@ describe('Utilities', () => {
   it('should return the same string', () => {
     const validStr = 'teststr8_one'
     expect(sanitize(validStr)).toBe(validStr)
+  })
+
+  test.each([
+    [['"Hello', 'World"'], ['Hello World']],
+    [
+      [
+        'sh',
+        '-c',
+        `'[ $(cat /etc/*release* | grep -i -e "^ID=*alpine*" -c) != 0 ] || exit 1'`
+      ],
+      [
+        'sh',
+        '-c',
+        `[ $(cat /etc/*release* | grep -i -e "^ID=*alpine*" -c) != 0 ] || exit 1`
+      ]
+    ],
+    [
+      [
+        'sh',
+        '-c',
+        `'[ $(cat /etc/*release* | grep -i -e '\\''^ID=*alpine*'\\'' -c) != 0 ] || exit 1'`
+      ],
+      [
+        'sh',
+        '-c',
+        `[ $(cat /etc/*release* | grep -i -e '^ID=*alpine*' -c) != 0 ] || exit 1`
+      ]
+    ]
+  ])('should fix split arguments(%p, %p)', (args, expected) => {
+    const got = fixArgs(args)
+    expect(got).toStrictEqual(expected)
   })
 
   describe('with docker options', () => {
