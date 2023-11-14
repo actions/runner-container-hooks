@@ -89,7 +89,7 @@ function createContainerSpec(
     ? [container.entryPoint]
     : undefined
   podContainer.args = container.entryPointArgs?.length
-    ? container.entryPointArgs
+    ? container.entryPointArgs.map(arg => arg.replace(/^"(.*)"$/, '$1'))
     : undefined
 
   if (secretName) {
