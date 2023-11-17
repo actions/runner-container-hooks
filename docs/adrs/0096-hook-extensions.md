@@ -2,7 +2,7 @@
 
 **Date:** 3 August 2023
 
-**Status**: Proposed <!--Accepted|Rejected|Superceded|Deprecated-->
+**Status**: Accepted <!--Accepted|Rejected|Superceded|Deprecated-->
 
 ## Context
 
