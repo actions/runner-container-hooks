@@ -14,7 +14,8 @@ import {
   containerVolumes,
   PodPhase,
   mergeContainerWithOptions,
-  readExtensionFromFile
+  readExtensionFromFile,
+  fixArgs
 } from '../k8s/utils'
 import { JOB_CONTAINER_EXTENSION_NAME, JOB_CONTAINER_NAME } from './constants'
 
@@ -89,7 +90,7 @@ function createContainerSpec(
     ? [container.entryPoint]
     : undefined
   podContainer.args = container.entryPointArgs?.length
-    ? container.entryPointArgs
+    ? fixArgs(container.entryPointArgs)
     : undefined
 
   if (secretName) {

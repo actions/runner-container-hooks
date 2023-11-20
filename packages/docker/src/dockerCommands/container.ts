@@ -444,7 +444,7 @@ export async function isContainerAlpine(containerId: string): Promise<boolean> {
     containerId,
     'sh',
     '-c',
-    "[ $(cat /etc/*release* | grep -i -e '^ID=*alpine*' -c) != 0 ] || exit 1"
+    `'[ $(cat /etc/*release* | grep -i -e "^ID=*alpine*" -c) != 0 ] || exit 1'`
   ]
   try {
     await runDockerCommand(dockerArgs)

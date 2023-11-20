@@ -7,6 +7,7 @@ import * as path from 'path'
 import { v1 as uuidv4 } from 'uuid'
 import { POD_VOLUME_NAME } from './index'
 import { JOB_CONTAINER_EXTENSION_NAME } from '../hooks/constants'
+import * as shlex from 'shlex'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
@@ -281,4 +282,8 @@ function mergeLists<T>(base?: T[], from?: T[]): T[] {
   }
   b.push(...from)
   return b
+}
+
+export function fixArgs(args: string[]): string[] {
+  return shlex.split(args.join(' '))
 }

@@ -511,7 +511,7 @@ export async function isPodContainerAlpine(
       [
         'sh',
         '-c',
-        "[ $(cat /etc/*release* | grep -i -e '^ID=*alpine*' -c) != 0 ] || exit 1"
+        `'[ $(cat /etc/*release* | grep -i -e "^ID=*alpine*" -c) != 0 ] || exit 1'`
       ],
       podName,
       containerName

@@ -5,6 +5,7 @@ import * as core from '@actions/core'
 import { env } from 'process'
 // Import this way otherwise typescript has errors
 const exec = require('@actions/exec')
+const shlex = require('shlex')
 
 export interface RunDockerCommandOptions {
   workingDir?: string
@@ -17,6 +18,7 @@ export async function runDockerCommand(
   options?: RunDockerCommandOptions
 ): Promise<string> {
   options = optionsWithDockerEnvs(options)
+  args = fixArgs(args)
   const pipes = await exec.getExecOutput('docker', args, options)
   if (pipes.exitCode !== 0) {
     core.error(`Docker failed with exit code ${pipes.exitCode}`)
@@ -82,6 +84,10 @@ export function sanitize(val: string): string {
     }
   }
   return newNameBuilder.join('')
+}
+
+export function fixArgs(args: string[]): string[] {
+  return shlex.split(args.join(' '))
 }
 
 export function checkEnvironment(): void {

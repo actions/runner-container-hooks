@@ -23,7 +23,8 @@ import {
   generateContainerName,
   mergeContainerWithOptions,
   readExtensionFromFile,
-  PodPhase
+  PodPhase,
+  fixArgs
 } from '../k8s/utils'
 import { JOB_CONTAINER_EXTENSION_NAME, JOB_CONTAINER_NAME } from './constants'
 
@@ -206,7 +207,7 @@ export function createContainerSpec(
   }
 
   if (container.entryPointArgs?.length > 0) {
-    podContainer.args = container.entryPointArgs
+    podContainer.args = fixArgs(container.entryPointArgs)
   }
 
   podContainer.env = []
