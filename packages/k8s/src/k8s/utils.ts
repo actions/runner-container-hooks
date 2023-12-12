@@ -14,6 +14,7 @@ export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
 export const ENV_USE_KUBE_SCHEDULER = 'ACTIONS_RUNNER_USE_KUBE_SCHEDULER'
+export const ENV_USE_HOST_VOLUME = 'ACTIONS_RUNNER_USE_HOST_VOLUME'
 
 export function containerVolumes(
   userMountVolumes: Mount[] = [],
