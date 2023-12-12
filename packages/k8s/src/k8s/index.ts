@@ -14,7 +14,8 @@ import {
   PodPhase,
   mergePodSpecWithOptions,
   mergeObjectMeta,
-  useKubeScheduler
+  useKubeScheduler,
+  useHostVolume
 } from './utils'
 
 const kc = new k8s.KubeConfig()
@@ -98,13 +99,15 @@ export async function createPod(
     appPod.spec.nodeName = await getCurrentNodeName()
   }
 
-  const claimName = getVolumeClaimName()
-  appPod.spec.volumes = [
-    {
-      name: 'work',
-      persistentVolumeClaim: { claimName }
-    }
-  ]
+  if (!useHostVolume()) {
+    const claimName = getVolumeClaimName()
+    appPod.spec.volumes = [
+      {
+        name: 'work',
+        persistentVolumeClaim: { claimName }
+      }
+    ]
+  }
 
   if (registry) {
     const secret = await createDockerSecret(registry)
@@ -158,13 +161,15 @@ export async function createJob(
     job.spec.template.spec.nodeName = await getCurrentNodeName()
   }
 
-  const claimName = getVolumeClaimName()
-  job.spec.template.spec.volumes = [
-    {
-      name: 'work',
-      persistentVolumeClaim: { claimName }
-    }
-  ]
+  if (!useHostVolume()) {
+    const claimName = getVolumeClaimName()
+    job.spec.template.spec.volumes = [
+      {
+        name: 'work',
+        persistentVolumeClaim: { claimName }
+      }
+    ]
+  }
 
   if (extension) {
     if (extension.metadata) {
