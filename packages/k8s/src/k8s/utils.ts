@@ -267,6 +267,10 @@ export function useKubeScheduler(): boolean {
   return process.env[ENV_USE_KUBE_SCHEDULER] === 'true'
 }
 
+export function useHostVolume(): boolean {
+  return process.env[ENV_USE_HOST_VOLUME] === 'true'
+}
+
 export enum PodPhase {
   PENDING = 'Pending',
   RUNNING = 'Running',
