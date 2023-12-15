@@ -36,7 +36,15 @@ export async function runContainerStep(
   core.debug(`Created secret ${secretName} for container job envs`)
   const container = createContainerSpec(stepContainer, secretName, extension)
 
-  const job = await createJob(container, extension)
+  let job: k8s.V1Job
+  try {
+    job = await createJob(container, extension)
+  } catch (err) {
+    core.debug(`createJob failed: ${JSON.stringify(err)}`)
+    const message = (err as any)?.response?.body?.message || err
+    throw new Error(`failed to run script step: ${message}`)
+  }
+
   if (!job.metadata?.name) {
     throw new Error(
       `Expected job ${JSON.stringify(
@@ -46,7 +54,15 @@ export async function runContainerStep(
   }
   core.debug(`Job created, waiting for pod to start: ${job.metadata?.name}`)
 
-  const podName = await getContainerJobPodName(job.metadata.name)
+  let podName: string
+  try {
+    podName = await getContainerJobPodName(job.metadata.name)
+  } catch (err) {
+    core.debug(`getContainerJobPodName failed: ${JSON.stringify(err)}`)
+    const message = (err as any)?.response?.body?.message || err
+    throw new Error(`failed to get container job pod name: ${message}`)
+  }
+
   await waitForPodPhases(
     podName,
     new Set([PodPhase.COMPLETED, PodPhase.RUNNING, PodPhase.SUCCEEDED]),
@@ -58,6 +74,7 @@ export async function runContainerStep(
 
   core.debug('Waiting for container job to complete')
   await waitForJobToComplete(job.metadata.name)
+
   // pod has failed so pull the status code from the container
   const status = await getPodStatus(podName)
   if (status?.phase === 'Succeeded') {
