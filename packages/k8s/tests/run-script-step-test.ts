@@ -37,10 +37,19 @@ describe('Run script step', () => {
     await testHelper.cleanup()
   })
 
-
-  const execSpy = jest.spyOn(k8s.Exec.prototype, 'exec');
-
   it('should not throw an exception', async () => {
+    await expect(
+      runScriptStep(
+        runScriptStepDefinition.args,
+        prepareJobOutputData.state,
+        null
+      )
+    ).resolves.not.toThrow()
+  })
+
+  
+  const execSpy = jest.spyOn(k8s.Exec.prototype, 'exec');
+  it('should be able to handle errors occurring in k8s.Exec.exec() (e.g Kubernetes API failure)', async () => {
 
     let errorCallCount = 0;
     const mockExec = jest.fn(async (...args) => {
@@ -54,7 +63,6 @@ describe('Run script step', () => {
       }
     });
     execSpy.mockImplementation(mockExec);
-    
     await expect(
       runScriptStep(
         runScriptStepDefinition.args,
@@ -64,88 +72,88 @@ describe('Run script step', () => {
     ).resolves.not.toThrow()
   })
 
-  // it('should fail if the working directory does not exist', async () => {
-  //   runScriptStepDefinition.args.workingDirectory = '/foo/bar'
-  //   await expect(
-  //     runScriptStep(
-  //       runScriptStepDefinition.args,
-  //       prepareJobOutputData.state,
-  //       null
-  //     )
-  //   ).rejects.toThrow()
-  // })
+  it('should fail if the working directory does not exist', async () => {
+    runScriptStepDefinition.args.workingDirectory = '/foo/bar'
+    await expect(
+      runScriptStep(
+        runScriptStepDefinition.args,
+        prepareJobOutputData.state,
+        null
+      )
+    ).rejects.toThrow()
+  })
 
-  // it('should shold have env variables available', async () => {
-  //   runScriptStepDefinition.args.entryPoint = 'bash'
+  it('should shold have env variables available', async () => {
+    runScriptStepDefinition.args.entryPoint = 'bash'
 
-  //   runScriptStepDefinition.args.entryPointArgs = [
-  //     '-c',
-  //     "'if [[ -z $NODE_ENV ]]; then exit 1; fi'"
-  //   ]
-  //   await expect(
-  //     runScriptStep(
-  //       runScriptStepDefinition.args,
-  //       prepareJobOutputData.state,
-  //       null
-  //     )
-  //   ).resolves.not.toThrow()
-  // })
+    runScriptStepDefinition.args.entryPointArgs = [
+      '-c',
+      "'if [[ -z $NODE_ENV ]]; then exit 1; fi'"
+    ]
+    await expect(
+      runScriptStep(
+        runScriptStepDefinition.args,
+        prepareJobOutputData.state,
+        null
+      )
+    ).resolves.not.toThrow()
+  })
 
-  // it('Should have path variable changed in container with prepend path string', async () => {
-  //   runScriptStepDefinition.args.prependPath = '/some/path'
-  //   runScriptStepDefinition.args.entryPoint = '/bin/bash'
-  //   runScriptStepDefinition.args.entryPointArgs = [
-  //     '-c',
-  //     `'if [[ ! $(env | grep "^PATH=") = "PATH=${runScriptStepDefinition.args.prependPath}:"* ]]; then exit 1; fi'`
-  //   ]
+  it('Should have path variable changed in container with prepend path string', async () => {
+    runScriptStepDefinition.args.prependPath = '/some/path'
+    runScriptStepDefinition.args.entryPoint = '/bin/bash'
+    runScriptStepDefinition.args.entryPointArgs = [
+      '-c',
+      `'if [[ ! $(env | grep "^PATH=") = "PATH=${runScriptStepDefinition.args.prependPath}:"* ]]; then exit 1; fi'`
+    ]
 
-  //   await expect(
-  //     runScriptStep(
-  //       runScriptStepDefinition.args,
-  //       prepareJobOutputData.state,
-  //       null
-  //     )
-  //   ).resolves.not.toThrow()
-  // })
+    await expect(
+      runScriptStep(
+        runScriptStepDefinition.args,
+        prepareJobOutputData.state,
+        null
+      )
+    ).resolves.not.toThrow()
+  })
 
-  // it('Dollar symbols in environment variables should not be expanded', async () => {
-  //   runScriptStepDefinition.args.environmentVariables = {
-  //     VARIABLE1: '$VAR',
-  //     VARIABLE2: '${VAR}',
-  //     VARIABLE3: '$(VAR)'
-  //   }
-  //   runScriptStepDefinition.args.entryPointArgs = [
-  //     '-c',
-  //     '\'if [[ -z "$VARIABLE1" ]]; then exit 1; fi\'',
-  //     '\'if [[ -z "$VARIABLE2" ]]; then exit 2; fi\'',
-  //     '\'if [[ -z "$VARIABLE3" ]]; then exit 3; fi\''
-  //   ]
+  it('Dollar symbols in environment variables should not be expanded', async () => {
+    runScriptStepDefinition.args.environmentVariables = {
+      VARIABLE1: '$VAR',
+      VARIABLE2: '${VAR}',
+      VARIABLE3: '$(VAR)'
+    }
+    runScriptStepDefinition.args.entryPointArgs = [
+      '-c',
+      '\'if [[ -z "$VARIABLE1" ]]; then exit 1; fi\'',
+      '\'if [[ -z "$VARIABLE2" ]]; then exit 2; fi\'',
+      '\'if [[ -z "$VARIABLE3" ]]; then exit 3; fi\''
+    ]
 
-  //   await expect(
-  //     runScriptStep(
-  //       runScriptStepDefinition.args,
-  //       prepareJobOutputData.state,
-  //       null
-  //     )
-  //   ).resolves.not.toThrow()
-  // })
+    await expect(
+      runScriptStep(
+        runScriptStepDefinition.args,
+        prepareJobOutputData.state,
+        null
+      )
+    ).resolves.not.toThrow()
+  })
 
-  // it('Should have path variable changed in container with prepend path string array', async () => {
-  //   runScriptStepDefinition.args.prependPath = ['/some/other/path']
-  //   runScriptStepDefinition.args.entryPoint = '/bin/bash'
-  //   runScriptStepDefinition.args.entryPointArgs = [
-  //     '-c',
-  //     `'if [[ ! $(env | grep "^PATH=") = "PATH=${runScriptStepDefinition.args.prependPath.join(
-  //       ':'
-  //     )}:"* ]]; then exit 1; fi'`
-  //   ]
+  it('Should have path variable changed in container with prepend path string array', async () => {
+    runScriptStepDefinition.args.prependPath = ['/some/other/path']
+    runScriptStepDefinition.args.entryPoint = '/bin/bash'
+    runScriptStepDefinition.args.entryPointArgs = [
+      '-c',
+      `'if [[ ! $(env | grep "^PATH=") = "PATH=${runScriptStepDefinition.args.prependPath.join(
+        ':'
+      )}:"* ]]; then exit 1; fi'`
+    ]
 
-  //   await expect(
-  //     runScriptStep(
-  //       runScriptStepDefinition.args,
-  //       prepareJobOutputData.state,
-  //       null
-  //     )
-  //   ).resolves.not.toThrow()
-  // })
+    await expect(
+      runScriptStep(
+        runScriptStepDefinition.args,
+        prepareJobOutputData.state,
+        null
+      )
+    ).resolves.not.toThrow()
+  })
 })
