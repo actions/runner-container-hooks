@@ -228,28 +228,37 @@ export async function execPodStep(
 ): Promise<void> {
   const exec = new k8s.Exec(kc)
   await new Promise(async function (resolve, reject) {
-      try {
-        const backOffOptions = {
-          numOfAttempts: 3,
-          retry: (e, attemptNumber) => {
-            core.debug(e.toString())
-            core.debug(`an error occurred trying to execute command in pod, retrying (${attemptNumber}/3)`)
-            if (attemptNumber === 3) {
-              reject(e)
-              return false
-            }
-            return true
-          }
+    const backOffOptions = {
+      numOfAttempts: 3,
+      retry: (e, attemptNumber) => {
+        core.debug(e.toString())
+        core.debug(
+          `an error occurred trying to execute command in pod, retrying (${attemptNumber}/3)`
+        )
+        if (attemptNumber === 3) {
+          reject(e)
+          return false
         }
-
-        await backOff(async () => {
-          await executeCommand(exec, command, podName, containerName, resolve, reject, stdin)
-        }, backOffOptions);
-
-      } catch (e) {
-        core.debug('something went wrong in the exponential backoff')
-        reject(e)
+        return true
       }
+    }
+
+    try {
+      await backOff(async () => {
+        await executeCommand(
+          exec,
+          command,
+          podName,
+          containerName,
+          resolve,
+          reject,
+          stdin
+        )
+      }, backOffOptions)
+    } catch (e) {
+      core.debug('something went wrong in the exponential backoff')
+      reject(e)
+    }
   })
 }
 
@@ -260,7 +269,7 @@ async function executeCommand(
   containerName: string,
   resolve: (value?: number | PromiseLike<number> | undefined) => void,
   reject: (reason?: any) => void,
-  stdin?: stream.Readable,
+  stdin?: stream.Readable
 ): Promise<void> {
   await exec.exec(
     namespace(),
@@ -285,7 +294,7 @@ async function executeCommand(
         reject(resp?.message)
       }
     }
-  );
+  )
 }
 
 export async function waitForJobToComplete(jobName: string): Promise<void> {
@@ -568,7 +577,7 @@ async function getCurrentNodeName(): Promise<string> {
 }
 
 export function namespace(): string {
-  return "default";
+  return 'default'
 
   // if (process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE']) {
   //   return process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE']

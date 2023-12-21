@@ -3,7 +3,7 @@ import { cleanupJob, prepareJob, runScriptStep } from '../src/hooks'
 import { TestHelper } from './test-setup'
 import * as k8s from '@kubernetes/client-node'
 import { prunePods } from '../src/k8s'
-
+import { IncomingMessage } from 'http'
 
 jest.useRealTimers()
 
@@ -13,19 +13,19 @@ let prepareJobOutputData: any
 
 let runScriptStepDefinition
 
-let execSpy; 
+let execSpy
 
 describe('Run script step', () => {
   beforeEach(async () => {
-    execSpy = jest.spyOn(k8s.Exec.prototype, 'exec');
+    execSpy = jest.spyOn(k8s.Exec.prototype, 'exec')
     testHelper = new TestHelper()
     await testHelper.initialize()
     await prunePods()
-    
+
     const prepareJobOutputFilePath = testHelper.createFile(
       'prepare-job-output.json'
-      )
-      
+    )
+
     const prepareJobData = testHelper.getPrepareJobDefinition()
     runScriptStepDefinition = testHelper.getRunScriptStepDefinition()
 
@@ -35,7 +35,7 @@ describe('Run script step', () => {
   })
 
   afterEach(async () => {
-    execSpy.mockRestore();
+    execSpy.mockRestore()
     await cleanupJob()
     await testHelper.cleanup()
   })
@@ -50,21 +50,20 @@ describe('Run script step', () => {
     ).resolves.not.toThrow()
   })
 
-  
   it('should be able to handle errors occurring in k8s.Exec.exec() (e.g non 2xx Kubernetes API response)', async () => {
-    let errorCallCount = 0;
+    let errorCallCount = 0
     const mockExec = jest.fn(async (...args) => {
-      errorCallCount++;
+      errorCallCount++
 
       if (errorCallCount < 2) {
-        throw new Error('Simulated failure message, case1');
+        throw new k8s.HttpError('' as unknown as IncomingMessage, 'test', 500)
       } else {
-        execSpy.mockRestore();
-        throw new Error('Simulated failure message, case 1');
+        execSpy.mockRestore()
+        throw new k8s.HttpError('' as unknown as IncomingMessage, 'test', 500)
       }
-    });
+    })
 
-    execSpy.mockImplementation(mockExec);
+    execSpy.mockImplementation(mockExec)
     await expect(
       runScriptStep(
         runScriptStepDefinition.args,
@@ -75,11 +74,10 @@ describe('Run script step', () => {
   })
 
   it('should fail after multiple consecutive failures in k8s.Exec.exec()', async () => {
-
     const mockExec = jest.fn(async (...args) => {
-      throw new Error('Simulated failure message, case 2');
-    });
-    execSpy.mockImplementation(mockExec);
+      throw new k8s.HttpError('' as unknown as IncomingMessage, 'test', 500)
+    })
+    execSpy.mockImplementation(mockExec)
     await expect(
       runScriptStep(
         runScriptStepDefinition.args,
