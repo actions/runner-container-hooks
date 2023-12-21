@@ -13,9 +13,11 @@ let prepareJobOutputData: any
 
 let runScriptStepDefinition
 
+let execSpy; 
+
 describe('Run script step', () => {
   beforeEach(async () => {
-    
+    execSpy = jest.spyOn(k8s.Exec.prototype, 'exec');
     testHelper = new TestHelper()
     await testHelper.initialize()
     await prunePods()
@@ -33,6 +35,7 @@ describe('Run script step', () => {
   })
 
   afterEach(async () => {
+    execSpy.mockRestore();
     await cleanupJob()
     await testHelper.cleanup()
   })
@@ -48,20 +51,19 @@ describe('Run script step', () => {
   })
 
   
-  const execSpy = jest.spyOn(k8s.Exec.prototype, 'exec');
-  it('should be able to handle errors occurring in k8s.Exec.exec() (e.g Kubernetes API failure)', async () => {
-
+  it('should be able to handle errors occurring in k8s.Exec.exec() (e.g non 2xx Kubernetes API response)', async () => {
     let errorCallCount = 0;
     const mockExec = jest.fn(async (...args) => {
       errorCallCount++;
 
       if (errorCallCount < 2) {
-        throw new Error('Simulated failure message');
+        throw new Error('Simulated failure message, case1');
       } else {
         execSpy.mockRestore();
-        throw new Error('Simulated failure message');
+        throw new Error('Simulated failure message, case 1');
       }
     });
+
     execSpy.mockImplementation(mockExec);
     await expect(
       runScriptStep(
@@ -70,6 +72,21 @@ describe('Run script step', () => {
         null
       )
     ).resolves.not.toThrow()
+  })
+
+  it('should fail after multiple consecutive failures in k8s.Exec.exec()', async () => {
+
+    const mockExec = jest.fn(async (...args) => {
+      throw new Error('Simulated failure message, case 2');
+    });
+    execSpy.mockImplementation(mockExec);
+    await expect(
+      runScriptStep(
+        runScriptStepDefinition.args,
+        prepareJobOutputData.state,
+        null
+      )
+    ).rejects.toThrow()
   })
 
   it('should fail if the working directory does not exist', async () => {
