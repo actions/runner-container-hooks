@@ -251,7 +251,7 @@ export async function execPodStep(
         )
       }, backOffOptions)
     } catch (e) {
-      core.debug('something went wrong in the exponential backoff')
+      core.debug('something went wrong in the calling pod exec')
       reject(e)
     }
   })
