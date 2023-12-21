@@ -240,7 +240,7 @@ export async function execPodStep(
     }
     try {
       await backOff(async () => {
-        await executeCommand(
+        await execInPod(
           exec,
           command,
           podName,
@@ -257,7 +257,7 @@ export async function execPodStep(
   })
 }
 
-async function executeCommand(
+async function execInPod(
   exec: k8s.Exec,
   command: string[],
   podName: string,
