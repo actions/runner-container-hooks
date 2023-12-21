@@ -227,7 +227,7 @@ export async function execPodStep(
 ): Promise<void> {
   const exec = new k8s.Exec(kc)
   await new Promise(async function (resolve, reject) {
-    for(let callCount = 1; callCount <= 3; callCount++){
+    for(let callCount = 0; callCount <= 3; callCount++){
       try {
         await exec.exec(
           namespace(),
@@ -255,7 +255,7 @@ export async function execPodStep(
         )
         return
       } catch (error) {
-        core.debug(`an error occurred trying to execute command in pod, retrying (${callCount}/3)`)
+        core.debug(`an error occurred trying to execute command in pod, retrying (${callCount+1}/3)`)
         if (callCount === 3) {
           reject(error)
         }
