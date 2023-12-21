@@ -4,8 +4,8 @@ nodes:
 - role: control-plane
   # add a mount from /path/to/my/files on the host to /files on the node
   extraMounts:
-  - hostPath: /Users/nielstenboom/workspace/runner-container-hooks
-    containerPath: /Users/nielstenboom/workspace/runner-container-hooks
+  - hostPath: {{PATHTOREPO}}
+    containerPath: {{PATHTOREPO}}
     # optional: if set, the mount is read-only.
     # default false
     readOnly: false

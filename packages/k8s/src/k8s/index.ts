@@ -235,14 +235,9 @@ export async function execPodStep(
         core.debug(
           `an error occurred trying to execute command in pod, retrying (${attemptNumber}/3)`
         )
-        if (attemptNumber === 3) {
-          reject(e)
-          return false
-        }
         return true
       }
     }
-
     try {
       await backOff(async () => {
         await executeCommand(
@@ -577,19 +572,17 @@ async function getCurrentNodeName(): Promise<string> {
 }
 
 export function namespace(): string {
-  return 'default'
+  if (process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE']) {
+    return process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE']
+  }
 
-  // if (process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE']) {
-  //   return process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE']
-  // }
-
-  // const context = kc.getContexts().find(ctx => ctx.namespace)
-  // if (!context?.namespace) {
-  //   throw new Error(
-  //     'Failed to determine namespace, falling back to `default`. Namespace should be set in context, or in env variable "ACTIONS_RUNNER_KUBERNETES_NAMESPACE"'
-  //   )
-  // }
-  // return context.namespace
+  const context = kc.getContexts().find(ctx => ctx.namespace)
+  if (!context?.namespace) {
+    throw new Error(
+      'Failed to determine namespace, falling back to `default`. Namespace should be set in context, or in env variable "ACTIONS_RUNNER_KUBERNETES_NAMESPACE"'
+    )
+  }
+  return context.namespace
 }
 
 class BackOffManager {

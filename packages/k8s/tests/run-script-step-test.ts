@@ -20,8 +20,6 @@ describe('Run script step', () => {
     execSpy = jest.spyOn(k8s.Exec.prototype, 'exec')
     testHelper = new TestHelper()
     await testHelper.initialize()
-    await prunePods()
-
     const prepareJobOutputFilePath = testHelper.createFile(
       'prepare-job-output.json'
     )
@@ -39,6 +37,10 @@ describe('Run script step', () => {
     await cleanupJob()
     await testHelper.cleanup()
   })
+
+  // NOTE: To use this test, do kubectl apply -f podspec.yaml (from podspec examples)
+  // then change the name of the file to 'run-script-step-test.ts' and do
+  // npm run test run-script-step
 
   it('should not throw an exception', async () => {
     await expect(
