@@ -6,6 +6,12 @@ export async function networkCreate(networkName): Promise<void> {
   dockerArgs.push('--label')
   dockerArgs.push(getRunnerLabel())
   dockerArgs.push(networkName)
+
+  if (process.env.DOCKER_MTU) {
+    dockerArgs.push('--opt')
+    dockerArgs.push(`com.docker.network.driver.mtu=${process.env.DOCKER_MTU}`)
+  }
+
   await runDockerCommand(dockerArgs)
 }
 
