@@ -1,8 +1,9 @@
 <!-- ## Features -->
 ## Bugs
 
-- Add option to use the kubernetes scheduler for workflow pods [#111]
-- Docker and K8s: Fix shell arguments when split by the runner [#115]
+- K8s: Try to get response body message and log entire error response in debug log [#123]
+- Switch exec pod promise to reject on websocket error [#127]
+- Fix is alpine check using shlex [#130]
 
 <!-- ## Misc -->
 
