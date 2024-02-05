@@ -14,7 +14,8 @@ import {
   PodPhase,
   mergePodSpecWithOptions,
   mergeObjectMeta,
-  useKubeScheduler
+  useKubeScheduler,
+  fixArgs
 } from './utils'
 
 const kc = new k8s.KubeConfig()
@@ -226,30 +227,29 @@ export async function execPodStep(
   stdin?: stream.Readable
 ): Promise<void> {
   const exec = new k8s.Exec(kc)
-  await new Promise(function (resolve, reject) {
-    exec
-      .exec(
-        namespace(),
-        podName,
-        containerName,
-        command,
-        process.stdout,
-        process.stderr,
-        stdin ?? null,
-        false /* tty */,
-        resp => {
-          // kube.exec returns an error if exit code is not 0, but we can't actually get the exit code
-          if (resp.status === 'Success') {
-            resolve(resp.code)
-          } else {
-            core.debug(
-              JSON.stringify({
-                message: resp?.message,
-                details: resp?.details
-              })
-            )
-            reject(resp?.message)
-          }
+  command = fixArgs(command)
+  await new Promise(async function (resolve, reject) {
+    await exec.exec(
+      namespace(),
+      podName,
+      containerName,
+      command,
+      process.stdout,
+      process.stderr,
+      stdin ?? null,
+      false /* tty */,
+      resp => {
+        // kube.exec returns an error if exit code is not 0, but we can't actually get the exit code
+        if (resp.status === 'Success') {
+          resolve(resp.code)
+        } else {
+          core.debug(
+            JSON.stringify({
+              message: resp?.message,
+              details: resp?.details
+            })
+          )
+          reject(resp?.message)
         }
       )
       // eslint-disable-next-line github/no-then

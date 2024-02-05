@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import * as fs from 'fs'
+import * as core from '@actions/core'
 import { RunScriptStepArgs } from 'hooklib'
 import { execPodStep } from '../k8s'
 import { writeEntryPointScript } from '../k8s/utils'
@@ -28,7 +29,9 @@ export async function runScriptStep(
       JOB_CONTAINER_NAME
     )
   } catch (err) {
-    throw new Error(`failed to run script step: ${err}`)
+    core.debug(`execPodStep failed: ${JSON.stringify(err)}`)
+    const message = (err as any)?.response?.body?.message || err
+    throw new Error(`failed to run script step: ${message}`)
   } finally {
     fs.rmSync(runnerPath)
   }

@@ -79,7 +79,9 @@ export async function prepareJob(
     )
   } catch (err) {
     await prunePods()
-    throw new Error(`failed to create job pod: ${err}`)
+    core.debug(`createPod failed: ${JSON.stringify(err)}`)
+    const message = (err as any)?.response?.body?.message || err
+    throw new Error(`failed to create job pod: ${message}`)
   }
 
   if (!createdPod?.metadata?.name) {
@@ -98,7 +100,7 @@ export async function prepareJob(
     )
   } catch (err) {
     await prunePods()
-    throw new Error(`Pod failed to come online with error: ${err}`)
+    throw new Error(`pod failed to come online with error: ${err}`)
   }
 
   core.debug('Job pod is ready for traffic')
@@ -110,7 +112,11 @@ export async function prepareJob(
       JOB_CONTAINER_NAME
     )
   } catch (err) {
-    throw new Error(`Failed to determine if the pod is alpine: ${err}`)
+    core.debug(
+      `Failed to determine if the pod is alpine: ${JSON.stringify(err)}`
+    )
+    const message = (err as any)?.response?.body?.message || err
+    throw new Error(`failed to determine if the pod is alpine: ${message}`)
   }
   core.debug(`Setting isAlpine to ${isAlpine}`)
   generateResponseFile(responseFile, createdPod, isAlpine)
