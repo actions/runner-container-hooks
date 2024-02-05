@@ -228,31 +228,36 @@ export async function execPodStep(
 ): Promise<void> {
   const exec = new k8s.Exec(kc)
   command = fixArgs(command)
-  await new Promise(async function (resolve, reject) {
-    await exec.exec(
-      namespace(),
-      podName,
-      containerName,
-      command,
-      process.stdout,
-      process.stderr,
-      stdin ?? null,
-      false /* tty */,
-      resp => {
-        // kube.exec returns an error if exit code is not 0, but we can't actually get the exit code
-        if (resp.status === 'Success') {
-          resolve(resp.code)
-        } else {
-          core.debug(
-            JSON.stringify({
-              message: resp?.message,
-              details: resp?.details
-            })
-          )
-          reject(resp?.message)
+  // Exec returns a websocket. If websocket fails, we should reject the promise. Otherwise, websocket will call a callback. Since at that point, websocket is not failing, we can safely resolve or reject the promise.
+  await new Promise(function (resolve, reject) {
+    exec
+      .exec(
+        namespace(),
+        podName,
+        containerName,
+        command,
+        process.stdout,
+        process.stderr,
+        stdin ?? null,
+        false /* tty */,
+        resp => {
+          // kube.exec returns an error if exit code is not 0, but we can't actually get the exit code
+          if (resp.status === 'Success') {
+            resolve(resp.code)
+          } else {
+            core.debug(
+              JSON.stringify({
+                message: resp?.message,
+                details: resp?.details
+              })
+            )
+            reject(resp?.message)
+          }
         }
-      }
-    )
+      )
+      // If exec.exec fails, explicitly reject the outer promise
+      // eslint-disable-next-line github/no-then
+      .catch(e => reject(e))
   })
 }
 
