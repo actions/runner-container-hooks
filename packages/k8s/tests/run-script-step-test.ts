@@ -1,6 +1,9 @@
 import * as fs from 'fs'
 import { cleanupJob, prepareJob, runScriptStep } from '../src/hooks'
 import { TestHelper } from './test-setup'
+import * as k8s from '@kubernetes/client-node'
+import { prunePods } from '../src/k8s'
+import { IncomingMessage } from 'http'
 
 jest.useRealTimers()
 
@@ -10,8 +13,11 @@ let prepareJobOutputData: any
 
 let runScriptStepDefinition
 
+let execSpy
+
 describe('Run script step', () => {
   beforeEach(async () => {
+    execSpy = jest.spyOn(k8s.Exec.prototype, 'exec')
     testHelper = new TestHelper()
     await testHelper.initialize()
     const prepareJobOutputFilePath = testHelper.createFile(
@@ -27,6 +33,7 @@ describe('Run script step', () => {
   })
 
   afterEach(async () => {
+    execSpy.mockRestore()
     await cleanupJob()
     await testHelper.cleanup()
   })
@@ -43,6 +50,43 @@ describe('Run script step', () => {
         null
       )
     ).resolves.not.toThrow()
+  })
+
+  it('should be able to handle errors occurring in k8s.Exec.exec() (e.g non 2xx Kubernetes API response)', async () => {
+    let errorCallCount = 0
+    const mockExec = jest.fn(async (...args) => {
+      errorCallCount++
+
+      if (errorCallCount < 2) {
+        throw new k8s.HttpError('' as unknown as IncomingMessage, 'test', 500)
+      } else {
+        execSpy.mockRestore()
+        throw new k8s.HttpError('' as unknown as IncomingMessage, 'test', 500)
+      }
+    })
+
+    execSpy.mockImplementation(mockExec)
+    await expect(
+      runScriptStep(
+        runScriptStepDefinition.args,
+        prepareJobOutputData.state,
+        null
+      )
+    ).resolves.not.toThrow()
+  })
+
+  it('should fail after multiple consecutive failures in k8s.Exec.exec()', async () => {
+    const mockExec = jest.fn(async (...args) => {
+      throw new k8s.HttpError('' as unknown as IncomingMessage, 'test', 500)
+    })
+    execSpy.mockImplementation(mockExec)
+    await expect(
+      runScriptStep(
+        runScriptStepDefinition.args,
+        prepareJobOutputData.state,
+        null
+      )
+    ).rejects.toThrow()
   })
 
   it('should fail if the working directory does not exist', async () => {
