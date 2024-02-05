@@ -14,7 +14,8 @@ import {
   PodPhase,
   mergePodSpecWithOptions,
   mergeObjectMeta,
-  useKubeScheduler
+  useKubeScheduler,
+  fixArgs
 } from './utils'
 
 const kc = new k8s.KubeConfig()
@@ -226,6 +227,7 @@ export async function execPodStep(
   stdin?: stream.Readable
 ): Promise<void> {
   const exec = new k8s.Exec(kc)
+  command = fixArgs(command)
   await new Promise(async function (resolve, reject) {
     await exec.exec(
       namespace(),

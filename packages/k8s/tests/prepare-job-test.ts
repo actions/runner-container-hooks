@@ -91,6 +91,15 @@ describe('Prepare job', () => {
     expect(services[0].args).toBe(undefined)
   })
 
+  it('should determine alpine correctly', async () => {
+    prepareJobData.args.container.image = 'alpine:latest'
+    await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+    const content = JSON.parse(
+      fs.readFileSync(prepareJobOutputFilePath).toString()
+    )
+    expect(content.isAlpine).toBe(true)
+  })
+
   it('should run pod with extensions applied', async () => {
     process.env[ENV_HOOK_TEMPLATE_PATH] = path.join(
       __dirname,
