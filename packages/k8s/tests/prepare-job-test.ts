@@ -133,6 +133,13 @@ describe('Prepare job', () => {
     expect(got.spec?.containers[1].image).toBe('redis')
     expect(got.spec?.containers[1].command).toBeFalsy()
     expect(got.spec?.containers[1].args).toBeFalsy()
+    expect(got.spec?.containers[1].env).toEqual([
+      { name: 'ENV2', value: 'value2' }
+    ])
+    expect(got.spec?.containers[1].resources).toEqual({
+      requests: { memory: '1Mi', cpu: '1' },
+      limits: { memory: '1Gi', cpu: '2' }
+    })
     // side-car
     expect(got.spec?.containers[2].name).toBe('side-car')
     expect(got.spec?.containers[2].image).toBe('ubuntu:latest')
