@@ -41,6 +41,11 @@ export function containerVolumes(
         name: POD_VOLUME_NAME,
         mountPath: '/github/file_commands',
         subPath: '_temp/_runner_file_commands'
+      },
+      {
+        name: POD_VOLUME_NAME,
+        mountPath: '/github/workflow',
+        subPath: '_temp/_github_workflow'
       }
     )
     return mounts
