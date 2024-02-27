@@ -2,7 +2,7 @@ import * as k8s from '@kubernetes/client-node'
 import * as fs from 'fs'
 import * as yaml from 'js-yaml'
 import * as core from '@actions/core'
-import { Mount } from 'hooklib'
+import { Mount, ServiceContainerInfo } from 'hooklib'
 import * as path from 'path'
 import { v1 as uuidv4 } from 'uuid'
 import { POD_VOLUME_NAME } from './index'
@@ -155,12 +155,16 @@ exec ${environmentPrefix} ${entryPoint} ${
   }
 }
 
-export function generateContainerName(image: string): string {
-  const nameWithTag = image.split('/').pop()
+export function generateContainerName(service: ServiceContainerInfo): string {
+  if (service.contextName){
+    return service.contextName
+  }
+
+  const nameWithTag = service.image.split('/').pop()
   const name = nameWithTag?.split(':').at(0)
 
   if (!name) {
-    throw new Error(`Image definition '${image}' is invalid`)
+    throw new Error(`Image definition '${service.image}' is invalid`)
   }
 
   return name
