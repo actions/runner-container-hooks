@@ -55,10 +55,10 @@ export async function prepareJob(
   let services: k8s.V1Container[] = []
   if (args.services?.length) {
     services = args.services.map(service => {
-      core.debug(`Adding service '${service.image}' to pod definition`)
+      core.debug(`Adding service '${service.image}' to pod definition`)      
       return createContainerSpec(
-        service,
-        generateContainerName(service.image),
+        service,        
+        generateContainerName(service),
         false,
         extension
       )
