@@ -11,11 +11,11 @@ import {
   RunnerInstanceLabel
 } from '../hooks/constants'
 import {
-  PodPhase,
-  mergePodSpecWithOptions,
+  fixArgs,
   mergeObjectMeta,
-  useKubeScheduler,
-  fixArgs
+  mergePodSpecWithOptions,
+  PodPhase,
+  useKubeScheduler
 } from './utils'
 
 const kc = new k8s.KubeConfig()
@@ -358,7 +358,8 @@ export async function pruneSecrets(): Promise<void> {
 
   await Promise.all(
     secretList.body.items.map(
-      secret => secret.metadata?.name && deleteSecret(secret.metadata.name)
+      async secret =>
+        secret.metadata?.name && deleteSecret(secret.metadata.name)
     )
   )
 }
@@ -474,7 +475,7 @@ export async function prunePods(): Promise<void> {
 
   await Promise.all(
     podList.body.items.map(
-      pod => pod.metadata?.name && deletePod(pod.metadata.name)
+      async pod => pod.metadata?.name && deletePod(pod.metadata.name)
     )
   )
 }

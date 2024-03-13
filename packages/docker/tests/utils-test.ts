@@ -1,4 +1,4 @@
-import { optionsWithDockerEnvs, sanitize, fixArgs } from '../src/utils'
+import { fixArgs, optionsWithDockerEnvs, sanitize } from '../src/utils'
 
 describe('Utilities', () => {
   it('should return sanitized image name', () => {

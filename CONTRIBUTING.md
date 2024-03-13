@@ -4,9 +4,9 @@ You'll need a runner compatible with hooks, a repository with container workflow
 
 
 ## Getting Started
-- Run ` npm install && npm run bootstrap` to setup your environment and install all the needed packages
+- Run `npm install` to install all the needed packages
 - Run `npm run lint` and `npm run format` to ensure your charges will pass CI
-- Run `npm run build-all` to build and test end to end.
+- Run `npm run build` to build and test end to end.
 
 
 ## E2E

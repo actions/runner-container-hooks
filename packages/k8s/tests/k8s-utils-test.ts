@@ -1,15 +1,15 @@
-﻿import * as fs from 'fs'
+﻿import * as k8s from '@kubernetes/client-node'
+import * as fs from 'fs'
 import { containerPorts, POD_VOLUME_NAME } from '../src/k8s'
 import {
   containerVolumes,
+  ENV_HOOK_TEMPLATE_PATH,
   generateContainerName,
-  writeEntryPointScript,
-  mergePodSpecWithOptions,
   mergeContainerWithOptions,
+  mergePodSpecWithOptions,
   readExtensionFromFile,
-  ENV_HOOK_TEMPLATE_PATH
+  writeEntryPointScript
 } from '../src/k8s/utils'
-import * as k8s from '@kubernetes/client-node'
 import { TestHelper } from './test-setup'
 
 let testHelper: TestHelper
@@ -230,7 +230,9 @@ describe('k8s utils', () => {
         containerVolumes(
           [
             {
-              sourceVolumePath: '/outside/of/workdir'
+              sourceVolumePath: '/outside/of/workdir',
+              targetVolumePath: '/fail',
+              readOnly: false
             }
           ],
           true,

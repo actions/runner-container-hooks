@@ -11,18 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - run: sed -i "s|{{PATHTOREPO}}|$(pwd)|" packages/k8s/tests/test-kind.yaml
-        name: Setup kind cluster yaml config
+      - name: Setup kind cluster yaml config
+        run: sed -i "s|{{PATHTOREPO}}|$(pwd)|" packages/k8s/tests/test-kind.yaml
       - uses: helm/kind-action@v1.2.0
         with:
           config: packages/k8s/tests/test-kind.yaml
-      - run: npm install
-        name: Install dependencies
-      - run: npm run bootstrap
-        name: Bootstrap the packages
-      - run: npm run build-all
-        name: Build packages
-      - run: npm run format-check
+      - name: Install dependencies
+        run: npm ci
+      - name: Build packages
+        run: npm run build
+      - name: Check formatting
+        run: npm run format-check
       - name: Check linter
         run: |
           npm run lint

@@ -1,5 +1,5 @@
 import * as fs from 'fs'
-import { PrepareJobResponse } from 'hooklib/lib'
+import { PrepareJobResponse } from 'hooklib'
 import { prepareJob, runScriptStep } from '../src/hooks'
 import TestSetup from './test-setup'
 

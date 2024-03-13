@@ -1,6 +1,5 @@
 import * as fs from 'fs'
-import { Mount } from 'hooklib'
-import { HookData } from 'hooklib/lib'
+import { HookData, Mount } from 'hooklib'
 import * as path from 'path'
 import { env } from 'process'
 import { v4 as uuidv4 } from 'uuid'
@@ -45,9 +44,8 @@ export default class TestSetup {
   public initialize(): void {
     env['GITHUB_WORKSPACE'] = this.workingDirectory
     env['RUNNER_NAME'] = 'test'
-    env[
-      'RUNNER_TEMP'
-    ] = `${this.runnerMockDir}/${this.runnerMockSubdirs.workTemp}`
+    env['RUNNER_TEMP'] =
+      `${this.runnerMockDir}/${this.runnerMockSubdirs.workTemp}`
 
     for (const dir of this.allTestDirectories) {
       fs.mkdirSync(dir, { recursive: true })

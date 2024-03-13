@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import * as fs from 'fs'
 import * as core from '@actions/core'
+import * as fs from 'fs'
 import { RunScriptStepArgs } from 'hooklib'
 import { execPodStep } from '../k8s'
 import { writeEntryPointScript } from '../k8s/utils'
