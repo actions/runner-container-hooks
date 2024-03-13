@@ -1,3 +1,4 @@
+# Copy this file to kind.yaml with your own customizations
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:

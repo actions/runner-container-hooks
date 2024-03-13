@@ -12,10 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Setup kind cluster yaml config
-        run: sed -i "s|{{PATHTOREPO}}|$(pwd)|" packages/k8s/tests/test-kind.yaml
+        run: sed "s|{{PATHTOREPO}}|$(pwd)|" packages/k8s/tests/kind-sample.yaml > packages/k8s/tests/kind.yaml
       - uses: helm/kind-action@v1.2.0
         with:
-          config: packages/k8s/tests/test-kind.yaml
+          config: packages/k8s/tests/kind.yaml
       - name: Install dependencies
         run: npm ci
       - name: Build packages
@@ -25,6 +25,6 @@ jobs:
       - name: Check linter
         run: |
           npm run lint
-          git diff --exit-code -- ':!packages/k8s/tests/test-kind.yaml'
+          git diff --exit-code
       - name: Run tests
         run: npm run test
