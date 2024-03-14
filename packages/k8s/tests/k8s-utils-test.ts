@@ -185,6 +185,20 @@ describe('k8s utils', () => {
       expect(volumes.find(e => e.mountPath === '/__w')).toBeTruthy()
     })
 
+    it('should always have /github/workflow mount if working on container job or container action', () => {
+      let volumes = containerVolumes([], true, true)
+      expect(volumes.find(e => e.mountPath === '/github/workflow')).toBeTruthy()
+      volumes = containerVolumes([], true, false)
+      expect(volumes.find(e => e.mountPath === '/github/workflow')).toBeTruthy()
+      volumes = containerVolumes([], false, true)
+      expect(volumes.find(e => e.mountPath === '/github/workflow')).toBeTruthy()
+
+      volumes = containerVolumes([], false, false)
+      expect(
+        volumes.find(e => e.mountPath === '/github/workflow')
+      ).toBeUndefined()
+    })
+
     it('should have container action volumes', () => {
       let volumes = containerVolumes([], true, true)
       let workspace = volumes.find(e => e.mountPath === '/github/workspace')
@@ -205,11 +219,10 @@ describe('k8s utils', () => {
       expect(fileCommands?.subPath).toBe('_temp/_runner_file_commands')
     })
 
-    it('should have externals, github home and github workflow mounts if job container', () => {
+    it('should have externals, github home mounts if job container', () => {
       const volumes = containerVolumes()
       expect(volumes.find(e => e.mountPath === '/__e')).toBeTruthy()
       expect(volumes.find(e => e.mountPath === '/github/home')).toBeTruthy()
-      expect(volumes.find(e => e.mountPath === '/github/workflow')).toBeTruthy()
     })
 
     it('should throw if user volume source volume path is not in workspace', () => {
