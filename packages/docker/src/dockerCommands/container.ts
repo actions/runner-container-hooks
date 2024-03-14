@@ -5,7 +5,7 @@ import {
   Registry,
   RunContainerStepArgs,
   ServiceContainerInfo
-} from 'hooklib/lib'
+} from 'hooklib'
 import * as path from 'path'
 import { env } from 'process'
 import { v4 as uuidv4 } from 'uuid'

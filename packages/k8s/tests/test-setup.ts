@@ -1,6 +1,6 @@
 import * as k8s from '@kubernetes/client-node'
 import * as fs from 'fs'
-import { HookData } from 'hooklib/lib'
+import { HookData } from 'hooklib'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 

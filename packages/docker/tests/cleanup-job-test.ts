@@ -1,4 +1,4 @@
-import { PrepareJobArgs } from 'hooklib/lib'
+import { PrepareJobArgs } from 'hooklib'
 import { cleanupJob, prepareJob } from '../src/hooks'
 import TestSetup from './test-setup'
 

@@ -1,4 +1,5 @@
 import * as k8s from '@kubernetes/client-node'
+import { PrepareJobArgs } from 'hooklib'
 import { cleanupJob, prepareJob } from '../src/hooks'
 import { RunnerInstanceLabel } from '../src/hooks/constants'
 import { namespace } from '../src/k8s'
@@ -14,7 +15,10 @@ describe('Cleanup Job', () => {
     const prepareJobOutputFilePath = testHelper.createFile(
       'prepare-job-output.json'
     )
-    await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+    await prepareJob(
+      prepareJobData.args as PrepareJobArgs,
+      prepareJobOutputFilePath
+    )
   })
 
   afterEach(async () => {

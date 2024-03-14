@@ -1,18 +1,15 @@
+import { V1Container } from '@kubernetes/client-node'
 import * as fs from 'fs'
 import * as path from 'path'
-import { cleanupJob } from '../src/hooks'
-import { createContainerSpec, prepareJob } from '../src/hooks/prepare-job'
-import { TestHelper } from './test-setup'
+import { cleanupJob, createContainerSpec, prepareJob } from '../src/hooks'
+import { JOB_CONTAINER_NAME } from '../src/hooks/constants'
+import { getPodByName } from '../src/k8s'
 import {
   ENV_HOOK_TEMPLATE_PATH,
   ENV_USE_KUBE_SCHEDULER,
-  generateContainerName,
-  readExtensionFromFile
+  generateContainerName
 } from '../src/k8s/utils'
-import { getPodByName } from '../src/k8s'
-import { V1Container } from '@kubernetes/client-node'
-import * as yaml from 'js-yaml'
-import { JOB_CONTAINER_NAME } from '../src/hooks/constants'
+import { TestHelper } from './test-setup'
 
 jest.useRealTimers()
 

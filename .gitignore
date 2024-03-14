@@ -1,5 +1,6 @@
+.idea/
 node_modules/
 lib/
 dist/
 **/tests/_temp/**
-packages/k8s/tests/test-kind.yaml
+packages/k8s/tests/kind.yaml

@@ -1,9 +1,9 @@
-import { runContainerStep } from '../src/hooks'
-import { TestHelper } from './test-setup'
-import { ENV_HOOK_TEMPLATE_PATH } from '../src/k8s/utils'
 import * as fs from 'fs'
 import * as yaml from 'js-yaml'
+import { runContainerStep } from '../src/hooks'
 import { JOB_CONTAINER_EXTENSION_NAME } from '../src/hooks/constants'
+import { ENV_HOOK_TEMPLATE_PATH } from '../src/k8s/utils'
+import { TestHelper } from './test-setup'
 
 jest.useRealTimers()
 

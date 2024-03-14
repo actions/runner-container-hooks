@@ -1,5 +1,5 @@
 import * as core from '@actions/core'
-import { ContextPorts, PrepareJobArgs, writeToResponseFile } from 'hooklib/lib'
+import { ContextPorts, PrepareJobArgs, writeToResponseFile } from 'hooklib'
 import { exit } from 'process'
 import { v4 as uuidv4 } from 'uuid'
 import {

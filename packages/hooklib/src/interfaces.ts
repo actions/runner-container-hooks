@@ -57,6 +57,11 @@ export interface StepContainerInfo extends ContainerInfo {
   systemMountVolumes: Mount[]
 }
 
+export const containerHasWorkingDirectory = (
+  container: any
+): container is JobContainerInfo | StepContainerInfo =>
+  !!container?.workingDirectory
+
 export interface Mount {
   sourceVolumePath: string
   targetVolumePath: string
