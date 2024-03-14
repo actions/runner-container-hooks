@@ -2,7 +2,7 @@
 
 **Date:** 3 August 2023
 
-**Status**: Accepted <!--Accepted|Rejected|Superceded|Deprecated-->
+**Status**: Superceded [^1]
 
 ## Context
 
@@ -30,3 +30,5 @@ In case the hook is able to read the extended spec, it will first create a defau
 ## Consequences
 
 The addition of hook extensions will provide a better user experience for users who need to customize the pods created by the container hook. However, it will require additional effort to provide the template to the runner pod, and configure it properly.
+
+[^1]: Superseded by [ADR 0134](0134-hook-extensions.md)
