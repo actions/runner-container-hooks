@@ -1,11 +1,16 @@
-<!-- ## Features -->
+## Features
+
+- Extend the hook extension to allow service container modifications [#134]
+
 ## Bugs
 
-- K8s: Try to get response body message and log entire error response in debug log [#123]
-- Switch exec pod promise to reject on websocket error [#127]
-- Fix is alpine check using shlex [#130]
+- Mount /github/workflow to docker action pods [#137]
+- Read logs from failed job container [#135]
 
-<!-- ## Misc -->
+## Misc
+
+- Bump jose from 4.11.4 to 4.15.5 [#142]
+- ADR-0134 - superseding ADR-0096 [#136]
 
 ## SHA-256 Checksums
 
