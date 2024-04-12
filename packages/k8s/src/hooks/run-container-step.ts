@@ -12,10 +12,10 @@ import {
 } from '../k8s'
 import {
   containerVolumes,
-  PodPhase,
+  fixArgs,
   mergeContainerWithOptions,
-  readExtensionFromFile,
-  fixArgs
+  PodPhase,
+  readExtensionFromFile
 } from '../k8s/utils'
 import { JOB_CONTAINER_EXTENSION_NAME, JOB_CONTAINER_NAME } from './constants'
 
@@ -65,7 +65,12 @@ export async function runContainerStep(
 
   await waitForPodPhases(
     podName,
-    new Set([PodPhase.COMPLETED, PodPhase.RUNNING, PodPhase.SUCCEEDED]),
+    new Set([
+      PodPhase.COMPLETED,
+      PodPhase.RUNNING,
+      PodPhase.SUCCEEDED,
+      PodPhase.FAILED
+    ]),
     new Set([PodPhase.PENDING, PodPhase.UNKNOWN])
   )
   core.debug('Container step is running or complete, pulling logs')

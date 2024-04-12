@@ -6,7 +6,7 @@ import { Mount } from 'hooklib'
 import * as path from 'path'
 import { v1 as uuidv4 } from 'uuid'
 import { POD_VOLUME_NAME } from './index'
-import { JOB_CONTAINER_EXTENSION_NAME } from '../hooks/constants'
+import { CONTAINER_EXTENSION_PREFIX } from '../hooks/constants'
 import * as shlex from 'shlex'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
@@ -41,6 +41,11 @@ export function containerVolumes(
         name: POD_VOLUME_NAME,
         mountPath: '/github/file_commands',
         subPath: '_temp/_runner_file_commands'
+      },
+      {
+        name: POD_VOLUME_NAME,
+        mountPath: '/github/workflow',
+        subPath: '_temp/_github_workflow'
       }
     )
     return mounts
@@ -180,7 +185,7 @@ export function mergeContainerWithOptions(
 ): void {
   for (const [key, value] of Object.entries(from)) {
     if (key === 'name') {
-      if (value !== base.name && value !== JOB_CONTAINER_EXTENSION_NAME) {
+      if (value !== CONTAINER_EXTENSION_PREFIX + base.name) {
         core.warning("Skipping name override: name can't be overwritten")
       }
       continue
@@ -209,7 +214,9 @@ export function mergePodSpecWithOptions(
   for (const [key, value] of Object.entries(from)) {
     if (key === 'containers') {
       base.containers.push(
-        ...from.containers.filter(e => !e.name?.startsWith('$'))
+        ...from.containers.filter(
+          e => !e.name?.startsWith(CONTAINER_EXTENSION_PREFIX)
+        )
       )
     } else if (key === 'volumes' && value) {
       const volumes = value as k8s.V1Volume[]

@@ -1,10 +1,16 @@
-<!-- ## Features -->
+## Features
+
+- Extend the hook extension to allow service container modifications [#134]
+
 ## Bugs
 
-- Add option to use the kubernetes scheduler for workflow pods [#111]
-- Docker and K8s: Fix shell arguments when split by the runner [#115]
+- Mount /github/workflow to docker action pods [#137]
+- Read logs from failed job container [#135]
 
-<!-- ## Misc -->
+## Misc
+
+- Bump jose from 4.11.4 to 4.15.5 [#142]
+- ADR-0134 - superseding ADR-0096 [#136]
 
 ## SHA-256 Checksums
 
