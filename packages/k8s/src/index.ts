@@ -43,6 +43,10 @@ async function run(): Promise<void> {
     }
   } catch (error) {
     core.error(error as Error)
+
+    if (core.isDebug() && error instanceof Error && error.stack)
+      console.trace(error)
+
     process.exit(1)
   }
 }
