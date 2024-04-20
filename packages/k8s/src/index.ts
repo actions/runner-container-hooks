@@ -44,8 +44,9 @@ async function run(): Promise<void> {
   } catch (error) {
     core.error(error as Error)
 
-    if (core.isDebug())
+    if (core.isDebug()) {
       console.trace(error)
+    }
 
     process.exit(1)
   }
