@@ -5,7 +5,7 @@
   "main": "lib/index.js",
   "scripts": {
     "test": "jest --runInBand",
-    "build": "tsc && npx ncc build",
+    "build": "tsc && npx ncc build --source-map",
     "format": "prettier --write '**/*.ts'",
     "format-check": "prettier --check '**/*.ts'",
     "lint": "eslint src/**/*.ts"
