@@ -44,7 +44,7 @@ async function run(): Promise<void> {
   } catch (error) {
     core.error(error as Error)
     if (error instanceof Error && error.stack) {
-      core.debug(error?.stack?.split('\n').slice(1).join('\n'))
+      core.debug(error.stack)
     }
     process.exit(1)
   }
