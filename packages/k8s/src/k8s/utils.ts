@@ -9,6 +9,7 @@ import { POD_VOLUME_NAME } from './index'
 import { CONTAINER_EXTENSION_PREFIX } from '../hooks/constants'
 import * as shlex from 'shlex'
 
+
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 
@@ -160,19 +161,16 @@ exec ${environmentPrefix} ${entryPoint} ${
   }
 }
 
-export function generateContainerName(service: ServiceContainerInfo): string {
-  if (service.contextName){
-    return service.contextName
-  }
-
-  const nameWithTag = service.image.split('/').pop()
+export function generateContainerName(image: string): string {
+  const nameWithTag = image.split('/').pop()
   const name = nameWithTag?.split(':').at(0)
 
   if (!name) {
-    throw new Error(`Image definition '${service.image}' is invalid`)
+    throw new Error(`Image definition '${image}' is invalid`)
   }
 
-  return name
+  const randomSuffix = uuidv4().substring(0, 6)
+  return `${name.substring(0, 56)}-${randomSuffix}` // 63 is the max length for container name
 }
 
 // Overwrite or append based on container options
@@ -188,6 +186,7 @@ export function mergeContainerWithOptions(
   from: k8s.V1Container
 ): void {
   for (const [key, value] of Object.entries(from)) {
+    core.debug(`Merging container options: ${key} = ${value}`)
     if (key === 'name') {
       if (value !== CONTAINER_EXTENSION_PREFIX + base.name) {
         core.warning("Skipping name override: name can't be overwritten")
@@ -263,11 +262,13 @@ export function mergeObjectMeta(
 
 export function readExtensionFromFile(): k8s.V1PodTemplateSpec | undefined {
   const filePath = process.env[ENV_HOOK_TEMPLATE_PATH]
+  core.debug(`Reading extension from file${filePath}`)
   if (!filePath) {
     return undefined
   }
   const doc = yaml.load(fs.readFileSync(filePath, 'utf8'))
   if (!doc || typeof doc !== 'object') {
+    core.debug(`Failed to parse ${filePath}`)
     throw new Error(`Failed to parse ${filePath}`)
   }
   return doc as k8s.V1PodTemplateSpec

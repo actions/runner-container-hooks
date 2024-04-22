@@ -27,21 +27,39 @@ import {
   fixArgs
 } from '../k8s/utils'
 import { CONTAINER_EXTENSION_PREFIX, JOB_CONTAINER_NAME } from './constants'
+import { promisify } from 'util'
+import { exec as execCallback } from 'child_process'
+import { listFilesSync } from './run-container-step';
+const exec = promisify(execCallback)
 
 export async function prepareJob(
   args: PrepareJobArgs,
   responseFile
 ): Promise<void> {
+  core.debug(`Preparing job with args: ${JSON.stringify(args)}`)
+  core.info('USING CUSTOM HOOK!!!!')
+
   if (!args.container) {
     throw new Error('Job Container is required.')
   }
 
+  core.info('!!!! Preparing job beginning ')
+  listFilesSync()
+
+  await archiveWorkspaceContents()
+
   await prunePods()
 
+  core.debug('Pruned old pods')
+
+  core.debug('read extension file ')
   const extension = readExtensionFromFile()
+
+  core.debug('copyExternalsToRoot')
   await copyExternalsToRoot()
 
   let container: k8s.V1Container | undefined = undefined
+
   if (args.container?.image) {
     core.debug(`Using image '${args.container.image}' for job image`)
     container = createContainerSpec(
@@ -53,15 +71,23 @@ export async function prepareJob(
   }
 
   let services: k8s.V1Container[] = []
+  const duplicates = new Map<string, number>()
+
   if (args.services?.length) {
     services = args.services.map(service => {
-      core.debug(`Adding service '${service.image}' to pod definition`)      
-      return createContainerSpec(
-        service,        
-        generateContainerName(service),
-        false,
-        extension
-      )
+      core.debug(`Adding service '${service.image}' to pod definition`)
+
+      let name = generateContainerName(service.image)
+
+      const ind = duplicates.get(name)
+      if (ind === undefined) {
+        duplicates.set(name, 0)
+      } else {
+        duplicates.set(name, ind + 1)
+        name = `${name}${ind + 1}`
+      }
+
+      return createContainerSpec(service, name, false, extension)
     })
   }
 
@@ -69,6 +95,7 @@ export async function prepareJob(
     throw new Error('No containers exist, skipping hook invocation')
   }
 
+  core.debug('creating pod')
   let createdPod: k8s.V1Pod | undefined = undefined
   try {
     createdPod = await createPod(
@@ -119,7 +146,11 @@ export async function prepareJob(
     throw new Error(`failed to determine if the pod is alpine: ${message}`)
   }
   core.debug(`Setting isAlpine to ${isAlpine}`)
+
   generateResponseFile(responseFile, args, createdPod, isAlpine)
+
+  core.info('!!!! Preparing job end ')
+  listFilesSync()
 }
 
 function generateResponseFile(
@@ -237,14 +268,44 @@ export function createContainerSpec(
   if (!extension) {
     return podContainer
   }
+  core.debug(
+    `Applying extensions to container spec ${JSON.stringify(extension)}`
+  )
 
   const from = extension.spec?.containers?.find(
     c => c.name === CONTAINER_EXTENSION_PREFIX + name
   )
 
+  core.debug(`Found extension for container ${name}: ${from}`)
+
   if (from) {
     mergeContainerWithOptions(podContainer, from)
   }
 
+  core.debug(`Merged container spec: ${JSON.stringify(podContainer)}`)
+
   return podContainer
+}
+
+async function archiveWorkspaceContents(): Promise<void> {
+  try {
+    core.info('Archiving workspace contents...')
+    const sourceDirectory = '/home/runner/_work' // Define the source directory to archive
+    const targetDirectory = '/nginx' // Define where the archive should be placed
+    const archiveName = 'workspace-archive.tar.gz' // Define the name of the output archive file
+
+    // Ensure the target directory exists; create it if not
+    await io.mkdirP(targetDirectory)
+
+    // Construct and run the command to compress and move the archive
+    const command = `tar -czf ${targetDirectory}/${archiveName} -C ${sourceDirectory} .`
+    await exec(command)
+
+    core.info(
+      `Workspace content archived successfully to ${targetDirectory}/${archiveName}`
+    )
+  } catch (error) {
+    core.error(`Failed to archive workspace: ${error}`)
+    throw error // Rethrow to handle the error outside, if necessary
+  }
 }

@@ -1,0 +1,16 @@
+# spec:
+#   tolerations:
+#   - effect: NoExecute
+#     key: ownedby
+#     value: ci-platform
+#   nodeSelector:
+#     ownedby: ci-platform
+  # containers: 
+  #   - name: $job
+  #     resources:
+  #       requests:
+  #         cpu: "1"
+  #         memory: "8Gi"
+  #       limits:
+  #         cpu: "2"
+  #         memory: "16Gi"
