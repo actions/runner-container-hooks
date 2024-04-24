@@ -1,4 +1,4 @@
-import { RunScriptStepArgs } from 'hooklib/lib'
+import { RunScriptStepArgs } from 'hooklib'
 import { containerExecStep } from '../dockerCommands'
 
 export async function runScriptStep(

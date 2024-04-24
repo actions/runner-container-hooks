@@ -1,5 +1,11 @@
 import * as core from '@actions/core'
-import { Command, getInputFromStdin, prepareJobArgs } from 'hooklib'
+import {
+  Command,
+  getInputFromStdin,
+  PrepareJobArgs,
+  RunScriptStepArgs,
+  RunContainerStepArgs
+} from 'hooklib'
 import {
   cleanupJob,
   prepareJob,
@@ -27,22 +33,25 @@ async function run(): Promise<void> {
     let exitCode = 0
     switch (command) {
       case Command.PrepareJob:
-        await prepareJob(args as prepareJobArgs, responseFile)
+        await prepareJob(args as PrepareJobArgs, responseFile)
         return process.exit(0)
       case Command.CleanupJob:
         await cleanupJob()
         return process.exit(0)
       case Command.RunScriptStep:
-        await runScriptStep(args, state, null)
+        await runScriptStep(args as RunScriptStepArgs, state, null)
         return process.exit(0)
       case Command.RunContainerStep:
-        exitCode = await runContainerStep(args)
+        exitCode = await runContainerStep(args as RunContainerStepArgs)
         return process.exit(exitCode)
       default:
         throw new Error(`Command not recognized: ${command}`)
     }
   } catch (error) {
     core.error(error as Error)
+    if (error instanceof Error && error.stack) {
+      core.debug(error.stack)
+    }
     process.exit(1)
   }
 }

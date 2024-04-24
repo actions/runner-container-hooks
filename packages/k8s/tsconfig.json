@@ -1,11 +1,13 @@
 {
     "extends": "../../tsconfig.json",
     "compilerOptions": {
-      "baseUrl": "./",
-      "outDir": "./lib",
-      "rootDir": "./src"
+      "rootDir": "..",
+      "outDir": "./lib"
     },
     "include": [
       "./src"
+    ],
+    "references": [
+      { "path": "../hooklib" }
     ]
   }

@@ -3,6 +3,7 @@ import * as io from '@actions/io'
 import * as k8s from '@kubernetes/client-node'
 import {
   JobContainerInfo,
+  ServiceContainerInfo,
   ContextPorts,
   PrepareJobArgs,
   writeToResponseFile
@@ -145,8 +146,8 @@ function generateResponseFile(
     const mainContainerContextPorts: ContextPorts = {}
     if (mainContainer?.ports) {
       for (const port of mainContainer.ports) {
-        mainContainerContextPorts[port.containerPort] =
-          mainContainerContextPorts.hostPort
+        if (port.hostPort)
+          mainContainerContextPorts[port.containerPort] = port.hostPort
       }
     }
 
@@ -164,7 +165,7 @@ function generateResponseFile(
       const ctxPorts: ContextPorts = {}
       if (c.ports?.length) {
         for (const port of c.ports) {
-          ctxPorts[port.containerPort] = port.hostPort
+          if (port.hostPort) ctxPorts[port.containerPort] = port.hostPort
         }
       }
 
@@ -189,7 +190,7 @@ async function copyExternalsToRoot(): Promise<void> {
 }
 
 export function createContainerSpec(
-  container: JobContainerInfo,
+  container: JobContainerInfo | ServiceContainerInfo,
   name: string,
   jobContainer = false,
   extension?: k8s.V1PodTemplateSpec
@@ -204,7 +205,7 @@ export function createContainerSpec(
     image: container.image,
     ports: containerPorts(container)
   } as k8s.V1Container
-  if (container.workingDirectory) {
+  if ('workingDirectory' in container) {
     podContainer.workingDir = container.workingDirectory
   }
 
@@ -212,16 +213,16 @@ export function createContainerSpec(
     podContainer.command = [container.entryPoint]
   }
 
-  if (container.entryPointArgs?.length > 0) {
+  if (container.entryPointArgs && container.entryPointArgs.length > 0) {
     podContainer.args = fixArgs(container.entryPointArgs)
   }
 
   podContainer.env = []
-  for (const [key, value] of Object.entries(
-    container['environmentVariables']
-  )) {
-    if (value && key !== 'HOME') {
-      podContainer.env.push({ name: key, value: value as string })
+  if (container.environmentVariables) {
+    for (const [key, value] of Object.entries(container.environmentVariables)) {
+      if (value && key !== 'HOME') {
+        podContainer.env.push({ name: key, value: value as string })
+      }
     }
   }
 

@@ -5,7 +5,7 @@ import {
   PrepareJobArgs,
   RunContainerStepArgs,
   RunScriptStepArgs
-} from 'hooklib/lib'
+} from 'hooklib'
 import { exit } from 'process'
 import {
   cleanupJob,
