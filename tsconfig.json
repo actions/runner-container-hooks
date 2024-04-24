@@ -1,8 +1,6 @@
 {
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig.json to read more about this file */
-    // "outDir": "./lib",
-    // "rootDir": "./packages",
     /* Basic Options */
     // "incremental": true,                   /* Enable incremental compilation */
     "target": "es5",                          /* Specify ECMAScript target version: 'ES3' (default), 'ES5', 'ES2015', 'ES2016', 'ES2017', 'ES2018', 'ES2019', 'ES2020', or 'ESNEXT'. */
@@ -11,8 +9,8 @@
     // "allowJs": true,                       /* Allow javascript files to be compiled. */
     // "checkJs": true,                       /* Report errors in .js files. */
     // "jsx": "preserve",                     /* Specify JSX code generation: 'preserve', 'react-native', or 'react'. */
-    "declaration": true,                   /* Generates corresponding '.d.ts' file. */
-    "declarationMap": true,                /* Generates a sourcemap for each corresponding '.d.ts' file. */
+    // "declaration": true,                   /* Generates corresponding '.d.ts' file. */
+    // "declarationMap": true,                /* Generates a sourcemap for each corresponding '.d.ts' file. */
     "sourceMap": true,                     /* Generates corresponding '.map' file. */
     // "outFile": "./",                       /* Concatenate and emit output to single file. */
     // "outDir": "./",                        /* Redirect output structure to the directory. */
@@ -67,7 +65,9 @@
     "skipLibCheck": true,                     /* Skip type checking of declaration files. */
     "forceConsistentCasingInFileNames": true, /* Disallow inconsistently-cased references to the same file. */
     "paths": {
-      "hooklib": ["hooklib/src"]
+      "hooklib":     ["hooklib/src"],
+      "kubehooks":   ["k8s/src"],
+      "dockerhooks": ["docker/src"]
     }
   }
 }
