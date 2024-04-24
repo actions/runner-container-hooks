@@ -88,5 +88,5 @@ export interface ContainerContext {
 }
 
 export interface ContextPorts {
-  [source: string]: string // source -> target
+  [source: number]: number // source -> target
 }
