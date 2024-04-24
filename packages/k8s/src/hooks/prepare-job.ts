@@ -165,8 +165,7 @@ function generateResponseFile(
       const ctxPorts: ContextPorts = {}
       if (c.ports?.length) {
         for (const port of c.ports) {
-          if (port.hostPort)
-            ctxPorts[port.containerPort] = port.hostPort
+          if (port.hostPort) ctxPorts[port.containerPort] = port.hostPort
         }
       }
 
@@ -191,7 +190,7 @@ async function copyExternalsToRoot(): Promise<void> {
 }
 
 export function createContainerSpec(
-  container: JobContainerInfo|ServiceContainerInfo,
+  container: JobContainerInfo | ServiceContainerInfo,
   name: string,
   jobContainer = false,
   extension?: k8s.V1PodTemplateSpec
@@ -206,7 +205,7 @@ export function createContainerSpec(
     image: container.image,
     ports: containerPorts(container)
   } as k8s.V1Container
-  if ("workingDirectory" in container) {
+  if ('workingDirectory' in container) {
     podContainer.workingDir = container.workingDirectory
   }
 
@@ -219,10 +218,8 @@ export function createContainerSpec(
   }
 
   podContainer.env = []
-  if(container.environmentVariables) {
-    for (const [key, value] of Object.entries(
-      container.environmentVariables
-    )) {
+  if (container.environmentVariables) {
+    for (const [key, value] of Object.entries(container.environmentVariables)) {
       if (value && key !== 'HOME') {
         podContainer.env.push({ name: key, value: value as string })
       }
