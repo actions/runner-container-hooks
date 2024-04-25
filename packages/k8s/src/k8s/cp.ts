@@ -34,10 +34,10 @@ export class Cp {
     const tmpFileName = await this.generateTmpFileName()
     const command = ['tar', 'xf', '-', '-C', tgtPath]
 
-    fs.existsSync(srcPath) ||
-      core.error(`Source path ${srcPath} does not exist`)
+    // fs.existsSync(srcPath) ||
+    //   core.error(`Source path ${srcPath} does not exist`)
 
-    core.info(`Archiving ${srcPath} to ${tmpFileName}`)
+    core.debug(`Archiving ${srcPath} to ${tmpFileName}`)
     await tar.c({ file: tmpFileName, cwd }, [srcPath])
 
     fs.existsSync(tmpFileName) ||
@@ -47,9 +47,9 @@ export class Cp {
     const errStream = new WritableStreamBuffer()
     const stdStream = new WritableStreamBuffer()
 
-    core.info('Exec cpToPod')
+    core.debug('Exec cpToPod')
 
-    await this.execInstance.exec(
+    const conn = await this.execInstance.exec(
       namespace,
       podName,
       containerName,
@@ -59,9 +59,9 @@ export class Cp {
       readStream,
       false,
       async ({ status }) => {
-        core.info(`cpToPod status: ${status}`)
-        core.info(`!!! exec stdstream: ${stdStream.getContentsAsString()}`)
-        core.info(`!!! exec errstream: ${errStream.getContentsAsString()}`)
+        core.debug(`cpToPod status: ${status}`)
+        core.debug(`!!! exec stdstream: ${stdStream.getContentsAsString()}`)
+        core.debug(`!!! exec errstream: ${errStream.getContentsAsString()}`)
 
         if (status === 'Failure' || errStream.size()) {
           throw new Error(
@@ -71,7 +71,11 @@ export class Cp {
       }
     )
 
-    core.info('Exec cpToPod done')
+    return await new Promise(resolve => {
+      conn.addEventListener('close', () => {
+        resolve()
+      })
+    })
   }
 
   async generateTmpFileName(): Promise<string> {
@@ -81,16 +85,12 @@ export class Cp {
     do {
       tmpFileName = `${tmpdir()}/${randomUUID()}`
 
-      core.info(`Checking if tmp file ${tmpFileName} exists`)
+      core.debug(`Checking if tmp file ${tmpFileName} exists`)
 
       try {
         await fs.promises.access(tmpFileName, fs.constants.W_OK)
-
-        core.info('Tmp file already exists')
+        core.debug('Tmp file already exists')
       } catch (err) {
-        core.info(
-          `Tmp file does not exist. We figured out that by error : ${err}`
-        )
         return tmpFileName
       }
       i++

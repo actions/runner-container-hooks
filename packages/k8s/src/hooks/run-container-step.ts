@@ -18,17 +18,6 @@ import {
   readExtensionFromFile
 } from '../k8s/utils'
 import { JOB_CONTAINER_EXTENSION_NAME, JOB_CONTAINER_NAME } from './constants'
-import { readdirSync } from 'fs'
-
-export function listFilesSync(): void {
-  const directoryPath = '/home/runner/_work/_temp'
-  try {
-    const files = readdirSync(directoryPath)
-    core.info(`Files in ${directoryPath}: ${files}`)
-  } catch (err) {
-    core.error(`Error reading directory: ${err}`)
-  }
-}
 
 export async function runContainerStep(
   stepContainer: RunContainerStepArgs
@@ -40,7 +29,6 @@ export async function runContainerStep(
   core.debug(
     `!!!!!!! Running container step with args: ${JSON.stringify(stepContainer)}`
   )
-  listFilesSync()
 
   let secretName: string | undefined = undefined
   if (stepContainer.environmentVariables) {

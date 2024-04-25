@@ -29,7 +29,6 @@ import {
 import { CONTAINER_EXTENSION_PREFIX, JOB_CONTAINER_NAME } from './constants'
 import { promisify } from 'util'
 import { exec as execCallback } from 'child_process'
-import { listFilesSync } from './run-container-step';
 const exec = promisify(execCallback)
 
 export async function prepareJob(
@@ -42,11 +41,6 @@ export async function prepareJob(
   if (!args.container) {
     throw new Error('Job Container is required.')
   }
-
-  core.info('!!!! Preparing job beginning ')
-  listFilesSync()
-
-  await archiveWorkspaceContents()
 
   await prunePods()
 
@@ -94,6 +88,11 @@ export async function prepareJob(
   if (!container && !services?.length) {
     throw new Error('No containers exist, skipping hook invocation')
   }
+
+  await archiveWorkspaceContents(
+    '/home/runner/_work',
+    'workspace-archive.tar.gz'
+  )
 
   core.debug('creating pod')
   let createdPod: k8s.V1Pod | undefined = undefined
@@ -149,8 +148,7 @@ export async function prepareJob(
 
   generateResponseFile(responseFile, args, createdPod, isAlpine)
 
-  core.info('!!!! Preparing job end ')
-  listFilesSync()
+  core.debug('!!!! Preparing job end ')
 }
 
 function generateResponseFile(
@@ -287,12 +285,15 @@ export function createContainerSpec(
   return podContainer
 }
 
-async function archiveWorkspaceContents(): Promise<void> {
+async function archiveWorkspaceContents(
+  sourceDirectory,
+  archiveName
+): Promise<void> {
   try {
     core.info('Archiving workspace contents...')
-    const sourceDirectory = '/home/runner/_work' // Define the source directory to archive
+    //const sourceDirectory = '/home/runner/_work' // Define the source directory to archive
     const targetDirectory = '/nginx' // Define where the archive should be placed
-    const archiveName = 'workspace-archive.tar.gz' // Define the name of the output archive file
+    //const archiveName = 'workspace-archive.tar.gz' // Define the name of the output archive file
 
     // Ensure the target directory exists; create it if not
     await io.mkdirP(targetDirectory)

@@ -20,6 +20,7 @@ import {
 import { execSync } from 'child_process'
 import { readFile } from 'fs'
 import * as localCp from './cp'
+import { dirname, parse } from 'path'
 
 const kc = new k8s.KubeConfig()
 kc.loadFromDefault()
@@ -97,7 +98,7 @@ export async function createPod(
   appPod.spec.containers = containers
   appPod.spec.restartPolicy = 'Never'
   appPod.spec.initContainers = [
-    createInitContainerForDownloadingAndUnarchiving('/home/runner/_work')
+    createInitContainerForDownloadingAndUnarchiving()
   ]
 
   if (!useKubeScheduler()) {
@@ -234,7 +235,7 @@ export async function copyToPod(
   try {
     const cp = new localCp.Cp(kc)
 
-    core.info(
+    core.debug(
       `Copying to pod ${podName} container ${containerName} from ${sourcePath} to ${targetPath} in namespace ${namespace()}`
     )
 
@@ -242,14 +243,14 @@ export async function copyToPod(
       namespace(),
       podName,
       containerName,
-      sourcePath,
-      targetPath
+      parse(sourcePath).base,
+      targetPath,
+      dirname(sourcePath)
     )
   } catch (error) {
     core.error(`Error copying to pod: ${error}`)
     throw new Error('Error copying to pod')
   }
-  core.info('exit from copyToPod')
 }
 
 export async function execPodStep(
@@ -659,9 +660,7 @@ export async function getPodByName(name): Promise<k8s.V1Pod> {
   return body
 }
 
-function createInitContainerForDownloadingAndUnarchiving(
-  targetDirectory: string
-): k8s.V1Container {
+function createInitContainerForDownloadingAndUnarchiving(): k8s.V1Container {
   const archiveUrl = `http://${getCurrentPodIp()}/workspace-archive.tar.gz`
   const initContainer = new k8s.V1Container()
   initContainer.name = 'download-and-unarchive-init'
@@ -669,7 +668,7 @@ function createInitContainerForDownloadingAndUnarchiving(
   initContainer.command = ['/bin/sh', '-c']
   // initContainer.args = [``]
   initContainer.args = [
-    `set -e; cd /home/runner/_work; wget $WORKSPACE_ARCHIVE_URL; tar -xzvf workspace-archive.tar.gz;`
+    `set -e; cd /__w; wget $WORKSPACE_ARCHIVE_URL; tar -xzvf workspace-archive.tar.gz;`
   ]
   initContainer.env = [
     {
@@ -680,8 +679,8 @@ function createInitContainerForDownloadingAndUnarchiving(
 
   initContainer.volumeMounts = [
     {
-      name: 'work', // Make sure this volume is defined in your Pod spec
-      mountPath: targetDirectory
+      name: POD_VOLUME_NAME,
+      mountPath: '/__w'
     }
   ]
 
