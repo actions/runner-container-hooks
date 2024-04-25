@@ -59,6 +59,10 @@ export function containerVolumes(
   mounts.push(
     {
       name: POD_VOLUME_NAME,
+      mountPath: '/whole_work_volume/_work'
+    },
+    {
+      name: POD_VOLUME_NAME,
       mountPath: '/__e',
       subPath: 'externals'
     },

@@ -1,11 +1,8 @@
 import * as fs from 'fs'
 import { WritableStreamBuffer } from 'stream-buffers'
 import * as tar from 'tar'
-//import { KubeConfig } from './config'
 import * as core from '@actions/core'
 import { tmpdir } from 'os'
-//import { promises as fs, constants as fsConstants } from 'fs';
-
 import * as k8s from '@kubernetes/client-node'
 import { randomUUID } from 'crypto'
 
@@ -31,17 +28,23 @@ export class Cp {
     tgtPath: string,
     cwd?: string
   ): Promise<void> {
+    // Generate a temporary file for the tar archive.
     const tmpFileName = await this.generateTmpFileName()
     const command = ['tar', 'xf', '-', '-C', tgtPath]
-
-    // fs.existsSync(srcPath) ||
-    //   core.error(`Source path ${srcPath} does not exist`)
 
     core.debug(`Archiving ${srcPath} to ${tmpFileName}`)
     await tar.c({ file: tmpFileName, cwd }, [srcPath])
 
-    fs.existsSync(tmpFileName) ||
+    // Ensure the tar file exists.
+    if (!fs.existsSync(tmpFileName)) {
       core.error(`Tar file ${tmpFileName} does not exist`)
+      throw new Error(`Tar file ${tmpFileName} does not exist`)
+    }
+
+    // Get the file size for logging purposes.
+    const stats = fs.statSync(tmpFileName)
+    const fileSizeInBytes = stats.size
+    core.debug(`Transferring: ${fileSizeInBytes.toLocaleString()} Bytes`)
 
     const readStream = fs.createReadStream(tmpFileName)
     const errStream = new WritableStreamBuffer()
@@ -49,30 +52,40 @@ export class Cp {
 
     core.debug('Exec cpToPod')
 
-    const conn = await this.execInstance.exec(
-      namespace,
-      podName,
-      containerName,
-      command,
-      stdStream,
-      errStream,
-      readStream,
-      false,
-      async ({ status }) => {
-        core.debug(`cpToPod status: ${status}`)
-        core.debug(`!!! exec stdstream: ${stdStream.getContentsAsString()}`)
-        core.debug(`!!! exec errstream: ${errStream.getContentsAsString()}`)
+    // Refactor this part to wait for the status in the callback
+    return await new Promise<void>(async (resolve, reject) => {
+      ;(
+        await this.execInstance.exec(
+          namespace,
+          podName,
+          containerName,
+          command,
+          stdStream,
+          errStream,
+          readStream,
+          false,
+          async ({ status }) => {
+            // this never happens
+            core.debug(`cpToPod status: ${status}`)
+            core.debug(`!!! exec stdstream: ${stdStream.getContentsAsString()}`)
+            core.debug(`!!! exec errstream: ${errStream.getContentsAsString()}`)
 
-        if (status === 'Failure' || errStream.size()) {
-          throw new Error(
-            `Error from cpToPod - details: \n ${errStream.getContentsAsString()}`
-          )
-        }
-      }
-    )
-
-    return await new Promise(resolve => {
-      conn.addEventListener('close', () => {
+            if (status === 'Failure' || errStream.size()) {
+              reject(
+                new Error(
+                  `Error from cpToPod - details: \n ${errStream.getContentsAsString()}`
+                )
+              )
+            } else {
+              resolve()
+            }
+          }
+        )
+      ).addEventListener('close', () => {
+        core.debug('Done copying files to pod')
+        // Possible rejection or resolution based on additional logic (e.g., checking if a resolution or rejection already occurred).
+        core.debug(`!!! exec std stream: ${stdStream.getContentsAsString()}`)
+        core.debug(`!!! exec err stream: ${errStream.getContentsAsString()}`)
         resolve()
       })
     })

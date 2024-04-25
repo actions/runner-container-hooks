@@ -17,8 +17,6 @@ import {
   useKubeScheduler,
   fixArgs
 } from './utils'
-import { execSync } from 'child_process'
-import { readFile } from 'fs'
 import * as localCp from './cp'
 import { dirname, parse } from 'path'
 
@@ -97,9 +95,6 @@ export async function createPod(
   appPod.spec = new k8s.V1PodSpec()
   appPod.spec.containers = containers
   appPod.spec.restartPolicy = 'Never'
-  appPod.spec.initContainers = [
-    createInitContainerForDownloadingAndUnarchiving()
-  ]
 
   if (!useKubeScheduler()) {
     appPod.spec.nodeName = await getCurrentNodeName()
@@ -659,42 +654,3 @@ export async function getPodByName(name): Promise<k8s.V1Pod> {
   const { body } = await k8sApi.readNamespacedPod(name, namespace())
   return body
 }
-
-function createInitContainerForDownloadingAndUnarchiving(): k8s.V1Container {
-  const archiveUrl = `http://${getCurrentPodIp()}/workspace-archive.tar.gz`
-  const initContainer = new k8s.V1Container()
-  initContainer.name = 'download-and-unarchive-init'
-  initContainer.image = 'busybox' // Or any other suitable base image that includes curl and tar
-  initContainer.command = ['/bin/sh', '-c']
-  // initContainer.args = [``]
-  initContainer.args = [
-    `set -e; cd /__w; wget $WORKSPACE_ARCHIVE_URL; tar -xzvf workspace-archive.tar.gz;`
-  ]
-  initContainer.env = [
-    {
-      name: 'WORKSPACE_ARCHIVE_URL',
-      value: archiveUrl
-    }
-  ]
-
-  initContainer.volumeMounts = [
-    {
-      name: POD_VOLUME_NAME,
-      mountPath: '/__w'
-    }
-  ]
-
-  return initContainer
-}
-
-function getCurrentPodIp(): string | null {
-  try {
-    // execSync returns a Buffer, so toString() converts it to a String
-    const stdout = execSync('hostname -i').toString()
-    return stdout.trim()
-  } catch (error) {
-    core.error(`Error retrieving Pod IP Address: ${error}`)
-    throw new Error('Error retrieving Pod IP Address')
-  }
-}
-

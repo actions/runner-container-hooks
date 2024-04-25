@@ -14,7 +14,8 @@ import {
   isPodContainerAlpine,
   prunePods,
   waitForPodPhases,
-  getPrepareJobTimeoutSeconds
+  getPrepareJobTimeoutSeconds,
+  copyToPod
 } from '../k8s'
 import {
   containerVolumes,
@@ -89,11 +90,6 @@ export async function prepareJob(
     throw new Error('No containers exist, skipping hook invocation')
   }
 
-  await archiveWorkspaceContents(
-    '/home/runner/_work',
-    'workspace-archive.tar.gz'
-  )
-
   core.debug('creating pod')
   let createdPod: k8s.V1Pod | undefined = undefined
   try {
@@ -128,6 +124,14 @@ export async function prepareJob(
     await prunePods()
     throw new Error(`pod failed to come online with error: ${err}`)
   }
+
+  core.debug('Writing externals to pod')
+  await copyToPod(
+    createdPod.metadata.name,
+    JOB_CONTAINER_NAME,
+    '/home/runner/_work',
+    '/whole_work_volume/'
+  )
 
   core.debug('Job pod is ready for traffic')
 
@@ -283,30 +287,4 @@ export function createContainerSpec(
   core.debug(`Merged container spec: ${JSON.stringify(podContainer)}`)
 
   return podContainer
-}
-
-async function archiveWorkspaceContents(
-  sourceDirectory,
-  archiveName
-): Promise<void> {
-  try {
-    core.info('Archiving workspace contents...')
-    //const sourceDirectory = '/home/runner/_work' // Define the source directory to archive
-    const targetDirectory = '/nginx' // Define where the archive should be placed
-    //const archiveName = 'workspace-archive.tar.gz' // Define the name of the output archive file
-
-    // Ensure the target directory exists; create it if not
-    await io.mkdirP(targetDirectory)
-
-    // Construct and run the command to compress and move the archive
-    const command = `tar -czf ${targetDirectory}/${archiveName} -C ${sourceDirectory} .`
-    await exec(command)
-
-    core.info(
-      `Workspace content archived successfully to ${targetDirectory}/${archiveName}`
-    )
-  } catch (error) {
-    core.error(`Failed to archive workspace: ${error}`)
-    throw error // Rethrow to handle the error outside, if necessary
-  }
 }
