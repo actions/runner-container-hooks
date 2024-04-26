@@ -126,7 +126,14 @@ export async function createPod(
     mergePodSpecWithOptions(appPod.spec, extension.spec)
   }
 
-  const { body } = await k8sApi.createNamespacedPod(namespace(), appPod)
+  core.debug(`Creating pod with manifest: ${JSON.stringify(appPod)}`)
+  const { response, body } = await k8sApi.createNamespacedPod(
+    namespace(),
+    appPod
+  )
+
+  core.debug(`Pod creation response: ${JSON.stringify(response)}`)
+
   return body
 }
 
@@ -227,13 +234,13 @@ export async function copyToPod(
   sourcePath: string,
   targetPath: string
 ): Promise<void> {
+  const startTime = Date.now()
   try {
     const cp = new localCp.Cp(kc)
 
     core.debug(
       `Copying to pod ${podName} container ${containerName} from ${sourcePath} to ${targetPath} in namespace ${namespace()}`
     )
-
     await cp.cpToPod(
       namespace(),
       podName,
@@ -246,6 +253,10 @@ export async function copyToPod(
     core.error(`Error copying to pod: ${error}`)
     throw new Error('Error copying to pod')
   }
+
+  const endTime = Date.now()
+  const elapsedTime = endTime - startTime
+  core.info(`Copy completed in ${elapsedTime} milliseconds`)
 }
 
 export async function execPodStep(

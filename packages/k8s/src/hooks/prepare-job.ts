@@ -28,16 +28,13 @@ import {
   fixArgs
 } from '../k8s/utils'
 import { CONTAINER_EXTENSION_PREFIX, JOB_CONTAINER_NAME } from './constants'
-import { promisify } from 'util'
-import { exec as execCallback } from 'child_process'
-const exec = promisify(execCallback)
 
 export async function prepareJob(
   args: PrepareJobArgs,
   responseFile
 ): Promise<void> {
   core.debug(`Preparing job with args: ${JSON.stringify(args)}`)
-  core.info('USING CUSTOM HOOK!!!!')
+  core.debug('USING CUSTOM HOOK v2 !!!!')
 
   if (!args.container) {
     throw new Error('Job Container is required.')

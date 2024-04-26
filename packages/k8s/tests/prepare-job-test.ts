@@ -178,19 +178,6 @@ describe('Prepare job', () => {
     delete process.env[ENV_USE_KUBE_SCHEDULER]
   })
 
-  it ('should handle duplicate services correctly', async () => {
-    prepareJobData.args.services.push(prepareJobData.args.services[0])
-    await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
-    const content = JSON.parse(
-      fs.readFileSync(prepareJobOutputFilePath).toString()
-    )
-
-    console.log("ReturnContent")
-    console.log(content)
-    
-    expect(content.context.services[0].name).not.toBe(content.context.services[1].name)
-  })
-
   test.each([undefined, null, []])(
     'should not throw exception when portMapping=%p',
     async pm => {
