@@ -13,8 +13,7 @@ import {
 import {
   PodPhase,
   mergePodSpecWithOptions,
-  mergeObjectMeta,
-  useKubeScheduler,
+  mergeObjectMeta,  
   fixArgs
 } from './utils'
 import * as localCp from './cp'
@@ -159,10 +158,6 @@ export async function createJob(
   job.spec.template.metadata.annotations = {}
   job.spec.template.spec.containers = [container]
   job.spec.template.spec.restartPolicy = 'Never'
-
-  if (!useKubeScheduler()) {
-    job.spec.template.spec.nodeName = await getCurrentNodeName()
-  }
 
   const claimName = getVolumeClaimName()
   job.spec.template.spec.volumes = [

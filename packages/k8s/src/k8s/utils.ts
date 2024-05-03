@@ -278,10 +278,6 @@ export function readExtensionFromFile(): k8s.V1PodTemplateSpec | undefined {
   return doc as k8s.V1PodTemplateSpec
 }
 
-export function useKubeScheduler(): boolean {
-  return process.env[ENV_USE_KUBE_SCHEDULER] === 'true'
-}
-
 export enum PodPhase {
   PENDING = 'Pending',
   RUNNING = 'Running',
