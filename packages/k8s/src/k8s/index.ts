@@ -96,9 +96,6 @@ export async function createPod(
   appPod.spec.containers = containers
   appPod.spec.restartPolicy = 'Never'
 
-  if (!useKubeScheduler()) {
-    appPod.spec.nodeName = await getCurrentNodeName()
-  }
 
   //const claimName = getVolumeClaimName()
   appPod.spec.volumes = [
