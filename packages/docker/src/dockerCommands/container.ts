@@ -54,7 +54,11 @@ export async function createContainer(
   ]
   for (const mountVolume of mountVolumes) {
     let sourceVolumePath = mountVolume.sourceVolumePath
-    if (sourceVolumePath === '/var/run/docker.sock' && env.DOCKER_HOST) {
+    if (
+      sourceVolumePath === '/var/run/docker.sock' &&
+      env.DOCKER_HOST &&
+      env.DOCKER_HOST.startsWith('unix://')
+    ) {
       sourceVolumePath = env.DOCKER_HOST.replace('unix://', '')
     }
     dockerArgs.push(
@@ -420,7 +424,11 @@ export async function containerRun(
   ]
   for (const mountVolume of mountVolumes) {
     let sourceVolumePath = mountVolume.sourceVolumePath
-    if (sourceVolumePath === '/var/run/docker.sock' && env.DOCKER_HOST) {
+    if (
+      sourceVolumePath === '/var/run/docker.sock' &&
+      env.DOCKER_HOST &&
+      env.DOCKER_HOST.startsWith('unix://')
+    ) {
       sourceVolumePath = env.DOCKER_HOST.replace('unix://', '')
     }
     dockerArgs.push(
