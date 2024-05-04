@@ -53,9 +53,15 @@ export async function createContainer(
     ...(args.systemMountVolumes || [])
   ]
   for (const mountVolume of mountVolumes) {
-    dockerArgs.push(
-      `-v=${mountVolume.sourceVolumePath}:${mountVolume.targetVolumePath}`
-    )
+    if (mountVolume.sourceVolumePath === '/var/run/docker.sock') {
+      dockerArgs.push(
+        `-v=${env.DOCKER_HOST || mountVolume.sourceVolumePath}:${mountVolume.targetVolumePath}`
+      )
+    } else {
+      dockerArgs.push(
+        `-v=${mountVolume.sourceVolumePath}:${mountVolume.targetVolumePath}`
+      )
+    }
   }
   if (args.entryPoint) {
     dockerArgs.push(`--entrypoint`)
@@ -413,12 +419,19 @@ export async function containerRun(
     ...(args.systemMountVolumes || [])
   ]
   for (const mountVolume of mountVolumes) {
-    dockerArgs.push(`-v`)
-    dockerArgs.push(
-      `${mountVolume.sourceVolumePath}:${mountVolume.targetVolumePath}${
-        mountVolume.readOnly ? ':ro' : ''
-      }`
-    )
+    if (mountVolume.sourceVolumePath === '/var/run/docker.sock') {
+      dockerArgs.push(
+        `-v=${env.DOCKER_HOST || mountVolume.sourceVolumePath}:${mountVolume.targetVolumePath}${
+          mountVolume.readOnly ? ':ro' : ''
+        }`
+      )
+    } else {
+      dockerArgs.push(
+        `-v=${mountVolume.sourceVolumePath}:${mountVolume.targetVolumePath}${
+          mountVolume.readOnly ? ':ro' : ''
+        }`
+      )
+    }
   }
 
   if (args['entryPoint']) {
