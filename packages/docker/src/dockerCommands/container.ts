@@ -61,11 +61,7 @@ export async function createContainer(
     ) {
       sourceVolumePath = env.DOCKER_HOST.replace('unix://', '')
     }
-    dockerArgs.push(
-      `-v=${sourceVolumePath}:${mountVolume.targetVolumePath}${
-        mountVolume.readOnly ? ':ro' : ''
-      }`
-    )
+    dockerArgs.push(`-v=${sourceVolumePath}:${mountVolume.targetVolumePath}`)
   }
   if (args.entryPoint) {
     dockerArgs.push(`--entrypoint`)
@@ -431,8 +427,9 @@ export async function containerRun(
     ) {
       sourceVolumePath = env.DOCKER_HOST.replace('unix://', '')
     }
+    dockerArgs.push(`-v`)
     dockerArgs.push(
-      `-v=${sourceVolumePath}:${mountVolume.targetVolumePath}${
+      `${sourceVolumePath}:${mountVolume.targetVolumePath}${
         mountVolume.readOnly ? ':ro' : ''
       }`
     )
