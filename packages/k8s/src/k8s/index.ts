@@ -17,9 +17,10 @@ import {
   useKubeScheduler,
   fixArgs
 } from './utils'
+import * as localCp from './cp'
+import { dirname, parse } from 'path'
 
 const kc = new k8s.KubeConfig()
-
 kc.loadFromDefault()
 
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api)
@@ -95,15 +96,12 @@ export async function createPod(
   appPod.spec.containers = containers
   appPod.spec.restartPolicy = 'Never'
 
-  if (!useKubeScheduler()) {
-    appPod.spec.nodeName = await getCurrentNodeName()
-  }
 
-  const claimName = getVolumeClaimName()
+  //const claimName = getVolumeClaimName()
   appPod.spec.volumes = [
     {
       name: 'work',
-      persistentVolumeClaim: { claimName }
+      emptyDir: {}
     }
   ]
 
@@ -125,7 +123,14 @@ export async function createPod(
     mergePodSpecWithOptions(appPod.spec, extension.spec)
   }
 
-  const { body } = await k8sApi.createNamespacedPod(namespace(), appPod)
+  core.debug(`Creating pod with manifest: ${JSON.stringify(appPod)}`)
+  const { response, body } = await k8sApi.createNamespacedPod(
+    namespace(),
+    appPod
+  )
+
+  core.debug(`Pod creation response: ${JSON.stringify(response)}`)
+
   return body
 }
 
@@ -218,6 +223,37 @@ export async function deletePod(podName: string): Promise<void> {
     undefined,
     0
   )
+}
+
+export async function copyToPod(
+  podName: string,
+  containerName: string,
+  sourcePath: string,
+  targetPath: string
+): Promise<void> {
+  const startTime = Date.now()
+  try {
+    const cp = new localCp.Cp(kc)
+
+    core.debug(
+      `Copying to pod ${podName} container ${containerName} from ${sourcePath} to ${targetPath} in namespace ${namespace()}`
+    )
+    await cp.cpToPod(
+      namespace(),
+      podName,
+      containerName,
+      parse(sourcePath).base,
+      targetPath,
+      dirname(sourcePath)
+    )
+  } catch (error) {
+    core.error(`Error copying to pod: ${error}`)
+    throw new Error('Error copying to pod')
+  }
+
+  const endTime = Date.now()
+  const elapsedTime = endTime - startTime
+  core.info(`Copy completed in ${elapsedTime} milliseconds`)
 }
 
 export async function execPodStep(

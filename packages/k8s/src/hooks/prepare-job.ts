@@ -14,7 +14,8 @@ import {
   isPodContainerAlpine,
   prunePods,
   waitForPodPhases,
-  getPrepareJobTimeoutSeconds
+  getPrepareJobTimeoutSeconds,
+  copyToPod
 } from '../k8s'
 import {
   containerVolumes,
@@ -32,16 +33,25 @@ export async function prepareJob(
   args: PrepareJobArgs,
   responseFile
 ): Promise<void> {
+  core.debug(`Preparing job with args: ${JSON.stringify(args)}`)
+  core.debug('USING CUSTOM HOOK v2 !!!!')
+
   if (!args.container) {
     throw new Error('Job Container is required.')
   }
 
   await prunePods()
 
+  core.debug('Pruned old pods')
+
+  core.debug('read extension file ')
   const extension = readExtensionFromFile()
+
+  core.debug('copyExternalsToRoot')
   await copyExternalsToRoot()
 
   let container: k8s.V1Container | undefined = undefined
+
   if (args.container?.image) {
     core.debug(`Using image '${args.container.image}' for job image`)
     container = createContainerSpec(
@@ -53,15 +63,23 @@ export async function prepareJob(
   }
 
   let services: k8s.V1Container[] = []
+  const duplicates = new Map<string, number>()
+
   if (args.services?.length) {
     services = args.services.map(service => {
       core.debug(`Adding service '${service.image}' to pod definition`)
-      return createContainerSpec(
-        service,
-        generateContainerName(service.image),
-        false,
-        extension
-      )
+
+      let name = generateContainerName(service.image)
+
+      const ind = duplicates.get(name)
+      if (ind === undefined) {
+        duplicates.set(name, 0)
+      } else {
+        duplicates.set(name, ind + 1)
+        name = `${name}${ind + 1}`
+      }
+
+      return createContainerSpec(service, name, false, extension)
     })
   }
 
@@ -69,6 +87,7 @@ export async function prepareJob(
     throw new Error('No containers exist, skipping hook invocation')
   }
 
+  core.debug('creating pod')
   let createdPod: k8s.V1Pod | undefined = undefined
   try {
     createdPod = await createPod(
@@ -103,6 +122,14 @@ export async function prepareJob(
     throw new Error(`pod failed to come online with error: ${err}`)
   }
 
+  core.debug('Writing externals to pod')
+  await copyToPod(
+    createdPod.metadata.name,
+    JOB_CONTAINER_NAME,
+    '/home/runner/_work',
+    '/whole_work_volume/'
+  )
+
   core.debug('Job pod is ready for traffic')
 
   let isAlpine = false
@@ -120,6 +147,8 @@ export async function prepareJob(
   }
   core.debug(`Setting isAlpine to ${isAlpine}`)
   generateResponseFile(responseFile, createdPod, isAlpine)
+
+  core.debug('!!!! Preparing job end ')
 }
 
 function generateResponseFile(
@@ -233,14 +262,21 @@ export function createContainerSpec(
   if (!extension) {
     return podContainer
   }
+  core.debug(
+    `Applying extensions to container spec ${JSON.stringify(extension)}`
+  )
 
   const from = extension.spec?.containers?.find(
     c => c.name === CONTAINER_EXTENSION_PREFIX + name
   )
 
+  core.debug(`Found extension for container ${name}: ${from}`)
+
   if (from) {
     mergeContainerWithOptions(podContainer, from)
   }
+
+  core.debug(`Merged container spec: ${JSON.stringify(podContainer)}`)
 
   return podContainer
 }

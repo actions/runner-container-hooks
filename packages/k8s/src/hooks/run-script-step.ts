@@ -1,16 +1,26 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import * as fs from 'fs'
 import * as core from '@actions/core'
+import { dirname } from 'path'
 import { RunScriptStepArgs } from 'hooklib'
-import { execPodStep } from '../k8s'
+import { execPodStep, copyToPod } from '../k8s'
 import { writeEntryPointScript } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
+
+process.on('unhandledRejection', (reason, promise) => {
+  core.error(`Unhandled Rejection at: ${promise}, reason: ${reason}`)
+  // Handle the rejection or log more details here
+})
 
 export async function runScriptStep(
   args: RunScriptStepArgs,
   state,
   responseFile
 ): Promise<void> {
+  core.debug(
+    `!!!!!!!!!!!!!! Running script step with args: ${JSON.stringify(args)}`
+  )
+
   const { entryPoint, entryPointArgs, environmentVariables } = args
   const { containerPath, runnerPath } = writeEntryPointScript(
     args.workingDirectory,
@@ -23,6 +33,18 @@ export async function runScriptStep(
   args.entryPoint = 'sh'
   args.entryPointArgs = ['-e', containerPath]
   try {
+    core.debug('Starting script step')
+
+    await copyToPod(
+      state.jobPod,
+      JOB_CONTAINER_NAME,
+      '/home/runner/_work/_temp',
+      '/__w/'
+    )
+
+    //await new Promise(resolve => setTimeout(resolve, 600000))
+
+    core.debug('! Running script by execPodStep')
     await execPodStep(
       [args.entryPoint, ...args.entryPointArgs],
       state.jobPod,
