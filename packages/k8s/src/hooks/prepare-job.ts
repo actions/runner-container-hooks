@@ -119,11 +119,12 @@ export async function prepareJob(
     throw new Error(`failed to determine if the pod is alpine: ${message}`)
   }
   core.debug(`Setting isAlpine to ${isAlpine}`)
-  generateResponseFile(responseFile, createdPod, isAlpine)
+  generateResponseFile(responseFile, args, createdPod, isAlpine)
 }
 
 function generateResponseFile(
   responseFile: string,
+  args: PrepareJobArgs,
   appPod: k8s.V1Pod,
   isAlpine
 ): void {
@@ -156,24 +157,27 @@ function generateResponseFile(
     }
   }
 
-  const serviceContainers = appPod.spec?.containers.filter(
-    c => c.name !== JOB_CONTAINER_NAME
-  )
-  if (serviceContainers?.length) {
-    response.context['services'] = serviceContainers.map(c => {
-      const ctxPorts: ContextPorts = {}
-      if (c.ports?.length) {
-        for (const port of c.ports) {
-          ctxPorts[port.containerPort] = port.hostPort
-        }
-      }
+  if (args.services?.length) {
+    const serviceContainerNames =
+      args.services?.map(s => generateContainerName(s.image)) || []
 
-      return {
-        image: c.image,
-        ports: ctxPorts
-      }
-    })
+    response.context['services'] = appPod?.spec?.containers
+      ?.filter(c => serviceContainerNames.includes(c.name))
+      .map(c => {
+        const ctxPorts: ContextPorts = {}
+        if (c.ports?.length) {
+          for (const port of c.ports) {
+            ctxPorts[port.containerPort] = port.hostPort
+          }
+        }
+
+        return {
+          image: c.image,
+          ports: ctxPorts
+        }
+      })
   }
+
   writeToResponseFile(responseFile, JSON.stringify(response))
 }
 
