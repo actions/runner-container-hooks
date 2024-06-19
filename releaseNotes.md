@@ -1,16 +1,15 @@
-## Features
-
-- Extend the hook extension to allow service container modifications [#134]
+<!-- ## Features -->
 
 ## Bugs
 
-- Mount /github/workflow to docker action pods [#137]
-- Read logs from failed job container [#135]
+- Skip writing extension containers in output context file [#154]
 
 ## Misc
 
-- Bump jose from 4.11.4 to 4.15.5 [#142]
-- ADR-0134 - superseding ADR-0096 [#136]
+- Bump ws from 7.5.7 to 7.5.10 in /packages/docker [#170]
+- Bump braces from 3.0.2 to 3.0.3 in /packages/docker [#171]
+- Bump tar from 6.1.11 to 6.2.1 in /packages/k8s [#156]
+
 
 ## SHA-256 Checksums
 
