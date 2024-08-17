@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import * as fs from 'fs'
 import * as core from '@actions/core'
+import { dirname } from 'path'
 import { RunScriptStepArgs } from 'hooklib'
-import { execPodStep } from '../k8s'
+import { execPodStep, copyToPod } from '../k8s'
 import { writeEntryPointScript } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
 
@@ -23,6 +24,16 @@ export async function runScriptStep(
   args.entryPoint = 'sh'
   args.entryPointArgs = ['-e', containerPath]
   try {
+    core.debug('Starting script step')
+
+    await copyToPod(
+      state.jobPod,
+      JOB_CONTAINER_NAME,
+      '/home/runner/_work/_temp',
+      '/__w/'
+    )
+
+    core.debug('Running script by execPodStep')
     await execPodStep(
       [args.entryPoint, ...args.entryPointArgs],
       state.jobPod,
