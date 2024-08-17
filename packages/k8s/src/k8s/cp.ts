@@ -67,8 +67,8 @@ export class Cp {
           async ({ status }) => {
             // this never happens
             core.debug(`cpToPod status: ${status}`)
-            core.debug(`!!! exec stdstream: ${stdStream.getContentsAsString()}`)
-            core.debug(`!!! exec errstream: ${errStream.getContentsAsString()}`)
+            core.debug(`exec stdstream: ${stdStream.getContentsAsString()}`)
+            core.debug(`exec errstream: ${errStream.getContentsAsString()}`)
 
             if (status === 'Failure' || errStream.size()) {
               reject(
@@ -84,8 +84,8 @@ export class Cp {
       ).addEventListener('close', () => {
         core.debug('Done copying files to pod')
         // Possible rejection or resolution based on additional logic (e.g., checking if a resolution or rejection already occurred).
-        core.debug(`!!! exec std stream: ${stdStream.getContentsAsString()}`)
-        core.debug(`!!! exec err stream: ${errStream.getContentsAsString()}`)
+        core.debug(`exec std stream: ${stdStream.getContentsAsString()}`)
+        core.debug(`exec err stream: ${errStream.getContentsAsString()}`)
         resolve()
       })
     })

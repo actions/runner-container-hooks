@@ -34,15 +34,12 @@ export async function prepareJob(
   responseFile
 ): Promise<void> {
   core.debug(`Preparing job with args: ${JSON.stringify(args)}`)
-  core.debug('USING CUSTOM HOOK v2 !!!!')
 
   if (!args.container) {
     throw new Error('Job Container is required.')
   }
 
   await prunePods()
-
-  core.debug('Pruned old pods')
 
   core.debug('read extension file ')
   const extension = readExtensionFromFile()
@@ -149,7 +146,7 @@ export async function prepareJob(
 
   generateResponseFile(responseFile, args, createdPod, isAlpine)
 
-  core.debug('!!!! Preparing job end ')
+  core.debug('Preparing job end ')
 }
 
 function generateResponseFile(

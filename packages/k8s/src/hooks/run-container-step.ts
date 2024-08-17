@@ -26,10 +26,6 @@ export async function runContainerStep(
     throw new Error('Building container actions is not currently supported')
   }
 
-  core.debug(
-    `!!!!!!! Running container step with args: ${JSON.stringify(stepContainer)}`
-  )
-
   let secretName: string | undefined = undefined
   if (stepContainer.environmentVariables) {
     secretName = await createSecretForEnvs(stepContainer.environmentVariables)

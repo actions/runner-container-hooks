@@ -12,10 +12,6 @@ export async function runScriptStep(
   state,
   responseFile
 ): Promise<void> {
-  core.debug(
-    `!!!!!!!!!!!!!! Running script step with args: ${JSON.stringify(args)}`
-  )
-
   const { entryPoint, entryPointArgs, environmentVariables } = args
   const { containerPath, runnerPath } = writeEntryPointScript(
     args.workingDirectory,
@@ -37,9 +33,7 @@ export async function runScriptStep(
       '/__w/'
     )
 
-    //await new Promise(resolve => setTimeout(resolve, 600000))
-
-    core.debug('! Running script by execPodStep')
+    core.debug('Running script by execPodStep')
     await execPodStep(
       [args.entryPoint, ...args.entryPointArgs],
       state.jobPod,

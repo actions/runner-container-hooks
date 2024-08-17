@@ -95,8 +95,6 @@ export async function createPod(
   appPod.spec.containers = containers
   appPod.spec.restartPolicy = 'Never'
 
-
-  //const claimName = getVolumeClaimName()
   appPod.spec.volumes = [
     {
       name: 'work',
@@ -122,7 +120,6 @@ export async function createPod(
     mergePodSpecWithOptions(appPod.spec, extension.spec)
   }
 
-  core.debug(`Creating pod with manifest: ${JSON.stringify(appPod)}`)
   const { response, body } = await k8sApi.createNamespacedPod(
     namespace(),
     appPod
