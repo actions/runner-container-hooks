@@ -7,11 +7,6 @@ import { execPodStep, copyToPod } from '../k8s'
 import { writeEntryPointScript } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
 
-process.on('unhandledRejection', (reason, promise) => {
-  core.error(`Unhandled Rejection at: ${promise}, reason: ${reason}`)
-  // Handle the rejection or log more details here
-})
-
 export async function runScriptStep(
   args: RunScriptStepArgs,
   state,

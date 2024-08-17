@@ -248,7 +248,7 @@ export async function copyToPod(
 
   const endTime = Date.now()
   const elapsedTime = endTime - startTime
-  core.info(`Copy completed in ${elapsedTime} milliseconds`)
+  core.debug(`Copy completed in ${elapsedTime} milliseconds`)
 }
 
 export async function execPodStep(
