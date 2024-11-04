@@ -8,14 +8,15 @@ import {
   getSecretName,
   getStepPodName,
   getVolumeClaimName,
-  RunnerInstanceLabel
+  RunnerInstanceLabel,
+  shouldInjectRunnerServiceAccount
 } from '../hooks/constants'
 import {
   PodPhase,
   mergePodSpecWithOptions,
   mergeObjectMeta,
   useKubeScheduler,
-  fixArgs
+  fixArgs, getCurrentServiceAccountName
 } from './utils'
 
 const kc = new k8s.KubeConfig()
@@ -123,6 +124,10 @@ export async function createPod(
 
   if (extension?.spec) {
     mergePodSpecWithOptions(appPod.spec, extension.spec)
+  }
+
+  if (shouldInjectRunnerServiceAccount()) {
+    appPod.spec.serviceAccountName = await getCurrentServiceAccountName(k8sApi)
   }
 
   const { body } = await k8sApi.createNamespacedPod(namespace(), appPod)
@@ -557,6 +562,7 @@ export function namespace(): string {
 class BackOffManager {
   private backOffSeconds = 1
   totalTime = 0
+
   constructor(private throwAfterSeconds?: number) {
     if (!throwAfterSeconds || throwAfterSeconds < 0) {
       this.throwAfterSeconds = undefined

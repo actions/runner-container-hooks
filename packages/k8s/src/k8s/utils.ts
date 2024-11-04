@@ -5,8 +5,8 @@ import * as core from '@actions/core'
 import { Mount } from 'hooklib'
 import * as path from 'path'
 import { v1 as uuidv4 } from 'uuid'
-import { POD_VOLUME_NAME } from './index'
-import { CONTAINER_EXTENSION_PREFIX } from '../hooks/constants'
+import { namespace, POD_VOLUME_NAME } from './index'
+import { CONTAINER_EXTENSION_PREFIX, getRunnerPodName } from '../hooks/constants'
 import * as shlex from 'shlex'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
@@ -293,4 +293,14 @@ function mergeLists<T>(base?: T[], from?: T[]): T[] {
 
 export function fixArgs(args: string[]): string[] {
   return shlex.split(args.join(' '))
+}
+
+export async function getCurrentServiceAccountName(kubernetesApiClient: k8s.CoreV1Api): Promise<string | undefined> {
+  try {
+    const podName = getRunnerPodName()
+    const { body } = await kubernetesApiClient.readNamespacedPod(podName, namespace())
+    return body.spec?.serviceAccountName
+  } catch (e) {
+    core.error(e as Error)
+  }
 }
