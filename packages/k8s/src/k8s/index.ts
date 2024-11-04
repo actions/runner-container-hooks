@@ -16,7 +16,8 @@ import {
   mergePodSpecWithOptions,
   mergeObjectMeta,
   useKubeScheduler,
-  fixArgs, getCurrentServiceAccountName
+  fixArgs,
+  getCurrentServiceAccountName
 } from './utils'
 
 const kc = new k8s.KubeConfig()
