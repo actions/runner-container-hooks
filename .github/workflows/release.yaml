@@ -1,76 +1,70 @@
 name: CD - Release new version
+
 on:
   workflow_dispatch:
+
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - run: npm install
-        name: Install dependencies
-      - run: npm run bootstrap
-        name: Bootstrap the packages
-      - run: npm run build-all
-        name: Build packages
-      - uses: actions/github-script@v6
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Bootstrap the packages
+        run: npm run bootstrap
+
+      - name: Build packages
+        run: npm run build-all
+
+      - uses: actions/github-script@v7
         id: releaseVersion
         with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: string
           script: |
             const fs = require('fs');
-            const hookVersion = require('./package.json').version
-            core.setOutput('version', hookVersion);
+            return require('./package.json').version
+
       - name: Zip up releases
         run: |
-          zip -r -j actions-runner-hooks-docker-${{ steps.releaseVersion.outputs.version }}.zip packages/docker/dist
-          zip -r -j actions-runner-hooks-k8s-${{ steps.releaseVersion.outputs.version }}.zip packages/k8s/dist
+          zip -r -j actions-runner-hooks-docker-${{ steps.releaseVersion.outputs.result }}.zip packages/docker/dist
+          zip -r -j actions-runner-hooks-k8s-${{ steps.releaseVersion.outputs.result }}.zip packages/k8s/dist
+
       - name: Calculate SHA
         id: sha
         shell: bash
         run: |
-          sha_docker=$(sha256sum actions-runner-hooks-docker-${{ steps.releaseVersion.outputs.version }}.zip | awk '{print $1}')
+          sha_docker=$(sha256sum actions-runner-hooks-docker-${{ steps.releaseVersion.outputs.result }}.zip | awk '{print $1}')
           echo "Docker SHA: $sha_docker"
           echo "docker-sha=$sha_docker" >> $GITHUB_OUTPUT
-          sha_k8s=$(sha256sum actions-runner-hooks-k8s-${{ steps.releaseVersion.outputs.version }}.zip | awk '{print $1}')
+          sha_k8s=$(sha256sum actions-runner-hooks-k8s-${{ steps.releaseVersion.outputs.result }}.zip | awk '{print $1}')
           echo "K8s SHA: $sha_k8s"
           echo "k8s-sha=$sha_k8s" >> $GITHUB_OUTPUT
-      - name: replace SHA
+
+      - name: Create release notes
         id: releaseNotes
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            var releaseNotes = fs.readFileSync('${{ github.workspace }}/releaseNotes.md', 'utf8').replace(/<HOOK_VERSION>/g, '${{ steps.releaseVersion.outputs.version }}')
+            var releaseNotes = fs.readFileSync('${{ github.workspace }}/releaseNotes.md', 'utf8').replace(/<HOOK_VERSION>/g, '${{ steps.releaseVersion.outputs.result }}')
             releaseNotes = releaseNotes.replace(/<DOCKER_SHA>/g, '${{ steps.sha.outputs.docker-sha }}')
             releaseNotes = releaseNotes.replace(/<K8S_SHA>/g, '${{ steps.sha.outputs.k8s-sha }}')
             console.log(releaseNotes)
-            core.setOutput('note', releaseNotes);
-      - uses: actions/create-release@v1
-        id: createRelease
-        name: Create ${{ steps.releaseVersion.outputs.version }} Hook Release
+            fs.writeFileSync('${{ github.workspace }}/finalReleaseNotes.md', releaseNotes);
+
+      - name: Create ${{ steps.releaseVersion.outputs.result }} Hook Release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: "v${{ steps.releaseVersion.outputs.version }}"
-          release_name: "v${{ steps.releaseVersion.outputs.version }}"
-          body: |
-            ${{ steps.releaseNotes.outputs.note }}
-      - name: Upload K8s hooks
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.createRelease.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/actions-runner-hooks-k8s-${{ steps.releaseVersion.outputs.version }}.zip
-          asset_name: actions-runner-hooks-k8s-${{ steps.releaseVersion.outputs.version }}.zip
-          asset_content_type: application/octet-stream
-      - name: Upload docker hooks
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.createRelease.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/actions-runner-hooks-docker-${{ steps.releaseVersion.outputs.version }}.zip
-          asset_name: actions-runner-hooks-docker-${{ steps.releaseVersion.outputs.version }}.zip
-          asset_content_type: application/octet-stream
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create v${{ steps.releaseVersion.outputs.result }} \
+            --title "v${{ steps.releaseVersion.outputs.result }}" \
+            --repo ${{ github.repository }} \
+            --notes-file ${{ github.workspace }}/finalReleaseNotes.md \
+            --latest \
+            ${{ github.workspace }}/actions-runner-hooks-k8s-${{ steps.releaseVersion.outputs.result }}.zip \
+            ${{ github.workspace }}/actions-runner-hooks-docker-${{ steps.releaseVersion.outputs.result }}.zip

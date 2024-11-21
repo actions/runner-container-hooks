@@ -147,6 +147,26 @@ describe('Prepare job', () => {
     expect(got.spec?.containers[2].args).toEqual(['-c', 'sleep 60'])
   })
 
+  it('should put only job and services in output context file', async () => {
+    process.env[ENV_HOOK_TEMPLATE_PATH] = path.join(
+      __dirname,
+      '../../../examples/extension.yaml'
+    )
+
+    await expect(
+      prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+    ).resolves.not.toThrow()
+
+    const content = JSON.parse(
+      fs.readFileSync(prepareJobOutputFilePath).toString()
+    )
+
+    expect(content.state.jobPod).toBeTruthy()
+    expect(content.context.container).toBeTruthy()
+    expect(content.context.services).toBeTruthy()
+    expect(content.context.services.length).toBe(1)
+  })
+
   it('should not throw exception using kube scheduler', async () => {
     // only for ReadWriteMany volumes or single node cluster
     process.env[ENV_USE_KUBE_SCHEDULER] = 'true'

@@ -16,7 +16,7 @@
     "@actions/core": "^1.9.1",
     "@actions/exec": "^1.1.1",
     "@actions/io": "^1.1.2",
-    "@kubernetes/client-node": "^0.18.1",
+    "@kubernetes/client-node": "^0.22.2",
     "hooklib": "file:../hooklib",
     "js-yaml": "^4.1.0",
     "shlex": "^2.1.2"

@@ -1,16 +1,10 @@
-## Features
+<!-- ## Features -->
 
-- Extend the hook extension to allow service container modifications [#134]
-
-## Bugs
-
-- Mount /github/workflow to docker action pods [#137]
-- Read logs from failed job container [#135]
+<!-- ## Bugs -->
 
 ## Misc
 
-- Bump jose from 4.11.4 to 4.15.5 [#142]
-- ADR-0134 - superseding ADR-0096 [#136]
+- Bump `@kubernetes/client-node` from 0.18.1 to 0.22.0 in /packages/k8s [#182]
 
 ## SHA-256 Checksums
 

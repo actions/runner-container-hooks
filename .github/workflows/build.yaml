@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: sed -i "s|{{PATHTOREPO}}|$(pwd)|" packages/k8s/tests/test-kind.yaml
         name: Setup kind cluster yaml config
       - uses: helm/kind-action@v1.2.0
