@@ -289,10 +289,7 @@ export async function getContainerEnvValue(
   return lines.length ? lines[0].replace(/^'/, '').replace(/'$/, '') : ''
 }
 
-export async function registryLogin(registry?: Registry): Promise<string> {
-  if (!registry) {
-    return ''
-  }
+export async function registryLogin(registry: Registry): Promise<string> {
   const credentials = {
     username: registry.username,
     password: registry.password

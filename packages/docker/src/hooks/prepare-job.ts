@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
 import { ContextPorts, PrepareJobArgs, writeToResponseFile } from 'hooklib/lib'
-import { exit } from 'process'
+import { env, exit } from 'process'
 import { v4 as uuidv4 } from 'uuid'
 import {
   ContainerMetadata,
@@ -42,7 +42,13 @@ export async function prepareJob(
   } else {
     setupContainer(container, true)
 
-    const configLocation = await registryLogin(container.registry)
+    // If registry credentials are provided to the step, then login using those,
+    // otherwise skip the login and use the default docker config location
+    // This allows us to fallback on Docker credential helpers to handle auth, e.g.
+    // https://github.com/awslabs/amazon-ecr-credential-helper
+    const configLocation = container.registry
+      ? await registryLogin(container.registry)
+      : `${env.HOME}/.docker`
     try {
       await containerPull(container.image, configLocation)
     } finally {
