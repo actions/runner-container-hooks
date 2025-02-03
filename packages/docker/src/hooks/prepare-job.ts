@@ -31,9 +31,13 @@ export async function prepareJob(
     core.info('No containers exist, skipping hook invocation')
     exit(0)
   }
-  const networkName = generateNetworkName()
-  // Create network
-  await networkCreate(networkName)
+
+  let networkName = process.env.ACTIONS_RUNNER_NETWORK_DRIVER
+  if (!networkName) {
+    networkName = generateNetworkName()
+    // Create network
+    await networkCreate(networkName)
+  }
 
   // Create Job Container
   let containerMetadata: ContainerMetadata | undefined = undefined
