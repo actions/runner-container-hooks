@@ -301,8 +301,24 @@ async function startRpc(url: string, id: string, containerPath: string): Promise
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   }
-  const request = new Request(url, { method: 'POST', headers: headers, body: JSON.stringify({ "id": id, "path": containerPath }) })
-  return fetch(request).then(response => response.json())
+  core.warning(`Starting rpc with id ${id} and containerPath ${containerPath} at url ${url}`)
+  const request = new Request(
+    url,
+    {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({ "id": id, "path": containerPath })
+    })
+  return fetch(request).then(
+    response => response.json(),
+    error => {
+      core.warning(`rpc failed: ${error}`)
+      return {
+        status: 'failed',
+        error: error
+      }
+    }
+  )
 }
 
 async function getRpcStatus(url: string): Promise<RpcResult> {
