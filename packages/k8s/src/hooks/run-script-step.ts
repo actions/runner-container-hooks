@@ -2,7 +2,7 @@
 import * as fs from 'fs'
 import * as core from '@actions/core'
 import { RunScriptStepArgs } from 'hooklib'
-import { execPodStep } from '../k8s'
+import { execPodStep, rpcPodStep } from '../k8s'
 import { writeEntryPointScript } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
 
@@ -23,10 +23,16 @@ export async function runScriptStep(
   args.entryPoint = 'sh'
   args.entryPointArgs = ['-e', containerPath]
   try {
-    await execPodStep(
-      [args.entryPoint, ...args.entryPointArgs],
-      state.jobPod,
-      JOB_CONTAINER_NAME
+    // FIXME: do we need to keep the original, condition on some env var or something?
+    // await execPodStep(
+    //   [args.entryPoint, ...args.entryPointArgs],
+    //   state.jobPod,
+    //   JOB_CONTAINER_NAME
+    // )
+    await rpcPodStep(
+      id,
+      containerPath,
+      state.jobService,
     )
   } catch (err) {
     core.debug(`execPodStep failed: ${JSON.stringify(err)}`)
