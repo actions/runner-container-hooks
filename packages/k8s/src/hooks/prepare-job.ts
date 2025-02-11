@@ -14,7 +14,8 @@ import {
   isPodContainerAlpine,
   prunePods,
   waitForPodPhases,
-  getPrepareJobTimeoutSeconds
+  getPrepareJobTimeoutSeconds,
+  createService
 } from '../k8s'
 import {
   containerVolumes,
@@ -87,6 +88,18 @@ export async function prepareJob(
   if (!createdPod?.metadata?.name) {
     throw new Error('created pod should have metadata.name')
   }
+
+  let createdService: k8s.V1Service | undefined = undefined
+  try {
+    createdService = await createService(createdPod)
+  } catch (err) {
+    await prunePods()
+    // FIXME: await pruneServices()
+    core.debug(`createService failed: ${JSON.stringify(err)}`)
+    const message = (err as any)?.response?.body?.message || err
+    throw new Error(`failed to create job pod: ${message}`)
+  }
+
   core.debug(
     `Job pod created, waiting for it to come online ${createdPod?.metadata?.name}`
   )

@@ -129,6 +129,26 @@ export async function createPod(
   return body
 }
 
+export async function createService(
+  pod: k8s.V1Pod
+): Promise<k8s.V1Service> {
+  const service = new k8s.V1Service()
+  service.apiVersion = 'v1'
+  service.kind = 'Service'
+  service.metadata = new k8s.V1ObjectMeta()
+  service.metadata.name = getJobPodName()
+  service.metadata.labels = pod.metadata?.labels
+  service.metadata.annotations = pod.metadata?.annotations
+
+  service.spec = new k8s.V1ServiceSpec()
+  service.spec.selector = pod.metadata?.labels
+  service.spec.ports = [{ port: 8080, targetPort: 8080 }]
+
+  const { body } = await k8sApi.createNamespacedService(namespace(), service)
+  return body
+}
+
+
 export async function createJob(
   container: k8s.V1Container,
   extension?: k8s.V1PodTemplateSpec
