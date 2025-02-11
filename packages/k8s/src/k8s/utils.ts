@@ -110,7 +110,7 @@ export function writeEntryPointScript(
   entryPointArgs?: string[],
   prependPath?: string[],
   environmentVariables?: { [key: string]: string }
-): { containerPath: string; runnerPath: string } {
+): { containerPath: string; runnerPath: string, id: string } {
   let exportPath = ''
   if (prependPath?.length) {
     // TODO: remove compatibility with typeof prependPath === 'string' as we bump to next major version, the hooks will lose PrependPath compat with runners 2.293.0 and older
@@ -151,12 +151,14 @@ exec ${environmentPrefix} ${entryPoint} ${
     entryPointArgs?.length ? entryPointArgs.join(' ') : ''
   }
 `
-  const filename = `${uuidv4()}.sh`
+  const id = uuidv4()
+  const filename = `${id}.sh`
   const entryPointPath = `${process.env.RUNNER_TEMP}/${filename}`
   fs.writeFileSync(entryPointPath, content)
   return {
     containerPath: `/__w/_temp/${filename}`,
-    runnerPath: entryPointPath
+    runnerPath: entryPointPath,
+    id: id,
   }
 }
 

@@ -50,6 +50,12 @@ export const requiredPermissions = [
     subresource: 'log'
   },
   {
+    group: '',
+    verbs: ['get', 'list', 'create', 'delete'],
+    resource: 'services',
+    subresource: ''
+  },
+  {
     group: 'batch',
     verbs: ['get', 'list', 'create', 'delete'],
     resource: 'jobs',

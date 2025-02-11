@@ -132,13 +132,14 @@ export async function prepareJob(
     throw new Error(`failed to determine if the pod is alpine: ${message}`)
   }
   core.debug(`Setting isAlpine to ${isAlpine}`)
-  generateResponseFile(responseFile, args, createdPod, isAlpine)
+  generateResponseFile(responseFile, args, createdPod, createdService, isAlpine)
 }
 
 function generateResponseFile(
   responseFile: string,
   args: PrepareJobArgs,
   appPod: k8s.V1Pod,
+  appService: k8s.V1Service,
   isAlpine
 ): void {
   if (!appPod.metadata?.name) {
@@ -146,7 +147,8 @@ function generateResponseFile(
   }
   const response = {
     state: {
-      jobPod: appPod.metadata.name
+      jobPod: appPod.metadata.name,
+      jobService: appService.metadata?.name,
     },
     context: {},
     isAlpine

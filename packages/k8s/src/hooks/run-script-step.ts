@@ -12,7 +12,7 @@ export async function runScriptStep(
   responseFile
 ): Promise<void> {
   const { entryPoint, entryPointArgs, environmentVariables } = args
-  const { containerPath, runnerPath } = writeEntryPointScript(
+  const { containerPath, runnerPath, id } = writeEntryPointScript(
     args.workingDirectory,
     entryPoint,
     entryPointArgs,
