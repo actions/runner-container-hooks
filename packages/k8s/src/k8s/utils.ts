@@ -12,7 +12,7 @@ import * as shlex from 'shlex'
 // FIXME: keep the original option too?
 // export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 // export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
-export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = []
+export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = ['--dev'] // FIXME: remove the dev ?
 export const DEFAULT_CONTAINER_ENTRY_POINT = '/gha-runner-rpc.py'
 
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'

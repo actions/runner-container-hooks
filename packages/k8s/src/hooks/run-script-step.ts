@@ -2,7 +2,8 @@
 import * as fs from 'fs'
 import * as core from '@actions/core'
 import { RunScriptStepArgs } from 'hooklib'
-import { execPodStep, rpcPodStep } from '../k8s'
+import { execPodStep } from '../k8s'
+import { rpcPodStep } from '../k8s/rpc'
 import { writeEntryPointScript } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
 

@@ -116,6 +116,9 @@ export async function prepareJob(
     throw new Error(`pod failed to come online with error: ${err}`)
   }
 
+  // FIXME: connect the rpc server to pod liveness
+  await new Promise(resolve => setTimeout(resolve, 10 * 1000))
+
   core.debug('Job pod is ready for traffic')
 
   let isAlpine = false
