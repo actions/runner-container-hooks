@@ -62,7 +62,9 @@ async function getLogs(url: string, id: string, fromLine: number): Promise<strin
 async function getLogsAndStatus(url: string, id: string, beginLogsAfterLine: number): Promise<{ status: RpcResult, logLines: number }> {
 
   // TODO: get all logs here
+  // core.warning(`Getting logs (id = ${id}, beginLogsAfterLine = ${beginLogsAfterLine})...`)
   const logs = await getLogs(`${url}/logs`, id, beginLogsAfterLine)
+  // core.warning(`Got ${logs.length} log lines`)
   logs.forEach(line => process.stdout.write(line))
 
   const status = await getRpcStatus(url)
@@ -75,7 +77,9 @@ async function getLogsAndStatus(url: string, id: string, beginLogsAfterLine: num
 
 async function flushLogs(url: string, id: string, beginLogsAfterLine: number): Promise<void> {
   while (true) {
+    // core.warning(`Flushing logs(id = ${id}, beginLogsAfterLine = ${beginLogsAfterLine})...`)
     const logs = await getLogs(`${url}/logs`, id, beginLogsAfterLine)
+    // core.warning(`Got ${logs.length} log lines`)
     logs.forEach(line => process.stdout.write(line))
 
     beginLogsAfterLine += logs.length

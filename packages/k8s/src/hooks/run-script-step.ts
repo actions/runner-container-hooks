@@ -40,6 +40,6 @@ export async function runScriptStep(
     const message = (err as any)?.response?.body?.message || err
     throw new Error(`failed to run script step (id ${id}): ${message}`)
   } finally {
-    fs.rmSync(runnerPath)
+    // fs.rmSync(runnerPath)
   }
 }
