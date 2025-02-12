@@ -38,7 +38,7 @@ export async function runScriptStep(
   } catch (err) {
     core.debug(`execPodStep failed: ${JSON.stringify(err)}`)
     const message = (err as any)?.response?.body?.message || err
-    throw new Error(`failed to run script step: ${message}`)
+    throw new Error(`failed to run script step (id ${id}): ${message}`)
   } finally {
     fs.rmSync(runnerPath)
   }
