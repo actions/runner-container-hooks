@@ -13,11 +13,12 @@ import {
   runContainerStep,
   runScriptStep
 } from './hooks'
-import { checkEnvironment } from './utils'
+import { checkEnvironment, cleanEnvironment } from './utils'
 
 async function run(): Promise<void> {
   try {
     checkEnvironment()
+    cleanEnvironment()
     const input = await getInputFromStdin()
 
     const args = input['args']

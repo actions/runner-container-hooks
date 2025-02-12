@@ -63,9 +63,14 @@ describe('Utilities', () => {
 
     it('should not overwrite other options', () => {
       process.env.DOCKER_HOST = 'unix:///run/user/1001/docker.sock'
+
       const opt = {
         workingDir: 'test',
-        input: Buffer.from('test')
+        input: Buffer.from('test'),
+        env: {
+          HOME: '/home/runner',
+          PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/runner/.local/bin/'
+        }
       }
 
       const options = optionsWithDockerEnvs(opt)
@@ -73,7 +78,11 @@ describe('Utilities', () => {
       expect(options?.workingDir).toBe(opt.workingDir)
       expect(options?.input).toBe(opt.input)
       expect(options?.env).toStrictEqual({
-        DOCKER_HOST: process.env.DOCKER_HOST
+        CI: process.env.CI,
+        GITHUB_ACTIONS: process.env.GITHUB_ACTIONS,
+        DOCKER_HOST: process.env.DOCKER_HOST,
+        PATH: opt.env.PATH,
+        HOME: opt.env.HOME
       })
     })
   })

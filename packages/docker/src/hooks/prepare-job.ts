@@ -26,6 +26,7 @@ export async function prepareJob(
 
   const container = args.container
   const services = args.services
+  core.debug(`Services: ${JSON.stringify(services)}`)
 
   if (!container?.image && !services?.length) {
     core.info('No containers exist, skipping hook invocation')
@@ -42,11 +43,17 @@ export async function prepareJob(
   } else {
     setupContainer(container, true)
 
+    // If registry credentials are provided to the step, then login using those,
+    // otherwise skip the login and use the default docker config location
+    // This allows us to fallback on Docker credential helpers to handle auth, e.g.
+    // https://github.com/awslabs/amazon-ecr-credential-helper
     const configLocation = await registryLogin(container.registry)
     try {
       await containerPull(container.image, configLocation)
     } finally {
-      await registryLogout(configLocation)
+      if (container?.registry) {
+        await registryLogout(configLocation)
+      }
     }
 
     containerMetadata = await createContainer(
@@ -70,7 +77,9 @@ export async function prepareJob(
       try {
         await containerPull(service.image, configLocation)
       } finally {
-        await registryLogout(configLocation)
+        if (service.registry) {
+          await registryLogout(configLocation)
+        }
       }
 
       setupContainer(service)

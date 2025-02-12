@@ -62,6 +62,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create v${{ steps.releaseVersion.outputs.result }} \
+            --target ${{ github.sha }} \
             --title "v${{ steps.releaseVersion.outputs.result }}" \
             --repo ${{ github.repository }} \
             --notes-file ${{ github.workspace }}/finalReleaseNotes.md \

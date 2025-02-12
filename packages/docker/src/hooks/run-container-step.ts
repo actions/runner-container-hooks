@@ -19,7 +19,9 @@ export async function runContainerStep(
     try {
       await containerPull(args.image, configLocation)
     } finally {
-      await registryLogout(configLocation)
+      if (args.registry) {
+        await registryLogout(configLocation)
+      }
     }
   } else if (args.dockerfile) {
     await containerBuild(args, tag)

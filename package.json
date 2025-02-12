@@ -1,6 +1,6 @@
 {
   "name": "hooks",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "description": "Three projects are included - k8s: a kubernetes hook implementation that spins up pods dynamically to run a job - docker: A hook implementation of the runner's docker implementation  - A hook lib, which contains shared typescript definitions and utilities that the other packages consume",
   "main": "",
   "directories": {

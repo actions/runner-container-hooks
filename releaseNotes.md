@@ -1,10 +1,10 @@
-<!-- ## Features -->
+## Features
+
+- conditionally skip docker login step to fallback on default docker config if no registry credentials are provided
 
 <!-- ## Bugs -->
 
-## Misc
-
-- Bump `@kubernetes/client-node` from 0.18.1 to 0.22.0 in /packages/k8s [#182]
+<!-- ## Misc -->
 
 ## SHA-256 Checksums
 

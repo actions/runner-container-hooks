@@ -20,6 +20,7 @@ export async function createContainer(
   if (!args.image) {
     throw new Error('Image was expected')
   }
+  core.debug(`ContainerInfo: ${JSON.stringify(args)}`)
 
   const dockerArgs: string[] = ['create']
   dockerArgs.push(`--label=${getRunnerLabel()}`)
@@ -47,6 +48,8 @@ export async function createContainer(
       dockerArgs.push(key)
     }
   }
+  // Explicitly set GITHUB_ACTIONS and CI env vars on the container
+  dockerArgs.push('-e', 'GITHUB_ACTIONS', '-e', 'CI')
 
   const mountVolumes = [
     ...(args.userMountVolumes || []),
@@ -98,9 +101,30 @@ export async function containerPull(
   }
   dockerArgs.push('pull')
   dockerArgs.push(image)
+
+  // If using the ECR docker credential helper, need to ensure that these environment variables
+  // are present in the shell of the docker pull command.
+  const containerPullCliEnvs = new Set([
+    'AWS_PROFILE',
+    'AWS_ACCESS_KEY_ID',
+    'AWS_SECRET_ACCESS_KEY',
+    'AWS_STS_REGIONAL_ENDPOINTS',
+    'AWS_DEFAULT_REGION',
+    'AWS_REGION',
+    'AWS_ROLE_ARN',
+    'AWS_WEB_IDENTITY_TOKEN_FILE',
+    'HOME',
+    'PATH'
+  ])
+  const dockerCliEnvs = {}
+  for (const key in process.env) {
+    if (containerPullCliEnvs.has(key)) {
+      dockerCliEnvs[key] = process.env[key]
+    }
+  }
   for (let i = 0; i < 3; i++) {
     try {
-      await runDockerCommand(dockerArgs)
+      await runDockerCommand(dockerArgs, { env: dockerCliEnvs })
       return
     } catch {
       core.info(`docker pull failed on attempt: ${i + 1}`)
@@ -290,8 +314,9 @@ export async function getContainerEnvValue(
 }
 
 export async function registryLogin(registry?: Registry): Promise<string> {
+  // if registry credentials are not provided, skip login and return default docker config location
   if (!registry) {
-    return ''
+    return env.DOCKER_CONFIG || `${env.HOME}/.docker`
   }
   const credentials = {
     username: registry.username,
