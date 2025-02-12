@@ -18,13 +18,18 @@ async function startRpc(url: string, id: string, containerPath: string): Promise
       const request = new Request(`${url}/`, { method: 'DELETE' })
       fetch(request).then(() => resolve());
     })
+    process.on('SIGTERM', () => {
+      core.warning('Received SIGTERM, terminating');
+      const request = new Request(`${url}/`, { method: 'DELETE' })
+      fetch(request).then(() => resolve());
+    })
   });
 
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   }
-  core.debug(`Starting rpc with id ${id} and containerPath ${containerPath} at url ${url}`)
+  core.warning(`Starting rpc with id ${id} and containerPath ${containerPath} at url ${url}`)
   const request = new Request(
     url,
     {
@@ -106,6 +111,7 @@ async function awaitRpcCompletion(url: string, id: string): Promise<RpcResult> {
     await flushLogs(url, id, logLines)
     throw new Error(`rpc failed: return code ${status.returncode}`)
   }
+  await flushLogs(url, id, logLines)
   return status
 }
 

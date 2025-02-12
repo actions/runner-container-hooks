@@ -12,7 +12,7 @@ import {
   containerPorts,
   createPod,
   isPodContainerAlpine,
-  prunePods,
+  prunePodsAndServices,
   waitForPodPhases,
   getPrepareJobTimeoutSeconds,
   createService
@@ -37,7 +37,7 @@ export async function prepareJob(
     throw new Error('Job Container is required.')
   }
 
-  await prunePods()
+  await prunePodsAndServices()
 
   const extension = readExtensionFromFile()
   await copyExternalsToRoot()
@@ -79,7 +79,7 @@ export async function prepareJob(
       extension
     )
   } catch (err) {
-    await prunePods()
+    await prunePodsAndServices()
     core.debug(`createPod failed: ${JSON.stringify(err)}`)
     const message = (err as any)?.response?.body?.message || err
     throw new Error(`failed to create job pod: ${message}`)
@@ -93,8 +93,7 @@ export async function prepareJob(
   try {
     createdService = await createService(createdPod)
   } catch (err) {
-    await prunePods()
-    // FIXME: await pruneServices()
+    await prunePodsAndServices()
     core.debug(`createService failed: ${JSON.stringify(err)}`)
     const message = (err as any)?.response?.body?.message || err
     throw new Error(`failed to create job pod: ${message}`)
@@ -112,7 +111,7 @@ export async function prepareJob(
       getPrepareJobTimeoutSeconds()
     )
   } catch (err) {
-    await prunePods()
+    await prunePodsAndServices()
     throw new Error(`pod failed to come online with error: ${err}`)
   }
 

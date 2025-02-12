@@ -246,6 +246,16 @@ export async function deletePod(podName: string): Promise<void> {
   )
 }
 
+export async function deleteService(svcName: string): Promise<void> {
+  await k8sApi.deleteNamespacedService(
+    svcName,
+    namespace(),
+    undefined,
+    undefined,
+    0
+  )
+}
+
 export async function execPodStep(
   command: string[],
   podName: string,
@@ -485,6 +495,10 @@ export async function getPodLogs(
   await new Promise(resolve => r.on('close', () => resolve(null)))
 }
 
+export async function prunePodsAndServices(): Promise<void> {
+  await Promise.all([prunePods(), pruneServices()])
+}
+
 export async function prunePods(): Promise<void> {
   const podList = await k8sApi.listNamespacedPod(
     namespace(),
@@ -501,6 +515,26 @@ export async function prunePods(): Promise<void> {
   await Promise.all(
     podList.body.items.map(
       pod => pod.metadata?.name && deletePod(pod.metadata.name)
+    )
+  )
+}
+
+export async function pruneServices(): Promise<void> {
+  const svcList = await k8sApi.listNamespacedService(
+    namespace(),
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    new RunnerInstanceLabel().toString()
+  )
+  if (!svcList.body.items.length) {
+    return
+  }
+
+  await Promise.all(
+    svcList.body.items.map(
+      svc => svc.metadata?.name && deleteService(svc.metadata.name)
     )
   )
 }
