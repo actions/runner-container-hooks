@@ -1,4 +1,5 @@
 import * as core from '@actions/core'
+import { log } from 'console'
 
 interface RpcResult {
   id: string,
@@ -14,7 +15,7 @@ async function startRpc(url: string, id: string, containerPath: string): Promise
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   }
-  core.warning(`Starting rpc with id ${id} and containerPath ${containerPath} at url ${url}`)
+  core.debug(`Starting rpc with id ${id} and containerPath ${containerPath} at url ${url}`)
   const request = new Request(
     url,
     {
@@ -22,7 +23,7 @@ async function startRpc(url: string, id: string, containerPath: string): Promise
       headers: headers,
       body: JSON.stringify({ "id": id, "path": containerPath })
     })
-  return fetch(request).then(
+  return await fetch(request).then(
     response => response.json(),
     async error => {
       core.warning(`rpc failed: ${error}`)
@@ -40,48 +41,46 @@ async function getRpcStatus(url: string): Promise<RpcResult> {
     'Accept': 'application/json',
   }
   const request = new Request(url, { method: 'GET', headers: headers })
-  return fetch(request).then(response => response.json())
+  const response = await fetch(request)
+  return response.json()
 }
 
-async function getLogs(url: string, id: string, beginAfterLine: number): Promise<string[]> {
+async function getLogs(url: string, id: string, fromLine: number): Promise<string[]> {
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   }
   const params = new URLSearchParams({
     id: id,
-    beginAfterLine: beginAfterLine.toString()
+    fromLine: fromLine.toString()
   })
   const request = new Request(`${url}?${params.toString()}`, { method: 'GET', headers: headers })
-  return fetch(request).then(response => response.json())
+  const response = await fetch(request)
+  return response.json()
 }
 
-async function getLogsAndStatus(url: string, id: string, beginStdoutAfterLine: number, beginStderrAfterLine: number): Promise<{ status: RpcResult, stdoutLines: number, stderrLines: number }> {
+async function getLogsAndStatus(url: string, id: string, beginLogsAfterLine: number): Promise<{ status: RpcResult, logLines: number }> {
 
-  const stdout = await getLogs(`${url}/stdout`, id, beginStdoutAfterLine)
-  stdout.forEach(line => process.stdout.write(line))
-
-  const stderr = await getLogs(`${url}/stderr`, id, beginStderrAfterLine)
-  stderr.forEach(line => process.stderr.write(line))
+  // TODO: get all logs here
+  const logs = await getLogs(`${url}/logs`, id, beginLogsAfterLine)
+  logs.forEach(line => process.stdout.write(line))
 
   const status = await getRpcStatus(url)
 
   return {
     status: status,
-    stdoutLines: stdout.length,
-    stderrLines: stderr.length
+    logLines: logs.length,
   }
 }
 
-async function flushLogs(url: string, id: string, beginStdoutAfterLine: number, beginStderrAfterLine: number): Promise<void> {
+async function flushLogs(url: string, id: string, beginLogsAfterLine: number): Promise<void> {
   while (true) {
-    const stdout = await getLogs(`${url}/stdout`, id, beginStdoutAfterLine)
-    stdout.forEach(line => process.stdout.write(line))
+    const logs = await getLogs(`${url}/logs`, id, beginLogsAfterLine)
+    logs.forEach(line => process.stdout.write(line))
 
-    const stderr = await getLogs(`${url}/stderr`, id, beginStderrAfterLine)
-    stderr.forEach(line => process.stderr.write(line))
+    beginLogsAfterLine += logs.length
 
-    if (stdout.length === 0 && stderr.length === 0) {
+    if (logs.length === 0) {
       return
     }
   }
@@ -89,23 +88,22 @@ async function flushLogs(url: string, id: string, beginStdoutAfterLine: number, 
 
 async function awaitRpcCompletion(url: string, id: string): Promise<RpcResult> {
 
-  let { status, stdoutLines, stderrLines } = await getLogsAndStatus(url, id, 0, 0)
+  let { status, logLines } = await getLogsAndStatus(url, id, 0)
 
   while (status.status !== 'completed' && status.status !== 'failed') {
-    core.warning(`Waiting for completion (id = ${status.id})...`)
+    // core.warning(`Waiting for completion (id = ${status.id})...`)
     await new Promise(resolve => setTimeout(resolve, 1000))
-    const { status: newStatus, stdoutLines: newStdoutLines, stderrLines: newStderrLines } = await getLogsAndStatus(url, id, stdoutLines, stderrLines)
-    stdoutLines += newStdoutLines
-    stderrLines += newStderrLines
-    status = newStatus
+    const logAndStatus = await getLogsAndStatus(url, id, logLines)
+    logLines += logAndStatus.logLines
+    status = logAndStatus.status
   }
   if (status.status === 'failed') {
-    flushLogs(url, id, stdoutLines, stderrLines)
+    await flushLogs(url, id, logLines)
     throw new Error(`rpc failed: ${status.error}`)
   } else if (status.status !== 'completed') {
     throw new Error(`rpc failed: unexpected status ${status.status}`)
   } else if (status.returncode !== 0) {
-    flushLogs(url, id, stdoutLines, stderrLines)
+    await flushLogs(url, id, logLines)
     throw new Error(`rpc failed: return code ${status.returncode}`)
   }
   return status
@@ -117,8 +115,8 @@ export async function rpcPodStep(
   serviceName: string
 ): Promise<void> {
   const url = `http://${serviceName}:8080`
-  await startRpc(url, id, containerPath).then(() =>
-    awaitRpcCompletion(url, id).then(status =>
-      core.warning(`completed with return code ${status.returncode}`)))
+  await startRpc(url, id, containerPath)
+  const status = await awaitRpcCompletion(url, id)
+  core.debug(`completed with return code ${status.returncode}`)
 }
 
