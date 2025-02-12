@@ -11,6 +11,15 @@ interface RpcResult {
 }
 
 async function startRpc(url: string, id: string, containerPath: string): Promise<RpcResult> {
+
+  new Promise<void>((resolve) => {
+    process.on('SIGINT', () => {
+      core.warning('Received SIGINT, terminating');
+      const request = new Request(`${url}/`, { method: 'DELETE' })
+      fetch(request).then(() => resolve());
+    })
+  });
+
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -23,16 +32,8 @@ async function startRpc(url: string, id: string, containerPath: string): Promise
       headers: headers,
       body: JSON.stringify({ "id": id, "path": containerPath })
     })
-  return await fetch(request).then(
-    response => response.json(),
-    async error => {
-      core.warning(`rpc failed: ${error}`)
-      return {
-        status: 'failed',
-        error: error
-      }
-    }
-  )
+  const response = await fetch(request)
+  return response.json();
 }
 
 async function getRpcStatus(url: string): Promise<RpcResult> {
@@ -62,9 +63,7 @@ async function getLogs(url: string, id: string, fromLine: number): Promise<strin
 async function getLogsAndStatus(url: string, id: string, beginLogsAfterLine: number): Promise<{ status: RpcResult, logLines: number }> {
 
   // TODO: get all logs here
-  // core.warning(`Getting logs (id = ${id}, beginLogsAfterLine = ${beginLogsAfterLine})...`)
   const logs = await getLogs(`${url}/logs`, id, beginLogsAfterLine)
-  // core.warning(`Got ${logs.length} log lines`)
   logs.forEach(line => process.stdout.write(line))
 
   const status = await getRpcStatus(url)
@@ -77,9 +76,7 @@ async function getLogsAndStatus(url: string, id: string, beginLogsAfterLine: num
 
 async function flushLogs(url: string, id: string, beginLogsAfterLine: number): Promise<void> {
   while (true) {
-    // core.warning(`Flushing logs(id = ${id}, beginLogsAfterLine = ${beginLogsAfterLine})...`)
     const logs = await getLogs(`${url}/logs`, id, beginLogsAfterLine)
-    // core.warning(`Got ${logs.length} log lines`)
     logs.forEach(line => process.stdout.write(line))
 
     beginLogsAfterLine += logs.length
@@ -95,7 +92,6 @@ async function awaitRpcCompletion(url: string, id: string): Promise<RpcResult> {
   let { status, logLines } = await getLogsAndStatus(url, id, 0)
 
   while (status.status !== 'completed' && status.status !== 'failed') {
-    // core.warning(`Waiting for completion (id = ${status.id})...`)
     await new Promise(resolve => setTimeout(resolve, 1000))
     const logAndStatus = await getLogsAndStatus(url, id, logLines)
     logLines += logAndStatus.logLines
