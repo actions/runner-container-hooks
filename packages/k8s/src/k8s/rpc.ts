@@ -121,7 +121,10 @@ export async function rpcPodStep(
   serviceName: string
 ): Promise<void> {
   const url = `http://${serviceName}:8080`
-  await startRpc(url, id, containerPath)
+  const startStatus = await startRpc(url, id, containerPath)
+  if (startStatus.status === 'failed') {
+    throw new Error(`rpc failed to start: ${startStatus.error}`)
+  }
   await awaitRpcCompletion(url, id)
 }
 
