@@ -9,6 +9,10 @@ import { POD_VOLUME_NAME } from './index'
 import { CONTAINER_EXTENSION_PREFIX } from '../hooks/constants'
 import * as shlex from 'shlex'
 
+// For now, we assume that the entry point script exists in the workflow container image,
+// and just invoke it. If this were to be generalized and reused outside of our own repo,
+// we should probably remove this assumption and e.g. mount the entrypoint into that pod
+// via a configMap instead.
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = []
 export const DEFAULT_CONTAINER_ENTRY_POINT = '/gha-runner-rpc.py'
 
