@@ -109,7 +109,7 @@ async function awaitRpcCompletion(url: string, id: string): Promise<RpcResult> {
     throw new Error(`rpc failed: unexpected status ${status.status}`)
   } else if (status.returncode !== 0) {
     await flushLogs(url, id, logLines)
-    throw new Error(`rpc failed: return code ${status.returncode}`)
+    throw new Error(`step failed with return code ${status.returncode}`)
   }
   await flushLogs(url, id, logLines)
   return status
@@ -121,12 +121,8 @@ export async function rpcPodStep(
   serviceName: string
 ): Promise<void> {
   const url = `http://${serviceName}:8080`
-  const startStatus = await startRpc(url, id, containerPath)
-  if (startStatus.status !== 'queued') {
-    throw new Error(`rpc failed to start: ${startStatus.error}`)
-  }
-  const status = await awaitRpcCompletion(url, id)
-  core.debug(`completed with return code ${status.returncode}`)
+  await startRpc(url, id, containerPath)
+  await awaitRpcCompletion(url, id)
 }
 
 export async function waitForRpcStatus(url: string): Promise<void> {
