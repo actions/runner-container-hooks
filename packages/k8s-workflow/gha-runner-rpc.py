@@ -3,6 +3,13 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# This implements a very simple RPC server that should be running on the job container of the workflow pod,
+# and used by the k8s hook to execute steps in the workflow on the workflow pod.
+
+# It supports a running a single RPC call at a time, and will return an error if a new call is made while
+# another one is still running (which is a valid assumption, as the runner is expected to execute one step at a time).
+
+
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import time
@@ -33,8 +40,7 @@ def readLines(path, fromLine, maxLines):
         with open(path, 'r') as f:
             return [x for i, x in enumerate(f) if i >= fromLine and x.endswith('\n') and i < fromLine + maxLines]
     except Exception as e:
-        # debug log only, as this can also happen if the log is read before the process has started
-        app.logger.debug(f"Error reading file {path}: {e}")
+        app.logger.warning(f"Error reading file {path}: {e}")
         return []
 
 class State:
@@ -50,7 +56,6 @@ class State:
         self.latest_id = id
         try:
             app.logger.debug(f"Running id {id}")
-            app.logger.debug(f"Content of script at {path}: {open(path).read()}")
             logsfilename = f"/logs/{id}.out"
             self.out = open(logsfilename, "w")
             self.process = subprocess.Popen(['sh', '-e', path], start_new_session=True, stdout=self.out, stderr=self.out)
@@ -63,7 +68,6 @@ class State:
             self.process.wait()
             self.out.close()
             app.logger.debug(f"Process for id {id} finished (return code {self.process.returncode})")
-            app.logger.debug(f"Output for id {id} is: {open(logsfilename).read()}")
             self.status = Response(
                 id = id,
                 status = 'completed',
@@ -116,36 +120,47 @@ class State:
 
 state = State()
 
+# Post a new job
 @app.route('/', methods=['POST'])
 def call():
     data = json.loads(request.data)
+    if 'id' not in data or 'path' not in data:
+        return jsonify(Response(
+            id = '',
+            status = 'failed',
+            error = 'Missing id or path in request',
+        ))
     id = data['id']
     path = data['path']
     return jsonify(state.exec(id, path))
 
+# Cancel the current job
 @app.route('/', methods=['DELETE'])
 def cancel():
     return jsonify(state.cancel())
 
+# Get the current status
 @app.route('/')
 def status():
     return jsonify(state.status)
 
+# Get the logs of a given job
 @app.route('/logs')
 def logs():
+    if 'id' not in request.args:
+        return 'Missing id in request', 400
     id = request.args.get('id')
     fromLine = int(request.args.get('fromLine', 0))
     maxLines = int(request.args.get('maxLines', 1000))
     path = f"/logs/{id}.out"
     return jsonify(readLines(path, fromLine, maxLines))
 
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dev', action='store_true', help='Run in Flask development mode')
-
     args = parser.parse_args()
-
     if args.dev:
         app.run(host='0.0.0.0', port=8080, debug=True)
     else:
