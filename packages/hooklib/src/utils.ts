@@ -3,7 +3,6 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as readline from 'readline'
 import { HookData } from './interfaces'
-import * as core from '@actions/core'
 
 
 export async function getInputFromStdin(): Promise<HookData> {

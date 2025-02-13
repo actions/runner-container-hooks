@@ -15,7 +15,7 @@ import {
   prunePodsAndServices,
   waitForPodPhases,
   getPrepareJobTimeoutSeconds,
-  createService
+  createService,
 } from '../k8s'
 import {
   containerVolumes,
@@ -28,6 +28,7 @@ import {
   fixArgs
 } from '../k8s/utils'
 import { CONTAINER_EXTENSION_PREFIX, JOB_CONTAINER_NAME } from './constants'
+import { waitForRpcStatus } from '../k8s/rpc'
 
 export async function prepareJob(
   args: PrepareJobArgs,
@@ -110,13 +111,13 @@ export async function prepareJob(
       new Set([PodPhase.PENDING]),
       getPrepareJobTimeoutSeconds()
     )
+
+    await waitForRpcStatus(`http://${createdService?.metadata?.name}:8080`)
+
   } catch (err) {
     await prunePodsAndServices()
     throw new Error(`pod failed to come online with error: ${err}`)
   }
-
-  // FIXME: connect the rpc server to pod liveness
-  await new Promise(resolve => setTimeout(resolve, 10 * 1000))
 
   core.debug('Job pod is ready for traffic')
 

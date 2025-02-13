@@ -8,6 +8,7 @@ import {
   getSecretName,
   getStepPodName,
   getVolumeClaimName,
+  JOB_CONTAINER_NAME,
   RunnerInstanceLabel
 } from '../hooks/constants'
 import {

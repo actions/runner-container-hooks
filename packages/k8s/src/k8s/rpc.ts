@@ -29,7 +29,7 @@ async function startRpc(url: string, id: string, containerPath: string): Promise
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   }
-  core.warning(`Starting rpc with id ${id} and containerPath ${containerPath} at url ${url}`)
+  core.debug(`Starting rpc with id ${id} and containerPath ${containerPath} at url ${url}`)
   const request = new Request(
     url,
     {
@@ -121,8 +121,22 @@ export async function rpcPodStep(
   serviceName: string
 ): Promise<void> {
   const url = `http://${serviceName}:8080`
-  await startRpc(url, id, containerPath)
+  const startStatus = await startRpc(url, id, containerPath)
+  if (startStatus.status !== 'queued') {
+    throw new Error(`rpc failed to start: ${startStatus.error}`)
+  }
   const status = await awaitRpcCompletion(url, id)
   core.debug(`completed with return code ${status.returncode}`)
 }
 
+export async function waitForRpcStatus(url: string): Promise<void> {
+  while (true) {
+    try {
+      await getRpcStatus(url)
+      return
+    } catch (err) {
+      core.debug(`failed getting RPC status, not yet ready: ${JSON.stringify(err)}`)
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000))
+  }
+}
