@@ -67,11 +67,15 @@ async function getLogs(url: string, id: string, fromLine: number): Promise<strin
 
 async function getLogsAndStatus(url: string, id: string, beginLogsAfterLine: number): Promise<{ status: RpcResult, logLines: number }> {
 
+  const status = await getRpcStatus(url)
+
+  if (status.id !== id) {
+    throw new Error(`unexpected id in status: ${status.id} (expected ${id})`)
+  }
+
   // TODO: get all logs here
   const logs = await getLogs(`${url}/logs`, id, beginLogsAfterLine)
   logs.forEach(line => process.stdout.write(line))
-
-  const status = await getRpcStatus(url)
 
   return {
     status: status,
