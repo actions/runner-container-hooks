@@ -65,6 +65,20 @@ async function getLogs(url: string, id: string, fromLine: number): Promise<strin
   return response.json()
 }
 
+async function flushLogs(url: string, id: string, beginLogsAfterLine: number): Promise<number> {
+  let logLines = 0
+  while (true) {
+    const logs = await getLogs(`${url}/logs`, id, beginLogsAfterLine)
+    logs.forEach(line => process.stdout.write(line))
+    logLines += logs.length
+    beginLogsAfterLine += logs.length
+
+    if (logs.length === 0) {
+      return logLines
+    }
+  }
+}
+
 async function getLogsAndStatus(url: string, id: string, beginLogsAfterLine: number): Promise<{ status: RpcResult, logLines: number }> {
 
   const status = await getRpcStatus(url)
@@ -73,26 +87,11 @@ async function getLogsAndStatus(url: string, id: string, beginLogsAfterLine: num
     throw new Error(`unexpected id in status: ${status.id} (expected ${id})`)
   }
 
-  // TODO: get all logs here
-  const logs = await getLogs(`${url}/logs`, id, beginLogsAfterLine)
-  logs.forEach(line => process.stdout.write(line))
+  const logLines = await flushLogs(url, id, beginLogsAfterLine)
 
   return {
     status: status,
-    logLines: logs.length,
-  }
-}
-
-async function flushLogs(url: string, id: string, beginLogsAfterLine: number): Promise<void> {
-  while (true) {
-    const logs = await getLogs(`${url}/logs`, id, beginLogsAfterLine)
-    logs.forEach(line => process.stdout.write(line))
-
-    beginLogsAfterLine += logs.length
-
-    if (logs.length === 0) {
-      return
-    }
+    logLines: logLines,
   }
 }
 
