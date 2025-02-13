@@ -24,9 +24,20 @@ import os
 import signal
 import subprocess
 
+import logging
+from pythonjsonlogger.json import JsonFormatter
+
+logHandler = logging.StreamHandler()
+logHandler.setFormatter(JsonFormatter())
+
 app = Flask(__name__)
 app.logger.setLevel(logging.DEBUG)
-logging.getLogger('waitress').setLevel(logging.DEBUG)
+app.logger.addHandler(logHandler)
+
+waitressLogger = logging.getLogger('waitress')
+waitressLogger.setLevel(logging.DEBUG)
+waitressLogger.addHandler(logHandler)
+
 @dataclass
 class Response:
     id: str
