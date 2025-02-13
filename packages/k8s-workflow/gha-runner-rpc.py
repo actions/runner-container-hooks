@@ -25,19 +25,15 @@ import signal
 import subprocess
 
 import logging
-from pythonjsonlogger import jsonlogger
-
-logHandler = logging.StreamHandler()
-format_str = '%(message)%(levelname)%(name)%(asctime)'
-logHandler.setFormatter(jsonlogger.JsonFormatter(format_str))
+import json_logging
 
 app = Flask(__name__)
 app.logger.setLevel(logging.DEBUG)
-app.logger.addHandler(logHandler)
+json_logging.init_flask(enable_json=True)
+json_logging.init_request_instrument(app)
 
 waitressLogger = logging.getLogger('waitress')
 waitressLogger.setLevel(logging.DEBUG)
-waitressLogger.addHandler(logHandler)
 
 @dataclass
 class Response:
@@ -105,6 +101,7 @@ class State:
                 returncode = -1,
             )
 
+        app.logger.debug(f"Queueing job {id} with path {path}")
         self.status = Response(id = id, status = "pending")
         self.future = self.worker.submit(self.__run, id, path)
         return self.status
