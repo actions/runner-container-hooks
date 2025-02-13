@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+import time
+from flask import Flask, jsonify, request
+from threading import Thread
+from waitress import serve
+
+import argparse
+import json
+import logging
+import os
+import signal
+import subprocess
+
+app = Flask(__name__)
+app.logger.setLevel(logging.DEBUG)
+logging.getLogger('waitress').setLevel(logging.DEBUG)
+@dataclass
+class Response:
+    id: str
+    status: str
+    pid: int = None
+    returncode: int = None
+    error: str = None
+
+def readLines(path, fromLine, maxLines):
+    try:
+        with open(path, 'r') as f:
+            return [x for i, x in enumerate(f) if i >= fromLine and x.endswith('\n') and i < fromLine + maxLines]
+    except Exception as e:
+        # debug log only, as this can also happen if the log is read before the process has started
+        app.logger.debug(f"Error reading file {path}: {e}")
+        return []
+
+class State:
+    def __init__(self):
+        self.latest_id = None
+        self.status = Response(id = "", status = "idle")
+        self.worker = ThreadPoolExecutor(max_workers=1)
+        self.future = None
+        self.process = None
+        self.out = None
+
+    def __run(self, id, path):
+        self.latest_id = id
+        try:
+            app.logger.debug(f"Running id {id}")
+            app.logger.debug(f"Content of script at {path}: {open(path).read()}")
+            logsfilename = f"/logs/{id}.out"
+            self.out = open(logsfilename, "w")
+            self.process = subprocess.Popen(['sh', '-e', path], start_new_session=True, stdout=self.out, stderr=self.out)
+            app.logger.debug(f"Process for id {id} started with pid {self.process.pid}")
+            self.status = Response(
+                id = id,
+                status = 'running',
+                pid = self.process.pid
+            )
+            self.process.wait()
+            self.out.close()
+            app.logger.debug(f"Process for id {id} finished (return code {self.process.returncode})")
+            app.logger.debug(f"Output for id {id} is: {open(logsfilename).read()}")
+            self.status = Response(
+                id = id,
+                status = 'completed',
+                returncode = self.process.returncode,
+            )
+        except Exception as e:
+            app.logger.error(f"Error starting process: {e}")
+            self.status = Response(
+                id = id,
+                status = 'failed',
+                error = str(e),
+                returncode = -1,
+            )
+
+
+    def exec(self, id, path):
+        if self.future and not self.future.done():
+            app.logger.error(f"A job is already running (ID {self.latest_id})")
+            return Response(
+                id = id,
+                status = 'failed',
+                error = f"A job is already running (ID {self.latest_id})",
+                returncode = -1,
+            )
+        self.future = self.worker.submit(self.__run, id, path)
+        # wait for the worker to pickup the job before returning
+        while self.status.id != id:
+            time.sleep(0.1)
+        return self.status
+
+    def cancel(self):
+        if not self.future:
+            return Response(
+                id = '',
+                status = 'failed',
+                error = 'No job has been started yet',
+            )
+        elif self.future.done():
+            # The job is already done, no need to cancel
+            return self.status
+        else:
+            app.logger.debug(f"Cancelling {self.latest_id} (pid {self.process.pid})")
+            os.killpg(os.getpgid(self.process.pid), signal.SIGINT)
+
+            return Response(
+                id = self.latest_id,
+                status = 'cancelling',
+                pid = self.process.pid
+            )
+
+state = State()
+
+@app.route('/', methods=['POST'])
+def call():
+    data = json.loads(request.data)
+    id = data['id']
+    path = data['path']
+    return jsonify(state.exec(id, path))
+
+@app.route('/', methods=['DELETE'])
+def cancel():
+    return jsonify(state.cancel())
+
+@app.route('/')
+def status():
+    return jsonify(state.status)
+
+@app.route('/logs')
+def logs():
+    id = request.args.get('id')
+    fromLine = int(request.args.get('fromLine', 0))
+    maxLines = int(request.args.get('maxLines', 1000))
+    path = f"/logs/{id}.out"
+    return jsonify(readLines(path, fromLine, maxLines))
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dev', action='store_true', help='Run in Flask development mode')
+
+    args = parser.parse_args()
+
+    if args.dev:
+        app.run(host='0.0.0.0', port=8080, debug=True)
+    else:
+        serve(app, host='0.0.0.0', port=8080, threads=1)
+
