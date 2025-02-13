@@ -9,9 +9,6 @@ import { POD_VOLUME_NAME } from './index'
 import { CONTAINER_EXTENSION_PREFIX } from '../hooks/constants'
 import * as shlex from 'shlex'
 
-// FIXME: keep the original option too?
-// export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
-// export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = []
 export const DEFAULT_CONTAINER_ENTRY_POINT = '/gha-runner-rpc.py'
 
