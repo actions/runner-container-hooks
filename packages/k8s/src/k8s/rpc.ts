@@ -38,7 +38,11 @@ async function startRpc(url: string, id: string, containerPath: string): Promise
       body: JSON.stringify({ "id": id, "path": containerPath })
     })
   const response = await fetch(request)
-  return response.json();
+  const status = await response.json()
+  if (status.status === 'failed' && status.id === id) {
+    throw new Error(`rpc failed to start: ${status.error}`)
+  }
+  return await waitForRpcStatus(url, id);
 }
 
 async function getRpcStatus(url: string): Promise<RpcResult> {
@@ -131,11 +135,13 @@ export async function rpcPodStep(
   await awaitRpcCompletion(url, id)
 }
 
-export async function waitForRpcStatus(url: string): Promise<void> {
+export async function waitForRpcStatus(url: string, expectedId?: string): Promise<RpcResult> {
   while (true) {
     try {
-      await getRpcStatus(url)
-      return
+      const status = await getRpcStatus(url)
+      if (!expectedId || status.id === expectedId) {
+        return status
+      }
     } catch (err) {
       core.debug(`failed getting RPC status, not yet ready: ${JSON.stringify(err)}`)
     }

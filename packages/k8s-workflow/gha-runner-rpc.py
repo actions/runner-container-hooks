@@ -32,9 +32,6 @@ app.logger.setLevel(logging.DEBUG)
 json_logging.init_flask(enable_json=True)
 json_logging.init_request_instrument(app)
 
-waitressLogger = logging.getLogger('waitress')
-waitressLogger.setLevel(logging.DEBUG)
-
 @dataclass
 class Response:
     id: str
