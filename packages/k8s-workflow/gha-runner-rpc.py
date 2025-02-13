@@ -25,10 +25,11 @@ import signal
 import subprocess
 
 import logging
-from pythonjsonlogger.json import JsonFormatter
+from pythonjsonlogger import jsonlogger
 
 logHandler = logging.StreamHandler()
-logHandler.setFormatter(JsonFormatter())
+format_str = '%(message)%(levelname)%(name)%(asctime)'
+logHandler.setFormatter(jsonlogger.JsonFormatter(format_str))
 
 app = Flask(__name__)
 app.logger.setLevel(logging.DEBUG)
@@ -103,10 +104,9 @@ class State:
                 error = f"A job is already running (ID {self.latest_id})",
                 returncode = -1,
             )
+
+        self.status = Response(id = id, status = "pending")
         self.future = self.worker.submit(self.__run, id, path)
-        # wait for the worker to pickup the job before returning
-        while self.status.id != id:
-            time.sleep(0.1)
         return self.status
 
     def cancel(self):
@@ -153,6 +153,7 @@ def cancel():
 # Get the current status
 @app.route('/')
 def status():
+    app.logger.debug(f"Status: {state.status}")
     return jsonify(state.status)
 
 # Get the logs of a given job
