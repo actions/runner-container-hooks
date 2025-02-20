@@ -314,17 +314,15 @@ export async function getContainerEnvValue(
 }
 
 export async function registryLogin(registry?: Registry): Promise<string> {
+  const configLocation = env.DOCKER_CONFIG || `${env.RUNNER_TEMP}/.docker_${uuidv4()}`
   // if registry credentials are not provided, skip login and return default docker config location
   if (!registry) {
-    return env.DOCKER_CONFIG || `${env.HOME}/.docker`
+    return configLocation
   }
   const credentials = {
     username: registry.username,
     password: registry.password
   }
-
-  const configLocation = `${env.RUNNER_TEMP}/.docker_${uuidv4()}`
-  fs.mkdirSync(configLocation)
   try {
     await dockerLogin(configLocation, registry.serverUrl, credentials)
   } catch (error) {

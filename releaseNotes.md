@@ -1,6 +1,6 @@
 ## Features
 
-- conditionally skip docker login step to fallback on default docker config if no registry credentials are provided
+- always run docker login and use env-provided docker config location
 
 <!-- ## Bugs -->
 
