@@ -53,9 +53,15 @@ export async function createContainer(
     ...(args.systemMountVolumes || [])
   ]
   for (const mountVolume of mountVolumes) {
-    dockerArgs.push(
-      `-v=${mountVolume.sourceVolumePath}:${mountVolume.targetVolumePath}`
-    )
+    let sourceVolumePath = mountVolume.sourceVolumePath
+    if (
+      sourceVolumePath === '/var/run/docker.sock' &&
+      env.DOCKER_HOST &&
+      env.DOCKER_HOST.startsWith('unix://')
+    ) {
+      sourceVolumePath = env.DOCKER_HOST.replace('unix://', '')
+    }
+    dockerArgs.push(`-v=${sourceVolumePath}:${mountVolume.targetVolumePath}`)
   }
   if (args.entryPoint) {
     dockerArgs.push(`--entrypoint`)
@@ -413,9 +419,17 @@ export async function containerRun(
     ...(args.systemMountVolumes || [])
   ]
   for (const mountVolume of mountVolumes) {
+    let sourceVolumePath = mountVolume.sourceVolumePath
+    if (
+      sourceVolumePath === '/var/run/docker.sock' &&
+      env.DOCKER_HOST &&
+      env.DOCKER_HOST.startsWith('unix://')
+    ) {
+      sourceVolumePath = env.DOCKER_HOST.replace('unix://', '')
+    }
     dockerArgs.push(`-v`)
     dockerArgs.push(
-      `${mountVolume.sourceVolumePath}:${mountVolume.targetVolumePath}${
+      `${sourceVolumePath}:${mountVolume.targetVolumePath}${
         mountVolume.readOnly ? ':ro' : ''
       }`
     )
