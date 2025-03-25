@@ -2,7 +2,7 @@ import * as k8s from '@kubernetes/client-node'
 import * as fs from 'fs'
 import * as yaml from 'js-yaml'
 import * as core from '@actions/core'
-import { Mount } from 'hooklib'
+import { ServiceContainerInfo, Mount } from 'hooklib'
 import * as path from 'path'
 import { v1 as uuidv4 } from 'uuid'
 import { POD_VOLUME_NAME } from './index'
@@ -160,12 +160,26 @@ exec ${environmentPrefix} ${entryPoint} ${
   }
 }
 
-export function generateContainerName(image: string): string {
+export function generateContainerName(service: ServiceContainerInfo): string {
+  const image = service.image
   const nameWithTag = image.split('/').pop()
-  const name = nameWithTag?.split(':').at(0)
+  let name = nameWithTag?.split(':').at(0)
 
   if (!name) {
     throw new Error(`Image definition '${image}' is invalid`)
+  }
+
+  if (service.createOptions) {
+    const optionsArr = service.createOptions.split(/[ ]+/)
+    for (let i = 0; i < optionsArr.length; i++) {
+      if (optionsArr[i] === '--name') {
+        if (i + 1 >= optionsArr.length) {
+          throw new Error(`Invalid create options: ${service.createOptions} (missing a value after --name)`)
+        }
+        name = optionsArr[++i]
+        core.debug(`Overriding service container name with: ${name}`)
+      }
+    }
   }
 
   return name

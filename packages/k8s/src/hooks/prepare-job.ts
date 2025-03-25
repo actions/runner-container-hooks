@@ -58,7 +58,7 @@ export async function prepareJob(
       core.debug(`Adding service '${service.image}' to pod definition`)
       return createContainerSpec(
         service,
-        generateContainerName(service.image),
+        generateContainerName(service),
         false,
         extension
       )
@@ -159,7 +159,7 @@ function generateResponseFile(
 
   if (args.services?.length) {
     const serviceContainerNames =
-      args.services?.map(s => generateContainerName(s.image)) || []
+      args.services?.map(s => generateContainerName(s)) || []
 
     response.context['services'] = appPod?.spec?.containers
       ?.filter(c => serviceContainerNames.includes(c.name))
