@@ -457,7 +457,6 @@ export async function getPodLogs(
 
   const r = await log.log(namespace(), podName, containerName, logStream, {
     follow: true,
-    tailLines: 50,
     pretty: false,
     timestamps: false
   })
