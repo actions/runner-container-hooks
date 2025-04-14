@@ -28,7 +28,13 @@ export async function runContainerStep(
 
   let secretName: string | undefined = undefined
   if (stepContainer.environmentVariables) {
-    secretName = await createSecretForEnvs(stepContainer.environmentVariables)
+    try {
+      secretName = await createSecretForEnvs(stepContainer.environmentVariables)
+    } catch (err) {
+      core.debug(`createSecretForEnvs failed: ${JSON.stringify(err)}`)
+      const message = (err as any)?.response?.body?.message || err
+      throw new Error(`failed to create script environment: ${message}`)
+    }
   }
 
   const extension = readExtensionFromFile()
