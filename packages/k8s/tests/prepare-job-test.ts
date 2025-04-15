@@ -125,7 +125,7 @@ describe('Prepare job', () => {
 
     // job container
     expect(got.spec?.containers[0].name).toBe(JOB_CONTAINER_NAME)
-    expect(got.spec?.containers[0].image).toBe('node:14.16')
+    expect(got.spec?.containers[0].image).toBe('node:22')
     expect(got.spec?.containers[0].command).toEqual(['sh'])
     expect(got.spec?.containers[0].args).toEqual(['-c', 'sleep 50'])
 
