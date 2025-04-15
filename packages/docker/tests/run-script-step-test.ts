@@ -75,4 +75,22 @@ describe('run script step', () => {
       runScriptStep(definitions.runScriptStep.args, prepareJobResponse.state)
     ).resolves.not.toThrow()
   })
+
+  it('Should confirm that CI and GITHUB_ACTIONS are set', async () => {
+    definitions.runScriptStep.args.entryPoint = '/bin/bash'
+    definitions.runScriptStep.args.entryPointArgs = [
+      '-c',
+      `'if [[ ! $(env | grep "^CI=") = "CI=true" ]]; then exit 1; fi'`
+    ]
+    await expect(
+      runScriptStep(definitions.runScriptStep.args, prepareJobResponse.state)
+    ).resolves.not.toThrow()
+    definitions.runScriptStep.args.entryPointArgs = [
+      '-c',
+      `'if [[ ! $(env | grep "^GITHUB_ACTIONS=") = "GITHUB_ACTIONS=true" ]]; then exit 1; fi'`
+    ]
+    await expect(
+      runScriptStep(definitions.runScriptStep.args, prepareJobResponse.state)
+    ).resolves.not.toThrow()
+  })
 })

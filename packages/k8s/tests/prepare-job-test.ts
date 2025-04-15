@@ -62,6 +62,28 @@ describe('Prepare job', () => {
     ).resolves.not.toThrow()
   })
 
+  it('should prepare job with envs CI and GITHUB_ACTIONS', async () => {
+    await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+
+    const content = JSON.parse(
+      fs.readFileSync(prepareJobOutputFilePath).toString()
+    )
+
+    const got = await getPodByName(content.state.jobPod)
+    expect(got.spec?.containers[0].env).toEqual(
+      expect.arrayContaining([
+        { name: 'CI', value: 'true' },
+        { name: 'GITHUB_ACTIONS', value: 'true' },
+      ])
+    )
+    expect(got.spec?.containers[1].env).toEqual(
+      expect.arrayContaining([
+        { name: 'CI', value: 'true' },
+        { name: 'GITHUB_ACTIONS', value: 'true' },
+      ])
+    )
+  })
+
   it('should throw an exception if the user volume mount is absolute path outside of GITHUB_WORKSPACE', async () => {
     prepareJobData.args.container.userMountVolumes = [
       {
@@ -133,9 +155,13 @@ describe('Prepare job', () => {
     expect(got.spec?.containers[1].image).toBe('redis')
     expect(got.spec?.containers[1].command).toBeFalsy()
     expect(got.spec?.containers[1].args).toBeFalsy()
-    expect(got.spec?.containers[1].env).toEqual([
-      { name: 'ENV2', value: 'value2' }
-    ])
+    expect(got.spec?.containers[1].env).toEqual(
+      expect.arrayContaining([
+        { name: 'CI', value: 'true' },
+        { name: 'GITHUB_ACTIONS', value: 'true' },
+        { name: 'ENV2', value: 'value2' }
+      ])
+    )
     expect(got.spec?.containers[1].resources).toEqual({
       requests: { memory: '1Mi', cpu: '1' },
       limits: { memory: '1Gi', cpu: '2' }
