@@ -73,13 +73,39 @@ describe('Prepare job', () => {
     expect(got.spec?.containers[0].env).toEqual(
       expect.arrayContaining([
         { name: 'CI', value: 'true' },
-        { name: 'GITHUB_ACTIONS', value: 'true' },
+        { name: 'GITHUB_ACTIONS', value: 'true' }
       ])
     )
     expect(got.spec?.containers[1].env).toEqual(
       expect.arrayContaining([
         { name: 'CI', value: 'true' },
-        { name: 'GITHUB_ACTIONS', value: 'true' },
+        { name: 'GITHUB_ACTIONS', value: 'true' }
+      ])
+    )
+  })
+
+  it('should not override CI env var if already set', async () => {
+    prepareJobData.args.container.environmentVariables = {
+      CI: 'false'
+    }
+
+    await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+
+    const content = JSON.parse(
+      fs.readFileSync(prepareJobOutputFilePath).toString()
+    )
+
+    const got = await getPodByName(content.state.jobPod)
+    expect(got.spec?.containers[0].env).toEqual(
+      expect.arrayContaining([
+        { name: 'CI', value: 'false' },
+        { name: 'GITHUB_ACTIONS', value: 'true' }
+      ])
+    )
+    expect(got.spec?.containers[1].env).toEqual(
+      expect.arrayContaining([
+        { name: 'CI', value: 'true' },
+        { name: 'GITHUB_ACTIONS', value: 'true' }
       ])
     )
   })
