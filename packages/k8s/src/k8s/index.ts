@@ -457,7 +457,6 @@ export async function getPodLogs(
     process.stderr.write(err.message)
   })
 
-
   await log.log(namespace(), podName, containerName, logStream, {
     follow: true,
     pretty: false,
