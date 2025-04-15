@@ -9,7 +9,7 @@
     }
   },
   "args": {
-    "image": "node:14.16",
+    "image": "node:22",
     "dockerfile": null,
     "entryPointArgs": [
       "-e",
