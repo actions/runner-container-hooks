@@ -200,6 +200,7 @@ export async function getContainerJobPodName(jobName: string): Promise<string> {
       labelSelector: selector,
       limit: 1
     })
+
     if (!podList.items?.length) {
       await backOffManager.backOff()
       continue
@@ -362,7 +363,7 @@ export async function pruneSecrets(): Promise<void> {
   await Promise.all(
     secretList.items.map(
       async secret =>
-        secret.metadata?.name && (await deleteSecret(secret.metadata.name))
+        secret.metadata?.name && deleteSecret(secret.metadata.name)
     )
   )
 }
@@ -465,8 +466,7 @@ export async function getPodLogs(
     pretty: false,
     timestamps: false
   })
-
-  await new Promise(resolve => logStream.on('close', resolve))
+  await new Promise(resolve => logStream.on('close', () => resolve(null)))
 }
 
 export async function prunePods(): Promise<void> {
@@ -480,7 +480,7 @@ export async function prunePods(): Promise<void> {
 
   await Promise.all(
     podList.items.map(
-      async pod => pod.metadata?.name && (await deletePod(pod.metadata.name))
+      async pod => pod.metadata?.name && deletePod(pod.metadata.name)
     )
   )
 }
@@ -488,11 +488,8 @@ export async function prunePods(): Promise<void> {
 export async function getPodStatus(
   name: string
 ): Promise<k8s.V1PodStatus | undefined> {
-  const { status } = await k8sApi.readNamespacedPod({
-    name,
-    namespace: namespace()
-  })
-  return status
+  const pod = await k8sApi.readNamespacedPod({ name, namespace: namespace() })
+  return pod.status
 }
 
 export async function isAuthPermissionsOK(): Promise<boolean> {
@@ -654,8 +651,5 @@ export function containerPorts(
 }
 
 export async function getPodByName(name): Promise<k8s.V1Pod> {
-  return await k8sApi.readNamespacedPod({
-    name,
-    namespace: namespace()
-  })
+  return await k8sApi.readNamespacedPod({ name, namespace: namespace() })
 }
