@@ -271,7 +271,7 @@ export async function waitForJobToComplete(jobName: string): Promise<void> {
         return
       }
     } catch (error) {
-      throw new Error(`job ${jobName} has failed`)
+      throw new Error(`job ${jobName} has failed: ${JSON.stringify(error)}`)
     }
     await backOffManager.backOff()
   }
@@ -361,7 +361,8 @@ export async function pruneSecrets(): Promise<void> {
 
   await Promise.all(
     secretList.items.map(
-      secret => secret.metadata?.name && deleteSecret(secret.metadata.name)
+      async secret =>
+        secret.metadata?.name && (await deleteSecret(secret.metadata.name))
     )
   )
 }
@@ -389,7 +390,9 @@ export async function waitForPodPhases(
       await backOffManager.backOff()
     }
   } catch (error) {
-    throw new Error(`Pod ${podName} is unhealthy with phase status ${phase}`)
+    throw new Error(
+      `Pod ${podName} is unhealthy with phase status ${phase}: ${JSON.stringify(error)}`
+    )
   }
 }
 
@@ -476,7 +479,9 @@ export async function prunePods(): Promise<void> {
   }
 
   await Promise.all(
-    podList.items.map(pod => pod.metadata?.name && deletePod(pod.metadata.name))
+    podList.items.map(
+      async pod => pod.metadata?.name && (await deletePod(pod.metadata.name))
+    )
   )
 }
 
@@ -526,7 +531,7 @@ export async function isPodContainerAlpine(
       podName,
       containerName
     )
-  } catch (err) {
+  } catch {
     isAlpine = false
   }
 

@@ -45,9 +45,8 @@ export default class TestSetup {
   public initialize(): void {
     env['GITHUB_WORKSPACE'] = this.workingDirectory
     env['RUNNER_NAME'] = 'test'
-    env[
-      'RUNNER_TEMP'
-    ] = `${this.runnerMockDir}/${this.runnerMockSubdirs.workTemp}`
+    env['RUNNER_TEMP'] =
+      `${this.runnerMockDir}/${this.runnerMockSubdirs.workTemp}`
 
     for (const dir of this.allTestDirectories) {
       fs.mkdirSync(dir, { recursive: true })
