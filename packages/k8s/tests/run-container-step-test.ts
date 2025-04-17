@@ -78,4 +78,15 @@ describe('Run container step', () => {
       runContainerStep(runContainerStepData.args)
     ).resolves.not.toThrow()
   })
+
+  it('should run container step with envs CI and GITHUB_ACTIONS', async () => {
+    runContainerStepData.args.entryPoint = 'bash'
+    runContainerStepData.args.entryPointArgs = [
+      '-c',
+      "'if [[ -z $GITHUB_ACTIONS  ]] || [[ -z $CI ]]; then exit 1; fi'"
+    ]
+    await expect(
+      runContainerStep(runContainerStepData.args)
+    ).resolves.not.toThrow()
+  })
 })
