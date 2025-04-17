@@ -39,6 +39,10 @@ export function getSecretName(): string {
   )}-secret-${uuidv4().substring(0, STEP_POD_NAME_SUFFIX_LENGTH)}`
 }
 
+export function shouldInjectRunnerServiceAccount(): boolean {
+  return process.env.ACTIONS_RUNNER_INJECT_RUNNER_SERVICE_ACCOUNT === 'true'
+}
+
 export const MAX_POD_NAME_LENGTH = 63
 export const STEP_POD_NAME_SUFFIX_LENGTH = 8
 export const CONTAINER_EXTENSION_PREFIX = '$'
