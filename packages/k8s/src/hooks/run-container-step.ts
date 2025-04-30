@@ -29,7 +29,14 @@ export async function runContainerStep(
   let secretName: string | undefined = undefined
   if (stepContainer.environmentVariables) {
     try {
-      secretName = await createSecretForEnvs(stepContainer.environmentVariables)
+      const envs = JSON.parse(
+        JSON.stringify(stepContainer.environmentVariables)
+      )
+      envs['GITHUB_ACTIONS'] = 'true'
+      if (!('CI' in envs)) {
+        envs.CI = 'true'
+      }
+      secretName = await createSecretForEnvs(envs)
     } catch (err) {
       core.debug(`createSecretForEnvs failed: ${JSON.stringify(err)}`)
       const message = (err as any)?.response?.body?.message || err

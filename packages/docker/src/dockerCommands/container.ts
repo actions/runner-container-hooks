@@ -43,9 +43,14 @@ export async function createContainer(
 
   if (args.environmentVariables) {
     for (const [key] of Object.entries(args.environmentVariables)) {
-      dockerArgs.push('-e')
-      dockerArgs.push(key)
+      dockerArgs.push('-e', key)
     }
+  }
+
+  dockerArgs.push('-e', 'GITHUB_ACTIONS=true')
+  // Use same behavior as the runner https://github.com/actions/runner/blob/27d9c886ab9a45e0013cb462529ac85d581f8c41/src/Runner.Worker/Container/DockerCommandManager.cs#L150
+  if (!('CI' in (args.environmentVariables ?? {}))) {
+    dockerArgs.push('-e', 'CI=true')
   }
 
   const mountVolumes = [
@@ -403,9 +408,14 @@ export async function containerRun(
   }
   if (args.environmentVariables) {
     for (const [key] of Object.entries(args.environmentVariables)) {
-      dockerArgs.push('-e')
-      dockerArgs.push(key)
+      dockerArgs.push('-e', key)
     }
+  }
+
+  dockerArgs.push('-e', 'GITHUB_ACTIONS=true')
+  // Use same behavior as the runner https://github.com/actions/runner/blob/27d9c886ab9a45e0013cb462529ac85d581f8c41/src/Runner.Worker/Container/DockerCommandManager.cs#L150
+  if (!('CI' in (args.environmentVariables ?? {}))) {
+    dockerArgs.push('-e', 'CI=true')
   }
 
   const mountVolumes = [

@@ -394,7 +394,7 @@ metadata:
 spec:
   containers:
     - name: test
-      image: node:14.16
+      image: node:22
     - name: job
       image: ubuntu:latest`
       )
@@ -407,7 +407,7 @@ spec:
 
   it('should merge container spec', () => {
     const base = {
-      image: 'node:14.16',
+      image: 'node:22',
       name: 'test',
       env: [
         {
@@ -462,7 +462,7 @@ spec:
     const base = {
       containers: [
         {
-          image: 'node:14.16',
+          image: 'node:22',
           name: 'test',
           env: [
             {

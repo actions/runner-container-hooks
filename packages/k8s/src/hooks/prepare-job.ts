@@ -229,6 +229,18 @@ export function createContainerSpec(
     }
   }
 
+  podContainer.env.push({
+    name: 'GITHUB_ACTIONS',
+    value: 'true'
+  })
+
+  if (!('CI' in container['environmentVariables'])) {
+    podContainer.env.push({
+      name: 'CI',
+      value: 'true'
+    })
+  }
+
   podContainer.volumeMounts = containerVolumes(
     container.userMountVolumes,
     jobContainer

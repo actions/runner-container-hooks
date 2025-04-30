@@ -5,7 +5,10 @@
   "main": "lib/index.js",
   "scripts": {
     "test": "jest --runInBand",
-    "build": "npx tsc && npx ncc build"
+    "build": "npx tsc && npx ncc build",
+    "format": "prettier --write '**/*.ts'",
+    "format-check": "prettier --check '**/*.ts'",
+    "lint": "eslint src/**/*.ts"
   },
   "author": "",
   "license": "MIT",
