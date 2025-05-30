@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package script_executor;
+
+service ScriptExecutor {
+  // Execute the provided script and stream the output, error, and exit code.
+  rpc ExecuteScript(ScriptRequest) returns (stream ScriptResponse) {}
+}
+
+message ScriptRequest {
+  // The script to execute.
+  string script = 1;
+  // Unique identifier for the script to prevent duplicate executions.
+  string id = 2;
+}
+
+message ScriptResponse {
+  // Streams the stdout from the process run by the script.
+  optional string output = 1;
+  // Streams the stderr from the process run by the script.
+  optional string error = 2;
+  // Returns the exit code of the process run by the script.
+  optional int32 code = 3;
+}
