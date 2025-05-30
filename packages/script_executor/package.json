@@ -5,7 +5,18 @@
         "@grpc/grpc-js": "^1.12.5",
         "@grpc/proto-loader": "^0.7.13"
     },
+    "main": "dist/server.js",
+    "scripts": {
+        "build": "npx tsc && npx ncc build",
+        "postbuild": "cp ../proto/script_executor.proto ./dist/proto/script_executor.proto",
+        "start": "npm run build && node dist/index.js",
+        "format": "prettier --write '**/*.ts'",
+        "format-check": "prettier --check '**/*.ts'",
+        "lint": "eslint src/**/*.ts"
+    },
     "devDependencies": {
+        "@vercel/ncc": "^0.38.3",
+        "prettier": "^3.5.3",
         "typescript": "^5.7.3"
     }
 }

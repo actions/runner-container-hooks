@@ -1,4 +1,5 @@
 dist/
 lib/
+proto/
 node_modules/
 **/tests/**

@@ -483,7 +483,7 @@ export async function getPodStatus(
   name: string
 ): Promise<k8s.V1PodStatus | undefined> {
   const pod = await k8sApi.readNamespacedPod({
-    name: name,
+    name,
     namespace: namespace()
   })
   return pod.status
@@ -648,5 +648,5 @@ export function containerPorts(
 }
 
 export async function getPodByName(name): Promise<k8s.V1Pod> {
-  return await k8sApi.readNamespacedPod({ name: name, namespace: namespace() })
+  return await k8sApi.readNamespacedPod({ name, namespace: namespace() })
 }
