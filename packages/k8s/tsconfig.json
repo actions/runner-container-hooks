@@ -3,7 +3,9 @@
     "compilerOptions": {
       "baseUrl": "./",
       "outDir": "./lib",
-      "rootDir": "./src"
+      "rootDir": "./src",
+      "module": "commonjs",
+      "esModuleInterop": true
     },
     "include": [
       "./src"

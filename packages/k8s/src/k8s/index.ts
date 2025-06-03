@@ -127,8 +127,10 @@ export async function createPod(
     mergePodSpecWithOptions(appPod.spec, extension.spec)
   }
 
-  const { body } = await k8sApi.createNamespacedPod(namespace(), appPod)
-  return body
+  return await k8sApi.createNamespacedPod({
+    namespace: namespace(),
+    body: appPod
+  })
 }
 
 export async function createJob(
@@ -183,46 +185,42 @@ export async function createJob(
     }
   }
 
-  const { body } = await k8sBatchV1Api.createNamespacedJob(namespace(), job)
-  return body
+  return await k8sBatchV1Api.createNamespacedJob({
+    namespace: namespace(),
+    body: job
+  })
 }
 
 export async function getContainerJobPodName(jobName: string): Promise<string> {
   const selector = `job-name=${jobName}`
   const backOffManager = new BackOffManager(60)
   while (true) {
-    const podList = await k8sApi.listNamespacedPod(
-      namespace(),
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      selector,
-      1
-    )
+    const podList = await k8sApi.listNamespacedPod({
+      namespace: namespace(),
+      labelSelector: selector,
+      limit: 1
+    })
 
-    if (!podList.body.items?.length) {
+    if (!podList.items?.length) {
       await backOffManager.backOff()
       continue
     }
 
-    if (!podList.body.items[0].metadata?.name) {
+    if (!podList.items[0].metadata?.name) {
       throw new Error(
         `Failed to determine the name of the pod for job ${jobName}`
       )
     }
-    return podList.body.items[0].metadata.name
+    return podList.items[0].metadata.name
   }
 }
 
 export async function deletePod(podName: string): Promise<void> {
-  await k8sApi.deleteNamespacedPod(
-    podName,
-    namespace(),
-    undefined,
-    undefined,
-    0
-  )
+  await k8sApi.deleteNamespacedPod({
+    name: podName,
+    namespace: namespace(),
+    gracePeriodSeconds: 0
+  })
 }
 
 export async function execPodStep(
@@ -315,8 +313,10 @@ export async function createDockerSecret(
     )
   }
 
-  const { body } = await k8sApi.createNamespacedSecret(namespace(), secret)
-  return body
+  return await k8sApi.createNamespacedSecret({
+    namespace: namespace(),
+    body: secret
+  })
 }
 
 export async function createSecretForEnvs(envs: {
@@ -340,29 +340,28 @@ export async function createSecretForEnvs(envs: {
     secret.data[key] = Buffer.from(value).toString('base64')
   }
 
-  await k8sApi.createNamespacedSecret(namespace(), secret)
+  await k8sApi.createNamespacedSecret({ namespace: namespace(), body: secret })
   return secretName
 }
 
 export async function deleteSecret(secretName: string): Promise<void> {
-  await k8sApi.deleteNamespacedSecret(secretName, namespace())
+  await k8sApi.deleteNamespacedSecret({
+    name: secretName,
+    namespace: namespace()
+  })
 }
 
 export async function pruneSecrets(): Promise<void> {
-  const secretList = await k8sApi.listNamespacedSecret(
-    namespace(),
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    new RunnerInstanceLabel().toString()
-  )
-  if (!secretList.body.items.length) {
+  const secretList = await k8sApi.listNamespacedSecret({
+    namespace: namespace(),
+    labelSelector: new RunnerInstanceLabel().toString()
+  })
+  if (!secretList.items.length) {
     return
   }
 
   await Promise.all(
-    secretList.body.items.map(
+    secretList.items.map(
       secret => secret.metadata?.name && deleteSecret(secret.metadata.name)
     )
   )
@@ -422,9 +421,10 @@ async function getPodPhase(podName: string): Promise<PodPhase> {
     PodPhase.FAILED,
     PodPhase.UNKNOWN
   ])
-  const { body } = await k8sApi.readNamespacedPod(podName, namespace())
-  const pod = body
-
+  const pod = await k8sApi.readNamespacedPod({
+    name: podName,
+    namespace: namespace()
+  })
   if (!pod.status?.phase || !podPhaseLookup.has(pod.status.phase)) {
     return PodPhase.UNKNOWN
   }
@@ -432,8 +432,10 @@ async function getPodPhase(podName: string): Promise<PodPhase> {
 }
 
 async function isJobSucceeded(jobName: string): Promise<boolean> {
-  const { body } = await k8sBatchV1Api.readNamespacedJob(jobName, namespace())
-  const job = body
+  const job = await k8sBatchV1Api.readNamespacedJob({
+    name: jobName,
+    namespace: namespace()
+  })
   if (job.status?.failed) {
     throw new Error(`job ${jobName} has failed`)
   }
@@ -455,47 +457,41 @@ export async function getPodLogs(
     process.stderr.write(err.message)
   })
 
-  const r = await log.log(namespace(), podName, containerName, logStream, {
+  await log.log(namespace(), podName, containerName, logStream, {
     follow: true,
     pretty: false,
     timestamps: false
   })
-  await new Promise(resolve => r.on('close', () => resolve(null)))
+  await new Promise(resolve => logStream.on('close', () => resolve(null)))
 }
 
 export async function prunePods(): Promise<void> {
-  const podList = await k8sApi.listNamespacedPod(
-    namespace(),
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    new RunnerInstanceLabel().toString()
-  )
-  if (!podList.body.items.length) {
+  const podList = await k8sApi.listNamespacedPod({
+    namespace: namespace(),
+    labelSelector: new RunnerInstanceLabel().toString()
+  })
+  if (!podList.items.length) {
     return
   }
 
   await Promise.all(
-    podList.body.items.map(
-      pod => pod.metadata?.name && deletePod(pod.metadata.name)
-    )
+    podList.items.map(pod => pod.metadata?.name && deletePod(pod.metadata.name))
   )
 }
 
 export async function getPodStatus(
   name: string
 ): Promise<k8s.V1PodStatus | undefined> {
-  const { body } = await k8sApi.readNamespacedPod(name, namespace())
-  return body.status
+  const pod = await k8sApi.readNamespacedPod({
+    name: name,
+    namespace: namespace()
+  })
+  return pod.status
 }
 
 export async function isAuthPermissionsOK(): Promise<boolean> {
   const sar = new k8s.V1SelfSubjectAccessReview()
-  const asyncs: Promise<{
-    response: unknown
-    body: k8s.V1SelfSubjectAccessReview
-  }>[] = []
+  const asyncs: Promise<k8s.V1SelfSubjectAccessReview>[] = []
   for (const resource of requiredPermissions) {
     for (const verb of resource.verbs) {
       sar.spec = new k8s.V1SelfSubjectAccessReviewSpec()
@@ -505,11 +501,13 @@ export async function isAuthPermissionsOK(): Promise<boolean> {
       sar.spec.resourceAttributes.group = resource.group
       sar.spec.resourceAttributes.resource = resource.resource
       sar.spec.resourceAttributes.subresource = resource.subresource
-      asyncs.push(k8sAuthorizationV1Api.createSelfSubjectAccessReview(sar))
+      asyncs.push(
+        k8sAuthorizationV1Api.createSelfSubjectAccessReview({ body: sar })
+      )
     }
   }
   const responses = await Promise.all(asyncs)
-  return responses.every(resp => resp.body.status?.allowed)
+  return responses.every(resp => resp.status?.allowed)
 }
 
 export async function isPodContainerAlpine(
@@ -535,9 +533,12 @@ export async function isPodContainerAlpine(
 }
 
 async function getCurrentNodeName(): Promise<string> {
-  const resp = await k8sApi.readNamespacedPod(getRunnerPodName(), namespace())
+  const resp = await k8sApi.readNamespacedPod({
+    name: getRunnerPodName(),
+    namespace: namespace()
+  })
 
-  const nodeName = resp.body.spec?.nodeName
+  const nodeName = resp.spec?.nodeName
   if (!nodeName) {
     throw new Error('Failed to determine node name')
   }
@@ -647,6 +648,5 @@ export function containerPorts(
 }
 
 export async function getPodByName(name): Promise<k8s.V1Pod> {
-  const { body } = await k8sApi.readNamespacedPod(name, namespace())
-  return body
+  return await k8sApi.readNamespacedPod({ name: name, namespace: namespace() })
 }

@@ -17,7 +17,7 @@
     "@actions/exec": "^1.1.1",
     "hooklib": "file:../hooklib",
     "shlex": "^2.1.2",
-    "uuid": "^8.3.2"
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/jest": "^27.4.1",

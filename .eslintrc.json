@@ -11,6 +11,7 @@
     "eslint-comments/no-use": "off",
     "import/no-namespace": "off",
     "no-constant-condition": "off",
+    "no-console": "off",
     "no-unused-vars": "off",
     "i18n-text/no-en": "off",
     "@typescript-eslint/no-unused-vars": "error",
