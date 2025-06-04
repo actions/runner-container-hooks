@@ -14,6 +14,7 @@ export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
 export const ENV_USE_KUBE_SCHEDULER = 'ACTIONS_RUNNER_USE_KUBE_SCHEDULER'
+export const ENV_USE_SCRIPT_EXECUTOR = 'ACTIONS_RUNNER_USE_SCRIPT_EXECUTOR'
 
 export function containerVolumes(
   userMountVolumes: Mount[] = [],
@@ -278,6 +279,10 @@ export function useKubeScheduler(): boolean {
   return process.env[ENV_USE_KUBE_SCHEDULER] === 'true'
 }
 
+export function useScriptExecutor(): boolean {
+  return process.env[ENV_USE_SCRIPT_EXECUTOR] === 'true'
+}
+
 export enum PodPhase {
   PENDING = 'Pending',
   RUNNING = 'Running',
@@ -298,4 +303,8 @@ function mergeLists<T>(base?: T[], from?: T[]): T[] {
 
 export function fixArgs(args: string[]): string[] {
   return shlex.split(args.join(' '))
+}
+
+export async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }

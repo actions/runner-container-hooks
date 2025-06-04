@@ -75,7 +75,7 @@ function main(): void {
   // As of now, only other job in the cluster can access it but we need to improve it.
   server.bindAsync(
     '0.0.0.0:50051',
-    grpc.ServerCredentials.createSsl(null, [], false),
+    grpc.ServerCredentials.createInsecure(), // TODO(quoct): Change to create SSL.
     () => {
       server.start()
       console.log('Server running on port 50051')
