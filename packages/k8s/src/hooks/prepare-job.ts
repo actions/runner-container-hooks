@@ -26,7 +26,11 @@ import {
   PodPhase,
   fixArgs
 } from '../k8s/utils'
-import { CONTAINER_EXTENSION_PREFIX, JOB_CONTAINER_NAME } from './constants'
+import {
+  CONTAINER_EXTENSION_PREFIX,
+  JOB_CONTAINER_NAME,
+  DEFAULT_CONTAINER_EXTENSION_NAME
+} from './constants'
 
 export async function prepareJob(
   args: PrepareJobArgs,
@@ -248,6 +252,14 @@ export function createContainerSpec(
 
   if (!extension) {
     return podContainer
+  }
+
+  const all = extension.spec?.containers?.find(
+    c => c.name === DEFAULT_CONTAINER_EXTENSION_NAME
+  )
+
+  if (all) {
+    mergeContainerWithOptions(podContainer, all)
   }
 
   const from = extension.spec?.containers?.find(
