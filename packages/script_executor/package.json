@@ -17,6 +17,6 @@
     "devDependencies": {
         "@vercel/ncc": "^0.38.3",
         "prettier": "^3.5.3",
-        "typescript": "^5.7.3"
+        "typescript": "^4.8.4"
     }
 }
