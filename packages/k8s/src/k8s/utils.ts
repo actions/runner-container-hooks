@@ -2,12 +2,15 @@ import * as k8s from '@kubernetes/client-node'
 import * as fs from 'fs'
 import * as yaml from 'js-yaml'
 import * as core from '@actions/core'
-import { Mount } from 'hooklib'
+import * as shlex from 'shlex'
+import * as grpc from '@grpc/grpc-js'
 import * as path from 'path'
+
+import { Mount } from 'hooklib'
 import { v1 as uuidv4 } from 'uuid'
 import { POD_VOLUME_NAME } from './index'
 import { CONTAINER_EXTENSION_PREFIX } from '../hooks/constants'
-import * as shlex from 'shlex'
+import { script_executor } from './script_executor'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
@@ -307,4 +310,64 @@ export function fixArgs(args: string[]): string[] {
 
 export async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+/**
+ * Invoke GRPC server at ip_address:grpc_port to run a command.
+ * Stream output and error from the command to the console.
+ */
+export async function runScriptByGrpc(
+  command: string,
+  ip: string,
+  grpc_port = 50051
+): Promise<void> {
+  const client = new script_executor.ScriptExecutorClient(
+    `${ip}:${grpc_port}`,
+    // TODO(quoct): Use mTLS with certificates here.
+    grpc.credentials.createInsecure(),
+    {
+      // Ping the server every 10 seconds to ensure the connection is still active
+      'grpc.keepalive_time_ms': 10_000,
+      // Wait 5 seconds for the ping ack before assuming the connection is dead
+      'grpc.keepalive_timeout_ms': 5_000,
+      // send pings even without active streams
+      'grpc.keepalive_permit_without_calls': 1
+    }
+  )
+
+  // TODO(quoct): Add logic to prevent duplicate execution using the `id` field.
+  const call = client.ExecuteScript(
+    new script_executor.ScriptRequest({ script: command })
+  )
+  await new Promise<void>(async function (resolve, reject) {
+    let exitCode = -1
+    call.on('data', (response: script_executor.ScriptResponse) => {
+      if (response.has_code) {
+        exitCode = response.code
+      }
+      if (response.has_output) {
+        process.stdout.write(response.output)
+      }
+      if (response.has_error) {
+        process.stderr.write(response.error)
+      }
+    })
+
+    call.on('end', async () => {
+      // Half a second wait in case the data event with the exit code did not get triggered yet.
+      await sleep(500)
+      process.stdout.write(`Job exit code is ${exitCode}.`)
+      if (exitCode === 0) {
+        resolve()
+      } else {
+        reject(new Error(`Job failed with exit code ${exitCode}.`))
+      }
+    })
+
+    call.on('error', (err: any) => {
+      const errorMessage = `Error execing ${command}: ${err}`
+      process.stdout.write(errorMessage)
+      reject(new Error(errorMessage))
+    })
+  })
 }

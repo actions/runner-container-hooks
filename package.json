@@ -9,6 +9,7 @@
   "scripts": {
     "test": "npm run test --prefix packages/docker && npm run test --prefix packages/k8s",
     "bootstrap": "npm install --prefix packages/hooklib && npm install --prefix packages/k8s && npm install --prefix packages/docker",
+    "generate-protoc": "protoc -I=./packages/proto --ts_out=./packages/script_executor/src script_executor.proto && protoc -I=./packages/proto --ts_out=./packages/k8s/src/k8s script_executor.proto",
     "format": "prettier --write '**/*.ts'",
     "format-check": "prettier --check '**/*.ts'",
     "lint": "eslint packages/**/*.ts",

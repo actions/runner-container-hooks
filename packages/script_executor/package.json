@@ -1,9 +1,10 @@
 {
-    "name": "script-executor",
-    "version": "0.1.0",
+    "name": "@quoct-test-registry/script-executor",
+    "version": "0.1.1",
     "dependencies": {
         "@grpc/grpc-js": "^1.12.5",
-        "@grpc/proto-loader": "^0.7.13"
+        "@grpc/proto-loader": "^0.7.13",
+        "google-protobuf": "^3.21.4"
     },
     "main": "dist/server.js",
     "scripts": {

@@ -21,6 +21,7 @@
     "@grpc/grpc-js": "^1.13.4",
     "@grpc/proto-loader": "^0.7.15",
     "@kubernetes/client-node": "^1.2.0",
+    "google-protobuf": "^3.21.4",
     "hooklib": "file:../hooklib",
     "js-yaml": "^4.1.0",
     "shlex": "^2.1.2",
