@@ -7,7 +7,8 @@ import {
   mergePodSpecWithOptions,
   mergeContainerWithOptions,
   readExtensionFromFile,
-  ENV_HOOK_TEMPLATE_PATH
+  ENV_HOOK_TEMPLATE_PATH,
+  createScriptExecutorContainer
 } from '../src/k8s/utils'
 import * as k8s from '@kubernetes/client-node'
 import { TestHelper } from './test-setup'
@@ -344,6 +345,29 @@ describe('k8s utils', () => {
         generateContainerName('localstack/localstack/:latest')
       ).toThrow()
       expect(() => generateContainerName(':latest')).toThrow()
+    })
+  })
+
+  describe('create script executor container', () => {
+    it('should install script executor at the volume mount location', () => {
+      const executorVolumeMount = new k8s.V1VolumeMount()
+      executorVolumeMount.name = 'script-executor'
+      executorVolumeMount.mountPath = '/foobar'
+      const version = '1.0.0'
+
+      const initContainer = createScriptExecutorContainer(
+        executorVolumeMount,
+        version
+      )
+
+      const args = initContainer.args
+      expect(args).toBeDefined()
+
+      const lastArg = args!![args!!.length - 1]
+      expect(lastArg).toContain(
+        `cp -r ./node_modules/ml-velocity-script-executor/dist ${executorVolumeMount.mountPath}`
+      )
+      expect(lastArg).toContain(`npm i ml-velocity-script-executor@${version}`)
     })
   })
 

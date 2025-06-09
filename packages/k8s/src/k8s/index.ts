@@ -15,7 +15,9 @@ import {
   mergePodSpecWithOptions,
   mergeObjectMeta,
   useKubeScheduler,
-  fixArgs
+  fixArgs,
+  createScriptExecutorContainer,
+  useScriptExecutor
 } from './utils'
 
 const kc = new k8s.KubeConfig()
@@ -95,6 +97,26 @@ export async function createPod(
   appPod.spec.containers = containers
   appPod.spec.restartPolicy = 'Never'
 
+  if (useScriptExecutor()) {
+    core.info('creating init container to install script executor.')
+
+    const initContainerVolumeMount = new k8s.V1VolumeMount()
+    initContainerVolumeMount.name = 'script-executor'
+    initContainerVolumeMount.mountPath = '/script_executor'
+
+    const initContainer = createScriptExecutorContainer(
+      initContainerVolumeMount
+    )
+    appPod.spec.initContainers = [initContainer]
+
+    const executorVolumeMount = new k8s.V1VolumeMount()
+    executorVolumeMount.name = 'script-executor'
+    executorVolumeMount.mountPath = '/script_executor'
+    executorVolumeMount.readOnly = true
+
+    jobContainer?.volumeMounts?.push(executorVolumeMount)
+  }
+
   const nodeName = await getCurrentNodeName()
   if (useKubeScheduler()) {
     appPod.spec.affinity = await getPodAffinity(nodeName)
@@ -106,6 +128,10 @@ export async function createPod(
     {
       name: 'work',
       persistentVolumeClaim: { claimName }
+    },
+    {
+      name: 'script-executor',
+      emptyDir: new k8s.V1EmptyDirVolumeSource()
     }
   ]
 
@@ -649,4 +675,11 @@ export function containerPorts(
 
 export async function getPodByName(name): Promise<k8s.V1Pod> {
   return await k8sApi.readNamespacedPod({ name, namespace: namespace() })
+}
+
+export async function getEvents(podName): Promise<k8s.CoreV1EventList> {
+  return await k8sApi.listNamespacedEvent({
+    namespace: namespace(),
+    labelSelector: `involvedObject.namespace=${namespace()},involvedObject.name=${podName}`
+  })
 }

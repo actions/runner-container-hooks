@@ -1,10 +1,14 @@
 {
-    "name": "@quoct-test-registry/script-executor",
-    "version": "0.1.1",
+    "name": "ml-velocity-script-executor",
+    "version": "0.1.0",
     "dependencies": {
         "@grpc/grpc-js": "^1.12.5",
         "@grpc/proto-loader": "^0.7.13",
         "google-protobuf": "^3.21.4"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/google-ml-infra/runner-container-hooks.git"
     },
     "main": "dist/server.js",
     "scripts": {

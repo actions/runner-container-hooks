@@ -15,6 +15,11 @@ import { script_executor } from './script_executor'
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 
+export const SCRIPT_EXECUTOR_ENTRY_POINT = '/__e/node20/bin/node'
+export const SCRIPT_EXECUTOR_ENTRY_POINT_ARGS = [
+  '/script_executor/dist/index.js'
+]
+
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
 export const ENV_USE_KUBE_SCHEDULER = 'ACTIONS_RUNNER_USE_KUBE_SCHEDULER'
 export const ENV_USE_SCRIPT_EXECUTOR = 'ACTIONS_RUNNER_USE_SCRIPT_EXECUTOR'
@@ -370,4 +375,28 @@ export async function runScriptByGrpc(
       reject(new Error(errorMessage))
     })
   })
+}
+
+/**
+ * Create a container that download ml-velocity-script-executor package and installs it to the
+ * location mounted by scriptExecutorVolumeMount.
+ */
+export function createScriptExecutorContainer(
+  scriptExecutorVolumeMount: k8s.V1VolumeMount,
+  version = 'latest'
+): k8s.V1Container {
+  const initContainer = new k8s.V1Container()
+  initContainer.name = 'grpc-server'
+  initContainer.image =
+    'node@sha256:41e4389f3d988d2ed55392df4db1420ad048ae53324a8e2b7c6d19508288107e' // node:22.16.0-alpine3.22
+  initContainer.workingDir = '/app'
+  initContainer.command = ['sh']
+  initContainer.args = [
+    '-c',
+    `npm i ml-velocity-script-executor@${version}; cp -r ./node_modules/ml-velocity-script-executor/dist ${scriptExecutorVolumeMount.mountPath};`
+  ]
+  initContainer.volumeMounts = []
+
+  initContainer.volumeMounts.push(scriptExecutorVolumeMount)
+  return initContainer
 }
