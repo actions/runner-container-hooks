@@ -19,6 +19,8 @@ import {
   createScriptExecutorContainer,
   useScriptExecutor
 } from './utils'
+import { generateCerts } from './certs'
+import { v4 as uuidv4 } from 'uuid'
 
 const kc = new k8s.KubeConfig()
 
@@ -96,25 +98,17 @@ export async function createPod(
   appPod.spec = new k8s.V1PodSpec()
   appPod.spec.containers = containers
   appPod.spec.restartPolicy = 'Never'
+  appPod.spec.volumes = []
 
   if (useScriptExecutor()) {
-    core.info('creating init container to install script executor.')
-
-    const initContainerVolumeMount = new k8s.V1VolumeMount()
-    initContainerVolumeMount.name = 'script-executor'
-    initContainerVolumeMount.mountPath = '/script_executor'
-
-    const initContainer = createScriptExecutorContainer(
-      initContainerVolumeMount
+    if (!jobContainer) {
+      throw new Error('script executor only works with a job container')
+    }
+    await prepareJobContainerAndPodForScriptExecutor(
+      jobContainer,
+      appPod.spec,
+      instanceLabel
     )
-    appPod.spec.initContainers = [initContainer]
-
-    const executorVolumeMount = new k8s.V1VolumeMount()
-    executorVolumeMount.name = 'script-executor'
-    executorVolumeMount.mountPath = '/script_executor'
-    executorVolumeMount.readOnly = true
-
-    jobContainer?.volumeMounts?.push(executorVolumeMount)
   }
 
   const nodeName = await getCurrentNodeName()
@@ -124,7 +118,7 @@ export async function createPod(
     appPod.spec.nodeName = nodeName
   }
   const claimName = getVolumeClaimName()
-  appPod.spec.volumes = [
+  appPod.spec.volumes.push(
     {
       name: 'work',
       persistentVolumeClaim: { claimName }
@@ -133,7 +127,7 @@ export async function createPod(
       name: 'script-executor',
       emptyDir: new k8s.V1EmptyDirVolumeSource()
     }
-  ]
+  )
 
   if (registry) {
     const secret = await createDockerSecret(registry)
@@ -157,6 +151,38 @@ export async function createPod(
     namespace: namespace(),
     body: appPod
   })
+}
+
+/**
+ * Add initContainer that contains script_executor GRPC server.
+ * Also mount certs for the GRPC server.
+ */
+export async function prepareJobContainerAndPodForScriptExecutor(
+  jobContainer: k8s.V1Container,
+  appPodSpec: k8s.V1PodSpec,
+  instanceLabel: RunnerInstanceLabel
+): Promise<void> {
+  core.info('creating init container to install script executor.')
+  const initContainerVolumeMount = new k8s.V1VolumeMount()
+  initContainerVolumeMount.name = 'script-executor'
+  initContainerVolumeMount.mountPath = '/script_executor'
+
+  const initContainer = createScriptExecutorContainer(initContainerVolumeMount)
+  appPodSpec.initContainers = [initContainer]
+
+  const executorVolumeMount = new k8s.V1VolumeMount()
+  executorVolumeMount.name = 'script-executor'
+  executorVolumeMount.mountPath = '/script_executor'
+  executorVolumeMount.readOnly = true
+
+  if (!jobContainer.volumeMounts) {
+    jobContainer.volumeMounts = []
+  }
+
+  jobContainer.volumeMounts.push(executorVolumeMount)
+
+  core.info('adding cert volume to pod spec and volumeMount to jobContainer.')
+  await addCertVolumeAndVolumeMount(appPodSpec, jobContainer, instanceLabel)
 }
 
 export async function createJob(
@@ -682,4 +708,81 @@ export async function getEvents(podName): Promise<k8s.CoreV1EventList> {
     namespace: namespace(),
     labelSelector: `involvedObject.namespace=${namespace()},involvedObject.name=${podName}`
   })
+}
+
+/**
+ * Generate self-signed root, client and server certificates.
+ * Store the certs as a secret in the runner's namespace.
+ */
+export async function createCertsAndSecrets(
+  instanceLabel: RunnerInstanceLabel
+): Promise<k8s.V1Secret> {
+  const certs = generateCerts()
+  const secretName = `certs-secret-${uuidv4().substring(0, 8)}`
+
+  core.debug(`Creating secrets ${secretName} to store certs`)
+  return await k8sApi.createNamespacedSecret({
+    namespace: namespace(),
+    body: {
+      data: {
+        'ca.crt': Buffer.from(certs.caCertAndkey.cert).toString('base64'),
+        'server.crt': Buffer.from(certs.serverCertAndKey.cert).toString(
+          'base64'
+        ),
+        'server.key': Buffer.from(certs.serverCertAndKey.privateKey).toString(
+          'base64'
+        ),
+        'client.crt': Buffer.from(certs.clientCertAndKey.cert).toString(
+          'base64'
+        ),
+        'client.key': Buffer.from(certs.clientCertAndKey.privateKey).toString(
+          'base64'
+        )
+      },
+      metadata: {
+        name: secretName,
+        labels: { [instanceLabel.key]: instanceLabel.value, certs: 'true' }
+      }
+    }
+  })
+}
+
+/**
+ * Call createCertsAndSecrets to generate cert secrets.
+ * Add the secret as a volume to appPodSpec.
+ * Mount the secret onto the jobContainer as a volumeMount.
+ */
+export async function addCertVolumeAndVolumeMount(
+  appPodSpec: k8s.V1PodSpec,
+  jobContainer: k8s.V1Container,
+  instanceLabel: RunnerInstanceLabel
+): Promise<void> {
+  if (!appPodSpec.volumes) {
+    appPodSpec.volumes = []
+  }
+
+  const secret = await createCertsAndSecrets(instanceLabel)
+  core.debug(`created ${secret.metadata?.name} to store certs`)
+
+  appPodSpec.volumes.push({
+    name: 'certs',
+    secret: {
+      secretName: secret.metadata?.name,
+      items: [
+        { key: 'ca.crt', path: 'ca.crt' },
+        { key: 'server.crt', path: 'server.crt' },
+        { key: 'server.key', path: 'server.key' }
+      ]
+    }
+  })
+
+  const certVolumeMount = new k8s.V1VolumeMount()
+  certVolumeMount.name = 'certs'
+  certVolumeMount.mountPath = '/certs'
+  certVolumeMount.readOnly = true
+
+  if (!jobContainer.volumeMounts) {
+    jobContainer.volumeMounts = []
+  }
+  jobContainer.volumeMounts.push(certVolumeMount)
 }

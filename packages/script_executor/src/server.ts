@@ -1,4 +1,5 @@
 import * as grpc from '@grpc/grpc-js'
+import { readFileSync } from 'fs'
 import { exec } from 'child_process'
 import { script_executor } from './script_executor'
 
@@ -14,6 +15,10 @@ const keepaliveOptions = {
   // Wait 5 seconds for the ping ack before assuming the connection is dead
   'grpc.keepalive_timeout_ms': 5_000
 }
+
+const ROOT_CERT_PATH = '/certs/ca.crt'
+const SERVER_CERT_PATH = '/certs/server.crt'
+const SERVER_KEY_PATH = '/certs/server.key'
 
 class ScriptExecutorService extends script_executor.UnimplementedScriptExecutorService {
   ExecuteScript(
@@ -51,16 +56,22 @@ function main(): void {
     new ScriptExecutorService()
   )
 
-  // TODO(quoct): Create and pass in a cert here to improve security.
-  // As of now, only other job in the cluster can access it but we need to improve it.
-  server.bindAsync(
-    '0.0.0.0:50051',
-    grpc.ServerCredentials.createInsecure(), // TODO(quoct): Change to create SSL.
-    () => {
-      server.start()
-      console.log('Server running on port 50051')
-    }
+  const serverCredential = grpc.ServerCredentials.createSsl(
+    readFileSync(ROOT_CERT_PATH),
+    [
+      {
+        cert_chain: readFileSync(SERVER_CERT_PATH),
+        private_key: readFileSync(SERVER_KEY_PATH)
+      }
+    ],
+    true // Checking Client Certificate to enable mTLS.
   )
+
+  server.bindAsync('0.0.0.0:50051', serverCredential, error => {
+    console.error(`Error when binding server ${error}`)
+    server.start()
+    console.log('Server running on port 50051')
+  })
 }
 
 main()
