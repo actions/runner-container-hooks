@@ -19,7 +19,7 @@ import {
   createScriptExecutorContainer,
   useScriptExecutor
 } from './utils'
-import { generateCerts } from './certs'
+import { generateCerts, MTLSCertAndPrivateKey } from './certs'
 import { v4 as uuidv4 } from 'uuid'
 
 const kc = new k8s.KubeConfig()
@@ -785,4 +785,46 @@ export async function addCertVolumeAndVolumeMount(
     jobContainer.volumeMounts = []
   }
   jobContainer.volumeMounts.push(certVolumeMount)
+}
+
+// Cache for the cert so we do not have to keep calling Kubernetes API.
+const clientCertDicts: { [key: string]: MTLSCertAndPrivateKey } = {}
+
+/**
+ * Return root cert, client cert and client key.
+ * This is needed to create a mTLS connection to the GRPC server.
+ */
+export async function getRootCertClientCertAndKey(): Promise<MTLSCertAndPrivateKey> {
+  const instanceLabel = new RunnerInstanceLabel()
+  const certDictKey = instanceLabel.toString()
+  if (clientCertDicts[certDictKey] !== undefined) {
+    return clientCertDicts[certDictKey]
+  }
+  const secrets = await k8sApi.listNamespacedSecret({
+    namespace: namespace(),
+    labelSelector: `${certDictKey},certs=true`
+  })
+  if (secrets.items.length !== 1) {
+    throw new Error(
+      'There should only be one cert secret for the workflow pod.'
+    )
+  }
+
+  const secret = secrets.items[0]
+  if (!secret.data) {
+    throw new Error(
+      `Secret ${secret.metadata?.name} does not contain client key and cert data.`
+    )
+  }
+
+  const rootCert = Buffer.from(secret.data['ca.crt'], 'base64').toString()
+  const clientCert = Buffer.from(secret.data['client.crt'], 'base64').toString()
+  const clientKey = Buffer.from(secret.data['client.key'], 'base64').toString()
+
+  clientCertDicts[certDictKey] = {
+    caCertAndkey: { cert: rootCert, privateKey: '' },
+    serverCertAndKey: { cert: '', privateKey: '' },
+    clientCertAndKey: { cert: clientCert, privateKey: clientKey }
+  }
+  return clientCertDicts[certDictKey]
 }

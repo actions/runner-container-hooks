@@ -3,7 +3,7 @@ import * as fs from 'fs'
 import * as core from '@actions/core'
 
 import { RunScriptStepArgs } from 'hooklib'
-import { execPodStep, getPodStatus } from '../k8s'
+import { execPodStep, getPodStatus, getRootCertClientCertAndKey } from '../k8s'
 import {
   fixArgs,
   runScriptByGrpc,
@@ -45,7 +45,16 @@ export async function runScriptStep(
         throw new Error(`Failed to get pod ${podName} IP`)
       }
 
-      await runScriptByGrpc(command, status.podIP, GRPC_SCRIPT_EXECUTOR_PORT)
+      const rootCertClientAndKey = await getRootCertClientCertAndKey()
+      core.debug('successfully retrieved root cert, client and key')
+      await runScriptByGrpc(
+        command,
+        rootCertClientAndKey.caCertAndkey.cert,
+        rootCertClientAndKey.clientCertAndKey.cert,
+        rootCertClientAndKey.clientCertAndKey.privateKey,
+        status.podIP,
+        GRPC_SCRIPT_EXECUTOR_PORT
+      )
     } else {
       core.info('using exec pod step')
       await execPodStep(
