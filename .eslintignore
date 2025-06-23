@@ -2,5 +2,6 @@ dist/
 lib/
 proto/
 script_executor.ts
+**/script_executor/**
 node_modules/
 **/tests/**

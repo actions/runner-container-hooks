@@ -1,5 +1,6 @@
 import * as grpc from '@grpc/grpc-js'
-import { readFileSync } from 'fs'
+import * as tmp from 'tmp'
+import { chmodSync, fchmodSync, readFileSync, writeFileSync } from 'fs'
 import { exec } from 'child_process'
 import { script_executor } from './script_executor'
 
@@ -31,7 +32,16 @@ class ScriptExecutorService extends script_executor.UnimplementedScriptExecutorS
       script_executor.ScriptResponse
     >
   ): void {
-    const process = exec(call.request.script)
+    const tmpFile = tmp.fileSync()
+    try {
+      writeFileSync(tmpFile.name, call.request.script)
+      chmodSync(tmpFile.name, '755')
+    } catch (error) {
+      console.log(`error writing script content to file ${error}`)
+      call.end()
+    }
+
+    const process = exec(`sh -e ${tmpFile.name}`)
 
     process.stdout?.on('data', data => {
       console.log(`stdout: ${data}`)

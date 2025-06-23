@@ -1,10 +1,11 @@
 {
     "name": "ml-velocity-script-executor",
-    "version": "0.1.2-alpha.11",
+    "version": "0.1.2-alpha.15.6",
     "dependencies": {
         "@grpc/grpc-js": "^1.12.5",
         "@grpc/proto-loader": "^0.7.13",
-        "google-protobuf": "^3.21.4"
+        "google-protobuf": "^3.21.4",
+        "tmp": "^0.2.3"
     },
     "type": "commonjs",
     "repository": {
@@ -21,6 +22,7 @@
         "lint": "eslint src/**/*.ts"
     },
     "devDependencies": {
+        "@types/tmp": "^0.2.6",
         "@vercel/ncc": "^0.38.3",
         "prettier": "^3.5.3",
         "typescript": "^5.0.4"

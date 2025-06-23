@@ -118,13 +118,13 @@ export function containerVolumes(
   return mounts
 }
 
-export function writeEntryPointScript(
+export function getEntryPointScriptContent(
   workingDirectory: string,
   entryPoint: string,
   entryPointArgs?: string[],
   prependPath?: string[],
   environmentVariables?: { [key: string]: string }
-): { containerPath: string; runnerPath: string } {
+): string {
   let exportPath = ''
   if (prependPath?.length) {
     // TODO: remove compatibility with typeof prependPath === 'string' as we bump to next major version, the hooks will lose PrependPath compat with runners 2.293.0 and older
@@ -165,6 +165,23 @@ exec ${environmentPrefix} ${entryPoint} ${
     entryPointArgs?.length ? entryPointArgs.join(' ') : ''
   }
 `
+  return content
+}
+
+export function writeEntryPointScript(
+  workingDirectory: string,
+  entryPoint: string,
+  entryPointArgs?: string[],
+  prependPath?: string[],
+  environmentVariables?: { [key: string]: string }
+): { containerPath: string; runnerPath: string } {
+  const content = getEntryPointScriptContent(
+    workingDirectory,
+    entryPoint,
+    entryPointArgs,
+    prependPath,
+    environmentVariables
+  )
   const filename = `${uuidv4()}.sh`
   const entryPointPath = `${process.env.RUNNER_TEMP}/${filename}`
   fs.writeFileSync(entryPointPath, content)
