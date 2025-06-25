@@ -49,9 +49,7 @@ async function runScriptStepWithGRPC(
       GRPC_SCRIPT_EXECUTOR_PORT
     )
   } catch (err) {
-    core.debug(
-      `Run script Executor through GRPC failed: ${JSON.stringify(err)}`
-    )
+    core.error(`ScriptExecutorError failure: ${JSON.stringify(err)}`)
     const message = (err as any)?.response?.body?.message || err
     throw new Error(`failed to run script step: ${message}`)
   }
