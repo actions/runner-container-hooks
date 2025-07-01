@@ -1,6 +1,6 @@
 {
     "name": "ml-velocity-script-executor",
-    "version": "0.1.2-alpha.15.6",
+    "version": "0.1.7",
     "dependencies": {
         "@grpc/grpc-js": "^1.12.5",
         "@grpc/proto-loader": "^0.7.13",
