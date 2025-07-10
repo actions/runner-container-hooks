@@ -6,6 +6,7 @@ import { Mount } from 'hooklib'
 import * as path from 'path'
 import { v1 as uuidv4 } from 'uuid'
 import { POD_VOLUME_NAME } from './index'
+import { POD_VOLUME_NAME_EXTERNALS } from './index'
 import { CONTAINER_EXTENSION_PREFIX } from '../hooks/constants'
 import * as shlex from 'shlex'
 
@@ -62,9 +63,8 @@ export function containerVolumes(
 
   mounts.push(
     {
-      name: POD_VOLUME_NAME,
-      mountPath: '/__e',
-      subPath: 'externals'
+      name: POD_VOLUME_NAME_EXTERNALS,
+      mountPath: '/__e'
     },
     {
       name: POD_VOLUME_NAME,

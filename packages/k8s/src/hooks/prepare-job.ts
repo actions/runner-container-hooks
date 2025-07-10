@@ -39,7 +39,7 @@ export async function prepareJob(
   await prunePods()
 
   const extension = readExtensionFromFile()
-  await copyExternalsToRoot()
+  // await copyExternalsToRoot()
 
   let container: k8s.V1Container | undefined = undefined
   if (args.container?.image) {

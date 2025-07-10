@@ -29,6 +29,7 @@ const k8sAuthorizationV1Api = kc.makeApiClient(k8s.AuthorizationV1Api)
 const DEFAULT_WAIT_FOR_POD_TIME_SECONDS = 10 * 60 // 10 min
 
 export const POD_VOLUME_NAME = 'work'
+export const POD_VOLUME_NAME_EXTERNALS = 'externals'
 
 export const requiredPermissions = [
   {
@@ -102,10 +103,15 @@ export async function createPod(
     appPod.spec.nodeName = nodeName
   }
   const claimName = getVolumeClaimName()
+  const externalsClaimName = 'clm-github-arc-externals'
   appPod.spec.volumes = [
     {
       name: 'work',
       persistentVolumeClaim: { claimName }
+    },
+    {
+      name: 'externals',
+      persistentVolumeClaim: { claimName: externalsClaimName }
     }
   ]
 
