@@ -111,7 +111,7 @@ export async function createPod(
     },
     {
       name: 'externals',
-      persistentVolumeClaim: { claimName: externalsClaimName }
+      persistentVolumeClaim: { claimName: externalsClaimName, readOnly: true }
     }
   ]
 
