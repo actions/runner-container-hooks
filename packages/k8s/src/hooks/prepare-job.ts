@@ -228,7 +228,7 @@ export function createContainerSpec(
     container['environmentVariables'] || {}
   )) {
     if (value && key !== 'HOME') {
-      podContainer.env.push({ name: key, value: value as string })
+      podContainer.env.push({ name: key, value  })
     }
   }
 

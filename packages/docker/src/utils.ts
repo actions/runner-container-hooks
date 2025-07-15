@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 /* eslint-disable @typescript-eslint/no-require-imports */
-/* eslint-disable import/no-commonjs */
 import * as core from '@actions/core'
 import { env } from 'process'
 // Import this way otherwise typescript has errors

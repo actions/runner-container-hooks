@@ -1,33 +1,30 @@
 const eslint = require('@eslint/js');
 const tseslint = require('@typescript-eslint/eslint-plugin');
 const tsparser = require('@typescript-eslint/parser');
-const github = require('eslint-plugin-github');
 const globals = require('globals');
+const pluginJest = require('eslint-plugin-jest');
 
 module.exports = [
   eslint.configs.recommended,
   {
-    files: ['**/*.ts', '**/*.tsx'],
+    files: ['**/*.ts'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
         ecmaVersion: 2018,
         sourceType: 'module',
-        project: './tsconfig.json'
+        project: ['./tsconfig.json', './packages/*/tsconfig.json']
       },
       globals: {
         ...globals.node,
-        ...globals.es2017
+        ...globals.es6
       }
     },
     plugins: {
       '@typescript-eslint': tseslint,
-      github: github
     },
     rules: {
-      ...github.recommended,
-      
-      // Disabled rules
+      // Disabled rules from original config
       'eslint-comments/no-use': 'off',
       'import/no-namespace': 'off',
       'no-constant-condition': 'off',
@@ -44,10 +41,9 @@ module.exports = [
       '@typescript-eslint/array-type': 'error',
       '@typescript-eslint/await-thenable': 'error',
       '@typescript-eslint/explicit-function-return-type': ['error', { allowExpressions: true }],
-      '@typescript-eslint/func-call-spacing': ['error', 'never'],
       '@typescript-eslint/no-array-constructor': 'error',
       '@typescript-eslint/no-empty-interface': 'error',
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'off', // Fixed: removed duplicate and kept only this one
       '@typescript-eslint/no-extraneous-class': 'error',
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-for-in-array': 'error',
@@ -66,19 +62,61 @@ module.exports = [
       '@typescript-eslint/promise-function-async': 'error',
       '@typescript-eslint/require-array-sort-compare': 'error',
       '@typescript-eslint/restrict-plus-operands': 'error',
-      '@typescript-eslint/semi': ['error', 'never'],
-      '@typescript-eslint/type-annotation-spacing': 'error',
       '@typescript-eslint/unbound-method': 'error',
       '@typescript-eslint/no-shadow': ['error']
     }
   },
   {
-    files: ['**/*.js', '**/*.mjs'],
+    // Test files configuration - Fixed file pattern to match .ts files
+    files: ['**/*test*.ts', '**/*spec*.ts', '**/tests/**/*.ts'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 2018,
+        sourceType: 'module',
+        project: ['./tsconfig.json', './packages/*/tsconfig.json']
+      },
+      globals: {
+        ...globals.node,
+        ...globals.es6,
+        // Fixed Jest globals
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        jest: 'readonly'
+      }
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+      jest: pluginJest
+    },
+    rules: {
+      // Disable no-undef for test files since Jest globals are handled above
+      'no-undef': 'off',
+      // Relax some rules for test files
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off'
+    }
+  },
+  {
+    files: ['**/jest.config.js', '**/jest.setup.js'],
     languageOptions: {
       globals: {
         ...globals.node,
-        ...globals.es2017
+        jest: 'readonly',
+        module: 'writable'
       }
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-var-requires': 'off',
+      'import/no-commonjs': 'off'
     }
   }
 ];

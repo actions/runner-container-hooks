@@ -19,7 +19,7 @@ export class TestHelper {
     this.podName = uuidv4().replace(/-/g, '')
   }
 
-  public async initialize(): Promise<void> {
+  async initialize(): Promise<void> {
     process.env['ACTIONS_RUNNER_POD_NAME'] = `${this.podName}`
     process.env['RUNNER_WORKSPACE'] = `${this.tempDirPath}/_work/repo`
     process.env['RUNNER_TEMP'] = `${this.tempDirPath}/_work/_temp`
@@ -44,53 +44,66 @@ export class TestHelper {
     }
   }
 
-  public async cleanup(): Promise<void> {
+  async cleanup(): Promise<void> {
     try {
       await this.cleanupK8sResources()
       fs.rmSync(this.tempDirPath, { recursive: true })
-    } catch {}
+    } catch {
+      // Ignore errors during cleanup
+    }
   }
-  public async cleanupK8sResources() {
+
+  async cleanupK8sResources(): Promise<void> {
     await k8sApi
       .deleteNamespacedPersistentVolumeClaim({
         name: `${this.podName}-work`,
         namespace: 'default',
         gracePeriodSeconds: 0
       })
-      .catch(e => {})
+      .catch(e => {
+        console.error(e)
+      })
     await k8sApi
       .deletePersistentVolume({ name: `${this.podName}-pv` })
-      .catch(e => {})
+      .catch(e => {
+        console.error(e)
+      })
     await k8sStorageApi
       .deleteStorageClass({ name: 'local-storage' })
-      .catch(e => {})
+      .catch(e => {
+        console.error(e)
+      })
     await k8sApi
       .deleteNamespacedPod({
         name: this.podName,
         namespace: 'default',
         gracePeriodSeconds: 0
       })
-      .catch(e => {})
+      .catch(e => {
+        console.error(e)
+      })
     await k8sApi
       .deleteNamespacedPod({
         name: `${this.podName}-workflow`,
         namespace: 'default',
         gracePeriodSeconds: 0
       })
-      .catch(e => {})
+      .catch(e => {
+        console.error(e)
+      })
   }
-  public createFile(fileName?: string): string {
+  createFile(fileName?: string): string {
     const filePath = `${this.tempDirPath}/${fileName || uuidv4()}`
     fs.writeFileSync(filePath, '')
     return filePath
   }
 
-  public removeFile(fileName: string): void {
+  removeFile(fileName: string): void {
     const filePath = `${this.tempDirPath}/${fileName}`
     fs.rmSync(filePath)
   }
 
-  public async createTestJobPod() {
+  async createTestJobPod(): Promise<void> {
     const container = {
       name: 'nginx',
       image: 'nginx:latest',
@@ -109,7 +122,7 @@ export class TestHelper {
     await k8sApi.createNamespacedPod({ namespace: 'default', body: pod })
   }
 
-  public async createTestVolume() {
+  async createTestVolume(): Promise<void> {
     var sc: k8s.V1StorageClass = {
       metadata: {
         name: 'local-storage'
@@ -158,7 +171,7 @@ export class TestHelper {
     })
   }
 
-  public getPrepareJobDefinition(): HookData {
+  getPrepareJobDefinition(): HookData {
     const prepareJob = JSON.parse(
       fs.readFileSync(
         path.resolve(__dirname + '/../../../examples/prepare-job.json'),
@@ -175,7 +188,7 @@ export class TestHelper {
     return prepareJob
   }
 
-  public getRunScriptStepDefinition(): HookData {
+  getRunScriptStepDefinition(): HookData {
     const runScriptStep = JSON.parse(
       fs.readFileSync(
         path.resolve(__dirname + '/../../../examples/run-script-step.json'),
@@ -187,7 +200,7 @@ export class TestHelper {
     return runScriptStep
   }
 
-  public getRunContainerStepDefinition(): HookData {
+  getRunContainerStepDefinition(): HookData {
     const runContainerStep = JSON.parse(
       fs.readFileSync(
         path.resolve(__dirname + '/../../../examples/run-container-step.json'),

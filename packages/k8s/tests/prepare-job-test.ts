@@ -7,11 +7,9 @@ import {
   ENV_HOOK_TEMPLATE_PATH,
   ENV_USE_KUBE_SCHEDULER,
   generateContainerName,
-  readExtensionFromFile
 } from '../src/k8s/utils'
 import { getPodByName } from '../src/k8s'
 import { V1Container } from '@kubernetes/client-node'
-import * as yaml from 'js-yaml'
 import { JOB_CONTAINER_NAME } from '../src/hooks/constants'
 
 jest.useRealTimers()
