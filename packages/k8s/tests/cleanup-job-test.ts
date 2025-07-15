@@ -15,7 +15,10 @@ describe('Cleanup Job', () => {
     const prepareJobOutputFilePath = testHelper.createFile(
       'prepare-job-output.json'
     )
-    await prepareJob(prepareJobData.args as PrepareJobArgs, prepareJobOutputFilePath)
+    await prepareJob(
+      prepareJobData.args as PrepareJobArgs,
+      prepareJobOutputFilePath
+    )
   })
 
   afterEach(async () => {

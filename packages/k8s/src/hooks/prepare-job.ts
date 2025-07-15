@@ -169,8 +169,7 @@ function generateResponseFile(
         if (c.ports?.length) {
           for (const port of c.ports) {
             if (port.containerPort && port.hostPort) {
-              ctxPorts[port.containerPort.toString()] =
-                port.hostPort.toString()
+              ctxPorts[port.containerPort.toString()] = port.hostPort.toString()
             }
           }
         }

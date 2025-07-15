@@ -37,7 +37,11 @@ describe('e2e', () => {
     const prepareJobOutputData = JSON.parse(prepareJobOutputJson.toString())
 
     await expect(
-      runScriptStep(scriptStepData.args as RunScriptStepArgs, prepareJobOutputData.state, null)
+      runScriptStep(
+        scriptStepData.args as RunScriptStepArgs,
+        prepareJobOutputData.state,
+        null
+      )
     ).resolves.not.toThrow()
 
     const runContainerStepData = testHelper.getRunContainerStepDefinition()
