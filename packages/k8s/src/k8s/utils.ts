@@ -167,7 +167,7 @@ exec ${environmentPrefix} ${entryPoint} ${
 
 export function generateContainerName(image: string): string {
   const nameWithTag = image.split('/').pop()
-  const name = nameWithTag?.split(':').at(0)
+  const name = nameWithTag?.split(':')[0]
 
   if (!name) {
     throw new Error(`Image definition '${image}' is invalid`)

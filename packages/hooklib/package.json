@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "",
   "main": "lib/index.js",
-  "types": "index.d.ts",
+  "types": "lib/index.d.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
@@ -14,15 +14,14 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^17.0.23",
-    "@typescript-eslint/parser": "^5.18.0",
+    "@types/node": "^24.0.14",
     "@zeit/ncc": "^0.22.3",
-    "eslint": "^8.12.0",
-    "eslint-plugin-github": "^4.3.6",
-    "prettier": "^2.6.2",
-    "typescript": "^4.6.3"
+    "eslint": "^9.31.0",
+    "eslint-plugin-github": "^6.0.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@actions/core": "^1.9.1"
+    "@actions/core": "^1.11.1"
   }
 }
