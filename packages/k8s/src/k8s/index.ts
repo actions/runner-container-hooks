@@ -15,6 +15,7 @@ import {
   mergePodSpecWithOptions,
   mergeObjectMeta,
   useKubeScheduler,
+  usePodAffinity,
   fixArgs
 } from './utils'
 
@@ -97,7 +98,9 @@ export async function createPod(
 
   const nodeName = await getCurrentNodeName()
   if (useKubeScheduler()) {
-    appPod.spec.affinity = await getPodAffinity(nodeName)
+    if (usePodAffinity()) {
+      appPod.spec.affinity = await getPodAffinity(nodeName)
+    }
   } else {
     appPod.spec.nodeName = nodeName
   }
@@ -159,7 +162,9 @@ export async function createJob(
 
   const nodeName = await getCurrentNodeName()
   if (useKubeScheduler()) {
-    job.spec.template.spec.affinity = await getPodAffinity(nodeName)
+    if (usePodAffinity()) {
+      job.spec.template.spec.affinity = await getPodAffinity(nodeName)
+    }
   } else {
     job.spec.template.spec.nodeName = nodeName
   }

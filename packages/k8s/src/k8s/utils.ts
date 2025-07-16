@@ -14,6 +14,7 @@ export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
 export const ENV_USE_KUBE_SCHEDULER = 'ACTIONS_RUNNER_USE_KUBE_SCHEDULER'
+export const ENV_USE_POD_AFFINITY = 'ACTIONS_RUNNER_USE_POD_AFFINITY'
 
 export function containerVolumes(
   userMountVolumes: Mount[] = [],
@@ -276,6 +277,10 @@ export function readExtensionFromFile(): k8s.V1PodTemplateSpec | undefined {
 
 export function useKubeScheduler(): boolean {
   return process.env[ENV_USE_KUBE_SCHEDULER] === 'true'
+}
+
+export function usePodAffinity(): boolean {
+  return process.env[ENV_USE_POD_AFFINITY] !== 'false'
 }
 
 export enum PodPhase {
