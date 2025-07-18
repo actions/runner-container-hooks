@@ -16,7 +16,7 @@ export class TestHelper {
   private podName: string
   constructor() {
     this.tempDirPath = `${__dirname}/_temp/runner`
-    this.podName = uuidv4().replace(/-/g, '')
+    this.podName = `p${uuidv4().replace(/-/g, '')}` // Needs to start with alphabetic character
   }
 
   public async initialize(): Promise<void> {

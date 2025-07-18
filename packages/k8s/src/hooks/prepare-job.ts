@@ -14,7 +14,8 @@ import {
   isPodContainerAlpine,
   prunePods,
   waitForPodPhases,
-  getPrepareJobTimeoutSeconds
+  getPrepareJobTimeoutSeconds,
+  createHeadlessService
 } from '../k8s'
 import {
   containerVolumes,
@@ -122,6 +123,12 @@ export async function prepareJob(
     throw new Error(`failed to determine if the pod is alpine: ${message}`)
   }
   core.debug(`Setting isAlpine to ${isAlpine}`)
+
+  if (useScriptExecutor()) {
+    core.debug(`Creating headless service`)
+    await createHeadlessService()
+  }
+
   generateResponseFile(responseFile, args, createdPod, isAlpine)
 }
 

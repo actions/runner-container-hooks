@@ -6,8 +6,10 @@ import {
   getJobPodName,
   getRunnerPodName,
   getSecretName,
+  getServiceName,
   getStepPodName,
   getVolumeClaimName,
+  GRPC_SCRIPT_EXECUTOR_PORT,
   RunnerInstanceLabel
 } from '../hooks/constants'
 import {
@@ -66,6 +68,31 @@ export const requiredPermissions = [
     subresource: ''
   }
 ]
+
+export async function createHeadlessService(): Promise<void> {
+  const instanceLabel = new RunnerInstanceLabel()
+  await k8sApi.createNamespacedService({
+    namespace: namespace(),
+    body: {
+      metadata: {
+        name: getServiceName(),
+        labels: { [instanceLabel.key]: instanceLabel.value }
+      },
+      spec: {
+        selector: {
+          [instanceLabel.key]: instanceLabel.value
+        },
+        ports: [
+          {
+            name: 'grpc',
+            targetPort: GRPC_SCRIPT_EXECUTOR_PORT,
+            port: GRPC_SCRIPT_EXECUTOR_PORT
+          }
+        ]
+      }
+    }
+  })
+}
 
 export async function createPod(
   jobContainer?: k8s.V1Container,
@@ -270,6 +297,14 @@ export async function getContainerJobPodName(jobName: string): Promise<string> {
 export async function deletePod(podName: string): Promise<void> {
   await k8sApi.deleteNamespacedPod({
     name: podName,
+    namespace: namespace(),
+    gracePeriodSeconds: 0
+  })
+}
+
+export async function deleteService(serviceName: string): Promise<void> {
+  await k8sApi.deleteNamespacedService({
+    name: serviceName,
     namespace: namespace(),
     gracePeriodSeconds: 0
   })
@@ -529,6 +564,30 @@ export async function prunePods(): Promise<void> {
   await Promise.all(
     podList.items.map(pod => pod.metadata?.name && deletePod(pod.metadata.name))
   )
+}
+
+export async function pruneServices(): Promise<void> {
+  const labelSelector = new RunnerInstanceLabel().toString()
+  core.debug(`pruning services with labels ${labelSelector}`)
+  const serviceList = await k8sApi.listNamespacedService({
+    namespace: namespace(),
+    labelSelector
+  })
+  core.debug(`pruning ${serviceList.items.length} service(s)`)
+  if (!serviceList.items.length) {
+    return
+  }
+
+  try {
+    await Promise.all(
+      serviceList.items.map(
+        service =>
+          service.metadata?.name && deleteService(service.metadata.name)
+      )
+    )
+  } catch (error) {
+    core.debug(`error pruning service ${error}`)
+  }
 }
 
 export async function getPodStatus(
