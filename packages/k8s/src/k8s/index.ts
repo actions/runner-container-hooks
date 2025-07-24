@@ -690,7 +690,7 @@ export function namespace(): string {
   return context.namespace
 }
 
-class BackOffManager {
+export class BackOffManager {
   private backOffSeconds = 1
   totalTime = 0
   constructor(private throwAfterSeconds?: number) {

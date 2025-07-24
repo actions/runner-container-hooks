@@ -3,7 +3,11 @@ import * as fs from 'fs'
 import * as core from '@actions/core'
 
 import { RunScriptStepArgs } from 'hooklib'
-import { execPodStep, getRootCertClientCertAndKey } from '../k8s'
+import {
+  BackOffManager,
+  execPodStep,
+  getRootCertClientCertAndKey
+} from '../k8s'
 import {
   getEntryPointScriptContent,
   runScriptByGrpc,
@@ -29,26 +33,36 @@ async function runScriptStepWithGRPC(
     environmentVariables
   )
 
-  try {
-    core.info('using script executor')
+  core.info('using script executor')
+  const rootCertClientAndKey = await getRootCertClientCertAndKey()
+  core.debug('successfully retrieved root cert, client and key')
 
-    const serviceName = getServiceName()
-    core.debug(`using service name ${serviceName}`)
-
-    const rootCertClientAndKey = await getRootCertClientCertAndKey()
-    core.debug('successfully retrieved root cert, client and key')
-    await runScriptByGrpc(
-      scriptContent,
-      rootCertClientAndKey.caCertAndkey.cert,
-      rootCertClientAndKey.clientCertAndKey.cert,
-      rootCertClientAndKey.clientCertAndKey.privateKey,
-      serviceName,
-      GRPC_SCRIPT_EXECUTOR_PORT
-    )
-  } catch (err) {
-    core.error(`ScriptExecutorError failure: ${JSON.stringify(err)}`)
-    const message = (err as any)?.response?.body?.message || err
-    throw new Error(`failed to run script step: ${message}`)
+  // This will throw after retrying with back off for up to 60s.
+  const backOffmanager = new BackOffManager(60)
+  while (true) {
+    try {
+      await runScriptByGrpc(
+        scriptContent,
+        rootCertClientAndKey.caCertAndkey.cert,
+        rootCertClientAndKey.clientCertAndKey.cert,
+        rootCertClientAndKey.clientCertAndKey.privateKey,
+        getServiceName(),
+        GRPC_SCRIPT_EXECUTOR_PORT
+      )
+      break
+    } catch (err) {
+      core.debug(
+        `ScriptExecutorError when trying to execute: ${JSON.stringify(err)}`
+      )
+      const message = (err as any)?.response?.body?.message || err
+      if (String(message).includes('ECONNREFUSED')) {
+        // Retry for 60s since the service may not be established.
+        core.debug(`Retrying execution for ECONNREFUSED.`)
+        await backOffmanager.backOff()
+      } else {
+        break
+      }
+    }
   }
 }
 
