@@ -5,7 +5,8 @@ import {
   JobContainerInfo,
   ContextPorts,
   PrepareJobArgs,
-  writeToResponseFile
+  writeToResponseFile,
+  ServiceContainerInfo
 } from 'hooklib'
 import path from 'path'
 import {
@@ -167,7 +168,9 @@ function generateResponseFile(
         const ctxPorts: ContextPorts = {}
         if (c.ports?.length) {
           for (const port of c.ports) {
-            ctxPorts[port.containerPort] = port.hostPort
+            if (port.containerPort && port.hostPort) {
+              ctxPorts[port.containerPort.toString()] = port.hostPort.toString()
+            }
           }
         }
 
@@ -193,7 +196,7 @@ async function copyExternalsToRoot(): Promise<void> {
 }
 
 export function createContainerSpec(
-  container: JobContainerInfo,
+  container: JobContainerInfo | ServiceContainerInfo,
   name: string,
   jobContainer = false,
   extension?: k8s.V1PodTemplateSpec
@@ -208,24 +211,24 @@ export function createContainerSpec(
     image: container.image,
     ports: containerPorts(container)
   } as k8s.V1Container
-  if (container.workingDirectory) {
-    podContainer.workingDir = container.workingDirectory
+  if (container['workingDirectory']) {
+    podContainer.workingDir = container['workingDirectory']
   }
 
   if (container.entryPoint) {
     podContainer.command = [container.entryPoint]
   }
 
-  if (container.entryPointArgs?.length > 0) {
+  if (container.entryPointArgs && container.entryPointArgs.length > 0) {
     podContainer.args = fixArgs(container.entryPointArgs)
   }
 
   podContainer.env = []
   for (const [key, value] of Object.entries(
-    container['environmentVariables']
+    container['environmentVariables'] || {}
   )) {
     if (value && key !== 'HOME') {
-      podContainer.env.push({ name: key, value: value as string })
+      podContainer.env.push({ name: key, value })
     }
   }
 
@@ -234,7 +237,7 @@ export function createContainerSpec(
     value: 'true'
   })
 
-  if (!('CI' in container['environmentVariables'])) {
+  if (!('CI' in (container['environmentVariables'] || {}))) {
     podContainer.env.push({
       name: 'CI',
       value: 'true'

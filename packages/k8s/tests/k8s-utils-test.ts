@@ -230,7 +230,9 @@ describe('k8s utils', () => {
         containerVolumes(
           [
             {
-              sourceVolumePath: '/outside/of/workdir'
+              sourceVolumePath: '/outside/of/workdir',
+              targetVolumePath: '/some/target/path',
+              readOnly: false
             }
           ],
           true,
