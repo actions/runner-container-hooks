@@ -26,7 +26,8 @@ export async function runScriptStep(
     await execPodStep(
       [args.entryPoint, ...args.entryPointArgs],
       state.jobPod,
-      JOB_CONTAINER_NAME
+      JOB_CONTAINER_NAME,
+      process.stdin
     )
   } catch (err) {
     core.debug(`execPodStep failed: ${JSON.stringify(err)}`)
