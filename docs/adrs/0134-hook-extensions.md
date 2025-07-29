@@ -29,9 +29,10 @@ In case the hook is able to read the extended spec, it will first create a defau
 3. The volumes are applied in form of appending additional volumes to the default volumes.
 4. The containers are merged based on the name assigned to them:
    1. If the name of the container *is* "$job", the `name` and the `image` fields are going to be ignored and the spec will be applied so that `env`, `volumeMounts`, `ports` are appended to the default container spec created by the hook, while the rest of the fields are going to be applied to the newly created container spec.
-   2. If the name of the container *starts with* "$", and matches the name of the [container service](https://docs.github.com/en/actions/using-containerized-services/about-service-containers), the `name` and the `image` fields are going to be ignored and the spec will be applied to that service container, so that `env`, `volumeMounts`, `ports` are appended to the default container spec for service created by the hook, while the rest of the fields are going to be applied to the created container spec. 
-      If there is no container service with such name defined in the workflow, such spec extension will be ignored.  
-   3. If the name of the container *does not start with* "$", the entire spec of the container will be added to the pod definition.
+   2. If the name of the container *starts with* "$", and matches the name of the [container service](https://docs.github.com/en/actions/using-containerized-services/about-service-containers), the `name` and the `image` fields are going to be ignored and the spec will be applied to that service container, so that `env`, `volumeMounts`, `ports` are appended to the default container spec for service created by the hook, while the rest of the fields are going to be applied to the created container spec.
+      If there is no container service with such name defined in the workflow, such spec extension will be ignored. 
+   3. If the name of the container *is "$default", the `name` and the `image` fields are going to be ignored and the spec will be applied to all service containers that were not extended at point 2.
+   4. If the name of the container *does not start with* "$", the entire spec of the container will be added to the pod definition.
 
 ## Consequences
 
