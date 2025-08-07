@@ -12,6 +12,8 @@ import { ChildProcess, exec, execSync } from 'child_process'
 import { runScriptByGrpc } from '../src/k8s/utils'
 import { MTLSCertAndPrivateKey } from '../src/k8s/certs'
 import process from 'process'
+import { cpToPod, execPodStep } from '../src/k8s'
+import path from 'path'
 
 const kc = new k8s.KubeConfig()
 kc.loadFromDefault()
@@ -163,5 +165,26 @@ describe('script-executor', () => {
     } finally {
       cleanupChildProcess(serverProcess)
     }
+  })
+})
+
+describe('cpToPod', () => {
+  it('should copy local files to container without error', async () => {
+    testHelper = new TestHelper()
+    const pod = await testHelper.createTestJobPod()
+    expect(pod.metadata?.name).toBeTruthy()
+    expect(pod.spec?.containers[0].name).toBeTruthy()
+    const tempTestDir = fs.mkdtempSync('test')
+    fs.writeFileSync(path.join(tempTestDir, 'foo'), 'abc')
+    fs.writeFileSync(path.join(tempTestDir, 'bar'), 'abc')
+
+    await expect(
+      cpToPod(
+        pod.metadata?.name!!,
+        pod.spec?.containers[0].name!!,
+        tempTestDir,
+        '/tmp'
+      )
+    ).resolves.not.toThrow()
   })
 })

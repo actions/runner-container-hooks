@@ -90,7 +90,7 @@ export class TestHelper {
     fs.rmSync(filePath)
   }
 
-  public async createTestJobPod() {
+  public async createTestJobPod(): Promise<k8s.V1Pod> {
     const container = {
       name: 'nginx',
       image: 'nginx:latest',
@@ -106,7 +106,7 @@ export class TestHelper {
         containers: [container]
       }
     } as k8s.V1Pod
-    await k8sApi.createNamespacedPod({ namespace: 'default', body: pod })
+    return await k8sApi.createNamespacedPod({ namespace: 'default', body: pod })
   }
 
   public async createTestVolume() {

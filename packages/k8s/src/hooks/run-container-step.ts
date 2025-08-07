@@ -4,6 +4,7 @@ import { RunContainerStepArgs } from 'hooklib'
 import {
   createJob,
   createSecretForEnvs,
+  extractErrorMessageFromK8sError,
   getContainerJobPodName,
   getPodLogs,
   getPodStatus,
@@ -38,8 +39,8 @@ export async function runContainerStep(
       }
       secretName = await createSecretForEnvs(envs)
     } catch (err) {
-      core.debug(`createSecretForEnvs failed: ${JSON.stringify(err)}`)
-      const message = (err as any)?.response?.body?.message || err
+      const message = extractErrorMessageFromK8sError(err)
+      core.debug(`createSecretForEnvs failed: ${message}`)
       throw new Error(`failed to create script environment: ${message}`)
     }
   }
@@ -53,8 +54,8 @@ export async function runContainerStep(
   try {
     job = await createJob(container, extension)
   } catch (err) {
-    core.debug(`createJob failed: ${JSON.stringify(err)}`)
-    const message = (err as any)?.response?.body?.message || err
+    const message = extractErrorMessageFromK8sError(err)
+    core.debug(`createJob failed: ${message}`)
     throw new Error(`failed to run script step: ${message}`)
   }
 
@@ -71,8 +72,8 @@ export async function runContainerStep(
   try {
     podName = await getContainerJobPodName(job.metadata.name)
   } catch (err) {
-    core.debug(`getContainerJobPodName failed: ${JSON.stringify(err)}`)
-    const message = (err as any)?.response?.body?.message || err
+    const message = extractErrorMessageFromK8sError(err)
+    core.debug(`getContainerJobPodName failed: ${message}`)
     throw new Error(`failed to get container job pod name: ${message}`)
   }
 

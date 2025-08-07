@@ -6,6 +6,7 @@ import { RunScriptStepArgs } from 'hooklib'
 import {
   BackOffManager,
   execPodStep,
+  extractErrorMessageFromK8sError,
   getRootCertClientCertAndKey
 } from '../k8s'
 import {
@@ -51,11 +52,9 @@ async function runScriptStepWithGRPC(
       )
       break
     } catch (err) {
-      core.debug(
-        `ScriptExecutorError when trying to execute: ${JSON.stringify(err)}`
-      )
-      const message = (err as any)?.response?.body?.message || err
-      if (String(message).includes('ECONNREFUSED')) {
+      const message = extractErrorMessageFromK8sError(err)
+      core.debug(`ScriptExecutorError when trying to execute: ${message}`)
+      if (message.includes('ECONNREFUSED')) {
         // Retry for 60s since the service may not be established.
         core.debug(`Retrying execution for ECONNREFUSED.`)
         await backOffmanager.backOff()
@@ -95,8 +94,8 @@ export async function runScriptStep(
       JOB_CONTAINER_NAME
     )
   } catch (err) {
-    core.debug(`execPodStep failed: ${JSON.stringify(err)}`)
-    const message = (err as any)?.response?.body?.message || err
+    const message = extractErrorMessageFromK8sError(err)
+    core.debug(`execPodStep failed: ${message}`)
     throw new Error(`failed to run script step: ${message}`)
   } finally {
     fs.rmSync(runnerPath)

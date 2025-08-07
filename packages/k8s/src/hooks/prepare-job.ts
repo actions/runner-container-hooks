@@ -15,7 +15,8 @@ import {
   prunePods,
   waitForPodPhases,
   getPrepareJobTimeoutSeconds,
-  createHeadlessService
+  createHeadlessService,
+  extractErrorMessageFromK8sError
 } from '../k8s'
 import {
   containerVolumes,
@@ -84,7 +85,7 @@ export async function prepareJob(
   } catch (err) {
     await prunePods()
     core.debug(`createPod failed: ${JSON.stringify(err)}`)
-    const message = (err as any)?.response?.body?.message || err
+    const message = extractErrorMessageFromK8sError(err)
     throw new Error(`failed to create job pod: ${message}`)
   }
 
@@ -119,7 +120,7 @@ export async function prepareJob(
     core.debug(
       `Failed to determine if the pod is alpine: ${JSON.stringify(err)}`
     )
-    const message = (err as any)?.response?.body?.message || err
+    const message = extractErrorMessageFromK8sError(err)
     throw new Error(`failed to determine if the pod is alpine: ${message}`)
   }
   core.debug(`Setting isAlpine to ${isAlpine}`)
