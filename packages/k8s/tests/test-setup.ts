@@ -10,6 +10,7 @@ kc.loadFromDefault()
 
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api)
 const k8sStorageApi = kc.makeApiClient(k8s.StorageV1Api)
+const k8sCustomApi = kc.makeApiClient(k8s.CustomObjectsApi)
 
 export class TestHelper {
   private tempDirPath: string
@@ -107,6 +108,47 @@ export class TestHelper {
       }
     } as k8s.V1Pod
     return await k8sApi.createNamespacedPod({ namespace: 'default', body: pod })
+  }
+
+  public async createJobSet(jobSetName: string): Promise<void> {
+    return await k8sCustomApi.createNamespacedCustomObject({
+      group: 'jobset.x-k8s.io',
+      version: 'v1alpha2',
+      namespace: 'default',
+      plural: 'jobsets',
+      body: {
+        apiVersion: 'jobset.x-k8s.io/v1alpha2',
+        kind: 'JobSet',
+        metadata: {
+          name: jobSetName
+        },
+        spec: {
+          replicatedJobs: [
+            {
+              name: 'workers',
+              template: {
+                spec: {
+                  parallelism: 2,
+                  completions: 2,
+                  backoffLimit: 0,
+                  template: {
+                    spec: {
+                      containers: [
+                        {
+                          name: 'nginx',
+                          image: 'nginx:latest',
+                          imagePullPolicy: 'IfNotPresent'
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    })
   }
 
   public async createTestVolume() {

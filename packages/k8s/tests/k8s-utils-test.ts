@@ -9,7 +9,9 @@ import {
   mergeContainerWithOptions,
   readExtensionFromFile,
   ENV_HOOK_TEMPLATE_PATH,
-  createScriptExecutorContainer
+  createScriptExecutorContainer,
+  getNumberOfHost,
+  ENV_NUMBER_OF_HOSTS
 } from '../src/k8s/utils'
 import * as k8s from '@kubernetes/client-node'
 import { TestHelper } from './test-setup'
@@ -550,6 +552,19 @@ spec:
     mergePodSpecWithOptions(base, from)
 
     expect(base).toStrictEqual(expected)
+  })
+
+  it('should returns 1 for number of hosts if ACTIONS_RUNNER_NUMBER_OF_HOSTS is not set', () => {
+    expect(getNumberOfHost()).toBe(1)
+  })
+
+  it('should returns number of hosts corresponding to ACTIONS_RUNNER_NUMBER_OF_HOSTS if set', () => {
+    process.env[ENV_NUMBER_OF_HOSTS] = '4'
+    try {
+      expect(getNumberOfHost()).toBe(4)
+    } finally {
+      delete process.env.ENV_NUMBER_OF_HOSTS
+    }
   })
 })
 

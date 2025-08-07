@@ -46,6 +46,11 @@ export function getSecretName(): string {
   )}-secret-${uuidv4().substring(0, STEP_POD_NAME_SUFFIX_LENGTH)}`
 }
 
+// The end characters are better for uniqueness
+export function getJobSetName(): string {
+  return `jobset-${getRunnerPodName().slice(-30)}`
+}
+
 export const MAX_POD_NAME_LENGTH = 63
 export const STEP_POD_NAME_SUFFIX_LENGTH = 8
 export const CONTAINER_EXTENSION_PREFIX = '$'

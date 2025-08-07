@@ -23,6 +23,7 @@ export const SCRIPT_EXECUTOR_ENTRY_POINT_ARGS = [
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
 export const ENV_USE_KUBE_SCHEDULER = 'ACTIONS_RUNNER_USE_KUBE_SCHEDULER'
 export const ENV_USE_SCRIPT_EXECUTOR = 'ACTIONS_RUNNER_USE_SCRIPT_EXECUTOR'
+export const ENV_NUMBER_OF_HOSTS = 'ACTIONS_RUNNER_NUMBER_OF_HOSTS'
 
 export function containerVolumes(
   userMountVolumes: Mount[] = [],
@@ -306,6 +307,10 @@ export function useKubeScheduler(): boolean {
 
 export function useScriptExecutor(): boolean {
   return process.env[ENV_USE_SCRIPT_EXECUTOR] === 'true'
+}
+
+export function getNumberOfHost(): number {
+  return Number(process.env[ENV_NUMBER_OF_HOSTS]) || 1
 }
 
 export enum PodPhase {

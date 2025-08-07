@@ -9,10 +9,10 @@ import { TestHelper } from './test-setup'
 import * as k8s from '@kubernetes/client-node'
 import { generateCerts } from '../src/k8s/certs'
 import { ChildProcess, exec, execSync } from 'child_process'
-import { runScriptByGrpc } from '../src/k8s/utils'
+import { ENV_NUMBER_OF_HOSTS, runScriptByGrpc } from '../src/k8s/utils'
 import { MTLSCertAndPrivateKey } from '../src/k8s/certs'
 import process from 'process'
-import { cpToPod, execPodStep } from '../src/k8s'
+import { cpToPod, jobSetExists, pruneJobSet } from '../src/k8s'
 import path from 'path'
 
 const kc = new k8s.KubeConfig()
@@ -186,5 +186,36 @@ describe('cpToPod', () => {
         '/tmp'
       )
     ).resolves.not.toThrow()
+  })
+})
+
+describe('jobset', () => {
+  it('jobSetExists returns false if a jobset does not exist', async () => {
+    await expect(jobSetExists('random-jobset')).resolves.toBeFalsy()
+  })
+
+  it('jobSetExists returns true if a jobset exists', async () => {
+    testHelper = new TestHelper()
+    const jobSetName = 'foo'
+    try {
+      await testHelper.createJobSet(jobSetName)
+      await expect(jobSetExists(jobSetName)).resolves.toBeTruthy()
+    } finally {
+      await pruneJobSet(jobSetName)
+    }
+  })
+
+  it('pruneJobSet works', async () => {
+    testHelper = new TestHelper()
+    const jobSetName = 'bar'
+    await testHelper.createJobSet(jobSetName)
+    await expect(jobSetExists(jobSetName)).resolves.toBeTruthy()
+    try {
+      process.env[ENV_NUMBER_OF_HOSTS] = '2'
+      await expect(pruneJobSet(jobSetName)).resolves.not.toThrow()
+    } finally {
+      delete process.env[ENV_NUMBER_OF_HOSTS]
+    }
+    await expect(jobSetExists(jobSetName)).resolves.toBeFalsy()
   })
 })

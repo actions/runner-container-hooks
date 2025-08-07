@@ -21,7 +21,8 @@ import {
   useKubeScheduler,
   fixArgs,
   createScriptExecutorContainer,
-  useScriptExecutor
+  useScriptExecutor,
+  getNumberOfHost
 } from './utils'
 import { generateCerts, MTLSCertAndPrivateKey } from './certs'
 import { v4 as uuidv4 } from 'uuid'
@@ -34,6 +35,7 @@ const k8sApi = kc.makeApiClient(k8s.CoreV1Api)
 const k8sBatchV1Api = kc.makeApiClient(k8s.BatchV1Api)
 const k8sAuthorizationV1Api = kc.makeApiClient(k8s.AuthorizationV1Api)
 const k8sExec = new k8s.Exec(kc)
+const k8sCustomApi = kc.makeApiClient(k8s.CustomObjectsApi)
 
 const DEFAULT_WAIT_FOR_POD_TIME_SECONDS = 10 * 60 // 10 min
 
@@ -949,4 +951,40 @@ export async function cpToPod(
 
 export function extractErrorMessageFromK8sError(error: unknown): string {
   return String((error as any)?.response?.body?.message || error)
+}
+
+export async function pruneJobSet(jobSetName: string): Promise<void> {
+  if (getNumberOfHost() === 1 || !(await jobSetExists(jobSetName))) {
+    return
+  }
+
+  core.debug(`deleting job set ${jobSetName}`)
+  await k8sCustomApi.deleteNamespacedCustomObject({
+    group: 'jobset.x-k8s.io',
+    version: 'v1alpha2',
+    namespace: namespace(),
+    plural: 'jobsets',
+    name: jobSetName
+  })
+  core.debug(`deleted job set ${jobSetName}`)
+}
+
+export async function jobSetExists(name: string): Promise<boolean> {
+  try {
+    await k8sCustomApi.getNamespacedCustomObject({
+      group: 'jobset.x-k8s.io',
+      version: 'v1alpha2',
+      namespace: namespace(),
+      plural: 'jobsets',
+      name
+    })
+    return true
+  } catch (error) {
+    if ((error as any)?.code === 404) {
+      core.debug(`jobset ${name} does not exist`)
+      return false
+    } else {
+      throw new Error(`Error checking jobset '${name}': ${error}`)
+    }
+  }
 }
