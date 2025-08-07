@@ -16,6 +16,9 @@ jobs:
       - uses: helm/kind-action@v1.2.0
         with:
           config: packages/k8s/tests/test-kind.yaml
+      - name: Install Jobset
+        run: |
+          kubectl apply --server-side -f https://github.com/kubernetes-sigs/jobset/releases/download/v0.8.1/manifests.yaml
       - run: npm install
         name: Install dependencies
       - run: npm run bootstrap
