@@ -12,6 +12,7 @@ import {
   getStepPodName,
   getVolumeClaimName,
   GRPC_SCRIPT_EXECUTOR_PORT,
+  JOB_CONTAINER_NAME,
   RunnerInstanceLabel
 } from '../hooks/constants'
 import {
@@ -998,4 +999,99 @@ export async function jobSetExists(name: string): Promise<boolean> {
       throw new Error(`Error checking jobset '${name}': ${error}`)
     }
   }
+}
+
+export async function getPodsFromJobSet(jobSetName): Promise<k8s.V1PodList> {
+  const selector = `jobset.sigs.k8s.io/jobset-name=${jobSetName}`
+
+  return await k8sApi.listNamespacedPod({
+    namespace: namespace(),
+    labelSelector: selector
+  })
+}
+
+export async function createJobSet(
+  jobSetName: string,
+  podSpec: k8s.V1PodSpec,
+  numberOfHost: number
+) {
+  // TODO(quoct): Right now we are using Kube Scheduler, we need to switch to Kueue
+  // for resource assignment.
+  podSpec.nodeName = ''
+  if (!podSpec.initContainers) {
+    podSpec.initContainers = []
+  }
+
+  // Copy the externals folder from the actions-runner container.
+  const initContainer: k8s.V1Container = {
+    name: 'copy-directory',
+    image: 'ghcr.io/actions/actions-runner:latest',
+    command: ['sh', '-c', 'cp -r /home/runner/externals /__w;'],
+    volumeMounts: [
+      {
+        mountPath: '/__w',
+        name: 'work'
+      }
+    ]
+  }
+
+  podSpec.initContainers.unshift(initContainer)
+  if (!podSpec.volumes) {
+    podSpec.volumes = []
+  }
+
+  // The work volume does not have to be a persistent volume anymore.
+  // We can use emptyDir here since it is ephemeral.
+  const workVolume = podSpec.volumes.find(volume => volume.name === 'work')
+  if (workVolume) {
+    workVolume.persistentVolumeClaim = undefined
+    workVolume.emptyDir = {}
+  } else {
+    podSpec.volumes.push({
+      name: 'work',
+      emptyDir: {}
+    })
+  }
+
+  // The mount starting with /github will be copied over for each
+  // pod in the JobSet so we can remove it.
+  const jobContainer = podSpec.containers.find(
+    container => container.name === JOB_CONTAINER_NAME
+  )
+  if (jobContainer?.volumeMounts) {
+    jobContainer.volumeMounts = jobContainer.volumeMounts.filter(
+      volumeMount => !volumeMount.mountPath.startsWith('/github/')
+    )
+  }
+
+  return await k8sCustomApi.createNamespacedCustomObject({
+    group: 'jobset.x-k8s.io',
+    version: 'v1alpha2',
+    namespace: namespace(),
+    plural: 'jobsets',
+    body: {
+      apiVersion: 'jobset.x-k8s.io/v1alpha2',
+      kind: 'JobSet',
+      metadata: {
+        name: jobSetName
+      },
+      spec: {
+        replicatedJobs: [
+          {
+            name: 'workers',
+            template: {
+              spec: {
+                parallelism: numberOfHost,
+                completions: numberOfHost,
+                backoffLimit: 0,
+                template: {
+                  spec: podSpec
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  })
 }
