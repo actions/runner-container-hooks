@@ -105,14 +105,6 @@ export async function createPod(
   registry?: Registry,
   extension?: k8s.V1PodTemplateSpec
 ): Promise<k8s.V1Pod> {
-  const containers: k8s.V1Container[] = []
-  if (jobContainer) {
-    containers.push(jobContainer)
-  }
-  if (services?.length) {
-    containers.push(...services)
-  }
-
   const appPod = new k8s.V1Pod()
 
   appPod.apiVersion = 'v1'
@@ -127,10 +119,36 @@ export async function createPod(
   }
   appPod.metadata.annotations = {}
 
-  appPod.spec = new k8s.V1PodSpec()
-  appPod.spec.containers = containers
-  appPod.spec.restartPolicy = 'Never'
-  appPod.spec.volumes = []
+  appPod.spec = await createPodSpec(jobContainer, services, registry, extension)
+
+  if (extension?.metadata) {
+    mergeObjectMeta(appPod, extension.metadata)
+  }
+
+  return await k8sApi.createNamespacedPod({
+    namespace: namespace(),
+    body: appPod
+  })
+}
+
+export async function createPodSpec(
+  jobContainer?: k8s.V1Container,
+  services?: k8s.V1Container[],
+  registry?: Registry,
+  extension?: k8s.V1PodTemplateSpec
+): Promise<k8s.V1PodSpec> {
+  const containers: k8s.V1Container[] = []
+  if (jobContainer) {
+    containers.push(jobContainer)
+  }
+  if (services?.length) {
+    containers.push(...services)
+  }
+
+  const podSpec = new k8s.V1PodSpec()
+  podSpec.containers = containers
+  podSpec.restartPolicy = 'Never'
+  podSpec.volumes = []
 
   if (useScriptExecutor()) {
     if (!jobContainer) {
@@ -138,19 +156,19 @@ export async function createPod(
     }
     await prepareJobContainerAndPodForScriptExecutor(
       jobContainer,
-      appPod.spec,
-      instanceLabel
+      podSpec,
+      new RunnerInstanceLabel()
     )
   }
 
   const nodeName = await getCurrentNodeName()
   if (useKubeScheduler()) {
-    appPod.spec.affinity = await getPodAffinity(nodeName)
+    podSpec.affinity = await getPodAffinity(nodeName)
   } else {
-    appPod.spec.nodeName = nodeName
+    podSpec.nodeName = nodeName
   }
   const claimName = getVolumeClaimName()
-  appPod.spec.volumes.push(
+  podSpec.volumes.push(
     {
       name: 'work',
       persistentVolumeClaim: { claimName }
@@ -168,21 +186,14 @@ export async function createPod(
     }
     const secretReference = new k8s.V1LocalObjectReference()
     secretReference.name = secret.metadata.name
-    appPod.spec.imagePullSecrets = [secretReference]
-  }
-
-  if (extension?.metadata) {
-    mergeObjectMeta(appPod, extension.metadata)
+    podSpec.imagePullSecrets = [secretReference]
   }
 
   if (extension?.spec) {
-    mergePodSpecWithOptions(appPod.spec, extension.spec)
+    mergePodSpecWithOptions(podSpec, extension.spec)
   }
 
-  return await k8sApi.createNamespacedPod({
-    namespace: namespace(),
-    body: appPod
-  })
+  return podSpec
 }
 
 /**
