@@ -1,6 +1,7 @@
 import * as fs from 'fs'
 import { cleanupJob, prepareJob, runScriptStep } from '../src/hooks'
 import { TestHelper } from './test-setup'
+import { PrepareJobArgs } from 'hooklib'
 
 jest.useRealTimers()
 
@@ -21,7 +22,10 @@ describe('Run script step', () => {
     const prepareJobData = testHelper.getPrepareJobDefinition()
     runScriptStepDefinition = testHelper.getRunScriptStepDefinition()
 
-    await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+    await prepareJob(
+      prepareJobData.args as PrepareJobArgs,
+      prepareJobOutputFilePath
+    )
     const outputContent = fs.readFileSync(prepareJobOutputFilePath)
     prepareJobOutputData = JSON.parse(outputContent.toString())
   })

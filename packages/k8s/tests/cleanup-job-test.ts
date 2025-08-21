@@ -3,6 +3,7 @@ import { cleanupJob, prepareJob } from '../src/hooks'
 import { RunnerInstanceLabel } from '../src/hooks/constants'
 import { namespace } from '../src/k8s'
 import { TestHelper } from './test-setup'
+import { PrepareJobArgs } from 'hooklib'
 
 let testHelper: TestHelper
 
@@ -14,7 +15,10 @@ describe('Cleanup Job', () => {
     const prepareJobOutputFilePath = testHelper.createFile(
       'prepare-job-output.json'
     )
-    await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+    await prepareJob(
+      prepareJobData.args as PrepareJobArgs,
+      prepareJobOutputFilePath
+    )
   })
 
   afterEach(async () => {
@@ -32,16 +36,12 @@ describe('Cleanup Job', () => {
     kc.loadFromDefault()
     const k8sApi = kc.makeApiClient(k8s.CoreV1Api)
 
-    const podList = await k8sApi.listNamespacedPod(
-      namespace(),
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      new RunnerInstanceLabel().toString()
-    )
+    const podList = await k8sApi.listNamespacedPod({
+      namespace: namespace(),
+      labelSelector: new RunnerInstanceLabel().toString()
+    })
 
-    expect(podList.body.items.length).toBe(0)
+    expect(podList.items.length).toBe(0)
   })
 
   it('should have no runner linked secrets', async () => {
@@ -51,15 +51,11 @@ describe('Cleanup Job', () => {
     kc.loadFromDefault()
     const k8sApi = kc.makeApiClient(k8s.CoreV1Api)
 
-    const secretList = await k8sApi.listNamespacedSecret(
-      namespace(),
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      new RunnerInstanceLabel().toString()
-    )
+    const secretList = await k8sApi.listNamespacedSecret({
+      namespace: namespace(),
+      labelSelector: new RunnerInstanceLabel().toString()
+    })
 
-    expect(secretList.body.items.length).toBe(0)
+    expect(secretList.items.length).toBe(0)
   })
 })

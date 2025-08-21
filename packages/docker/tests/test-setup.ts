@@ -31,7 +31,7 @@ export default class TestSetup {
   private get allTestDirectories() {
     const resp = [this.testdir, this.runnerMockDir, this.runnerOutputDir]
 
-    for (const [key, value] of Object.entries(this.runnerMockSubdirs)) {
+    for (const [, value] of Object.entries(this.runnerMockSubdirs)) {
       resp.push(`${this.runnerMockDir}/${value}`)
     }
 
@@ -42,12 +42,11 @@ export default class TestSetup {
     return resp
   }
 
-  public initialize(): void {
+  initialize(): void {
     env['GITHUB_WORKSPACE'] = this.workingDirectory
     env['RUNNER_NAME'] = 'test'
-    env[
-      'RUNNER_TEMP'
-    ] = `${this.runnerMockDir}/${this.runnerMockSubdirs.workTemp}`
+    env['RUNNER_TEMP'] =
+      `${this.runnerMockDir}/${this.runnerMockSubdirs.workTemp}`
 
     for (const dir of this.allTestDirectories) {
       fs.mkdirSync(dir, { recursive: true })
@@ -59,7 +58,7 @@ export default class TestSetup {
     )
   }
 
-  public teardown(): void {
+  teardown(): void {
     fs.rmdirSync(this.testdir, { recursive: true })
   }
 
@@ -108,21 +107,21 @@ export default class TestSetup {
     ]
   }
 
-  public createOutputFile(name: string): string {
+  createOutputFile(name: string): string {
     let filePath = path.join(this.runnerOutputDir, name || `${uuidv4()}.json`)
     fs.writeFileSync(filePath, '')
     return filePath
   }
 
-  public get workingDirectory(): string {
+  get workingDirectory(): string {
     return `${this.runnerMockDir}/_work/${this.projectName}/${this.projectName}`
   }
 
-  public get containerWorkingDirectory(): string {
+  get containerWorkingDirectory(): string {
     return `/__w/${this.projectName}/${this.projectName}`
   }
 
-  public initializeDockerAction(): string {
+  initializeDockerAction(): string {
     const actionPath = `${this.testdir}/_actions/example-handle/example-repo/example-branch/mock-directory`
     fs.mkdirSync(actionPath, { recursive: true })
     this.writeDockerfile(actionPath)
@@ -147,7 +146,7 @@ echo "::set-output name=time::$time"`
     fs.chmodSync(entryPointPath, 0o755)
   }
 
-  public getPrepareJobDefinition(): HookData {
+  getPrepareJobDefinition(): HookData {
     const prepareJob = JSON.parse(
       fs.readFileSync(
         path.resolve(__dirname + '/../../../examples/prepare-job.json'),
@@ -166,7 +165,7 @@ echo "::set-output name=time::$time"`
     return prepareJob
   }
 
-  public getRunScriptStepDefinition(): HookData {
+  getRunScriptStepDefinition(): HookData {
     const runScriptStep = JSON.parse(
       fs.readFileSync(
         path.resolve(__dirname + '/../../../examples/run-script-step.json'),
@@ -178,7 +177,7 @@ echo "::set-output name=time::$time"`
     return runScriptStep
   }
 
-  public getRunContainerStepDefinition(): HookData {
+  getRunContainerStepDefinition(): HookData {
     const runContainerStep = JSON.parse(
       fs.readFileSync(
         path.resolve(__dirname + '/../../../examples/run-container-step.json'),
