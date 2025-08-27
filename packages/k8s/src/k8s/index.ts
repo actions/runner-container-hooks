@@ -1,10 +1,7 @@
 import * as core from '@actions/core'
-<<<<<<< HEAD
 import * as path from 'path'
 import { spawn } from 'child_process'
-=======
 import { context as jobContext } from '@actions/github'
->>>>>>> a3d6427 (feat: label job pods with context info)
 import * as k8s from '@kubernetes/client-node'
 import tar from 'tar-fs'
 import * as stream from 'stream'
@@ -66,10 +63,6 @@ export const requiredPermissions = [
   }
 ]
 
-<<<<<<< HEAD
-export async function createJobPod(
-  name: string,
-=======
 /**
  * Valid k8s labels conform to the following rules:
  *  - must be 63 characters or less (can be empty),
@@ -96,8 +89,27 @@ function sanitizeLabel(label: string): string {
   return sluggedLabel
 }
 
+function getArcContextLabels(): { [key: string]: string } {
+  const { GITHUB_RUN_ID, GITHUB_RUN_NUMBER, GITHUB_RUN_ATTEMPT } = process.env
+  return Object.fromEntries(
+    Object.entries({
+      'arc-context-event-name': jobContext.eventName,
+      'arc-context-sha': jobContext.sha,
+      'arc-context-workflow': jobContext.workflow,
+      'arc-context-actor': jobContext.actor,
+      'arc-context-job': jobContext.job,
+      'arc-context-repository': jobContext.repo.repo,
+      'arc-context-repository-owner': jobContext.repo.owner,
+      'arc-context-run-id': GITHUB_RUN_ID || '',
+      'arc-context-run-number': GITHUB_RUN_NUMBER || '',
+      'arc-context-run-attempt': GITHUB_RUN_ATTEMPT || ''
+    })
+      .map(([key, value]) => [key, sanitizeLabel(value)])
+      .filter(([, value]) => value !== '')
+  )
+}
+
 export async function createPod(
->>>>>>> a3d6427 (feat: label job pods with context info)
   jobContainer?: k8s.V1Container,
   services?: k8s.V1Container[],
   registry?: Registry,
@@ -119,22 +131,7 @@ export async function createPod(
   appPod.metadata = new k8s.V1ObjectMeta()
   appPod.metadata.name = name
 
-  const { GITHUB_RUN_ID, GITHUB_RUN_NUMBER, GITHUB_RUN_ATTEMPT } = process.env
-  const arcLabels = Object.fromEntries(
-    Object.entries({
-      'arc-context-event-name': jobContext.eventName,
-      'arc-context-sha': jobContext.sha,
-      'arc-context-workflow': jobContext.workflow,
-      'arc-context-actor': jobContext.actor,
-      'arc-context-job': jobContext.job,
-      'arc-context-repository': jobContext.repo.repo,
-      'arc-context-repository-owner': jobContext.repo.owner,
-      'arc-context-run-id': GITHUB_RUN_ID || '',
-      'arc-context-run-number': GITHUB_RUN_NUMBER || '',
-      'arc-context-run-attempt': GITHUB_RUN_ATTEMPT || ''
-    }).map(([key, value]) => [key, sanitizeLabel(value)])
-  )
-
+  const arcLabels = getArcContextLabels()
   const instanceLabel = new RunnerInstanceLabel()
   appPod.metadata.labels = {
     [instanceLabel.key]: instanceLabel.value,
@@ -250,8 +247,20 @@ export async function createContainerStepPod(
   appPod.metadata.name = name
 
   const instanceLabel = new RunnerInstanceLabel()
-  appPod.metadata.labels = {
-    [instanceLabel.key]: instanceLabel.value
+  const arcLabels = getArcContextLabels()
+  appPod.metadata.labels = arcLabels
+  job.spec.template.spec = new k8s.V1PodSpec()
+  job.spec.template.metadata = new k8s.V1ObjectMeta()
+  job.spec.template.metadata.labels = arcLabels
+  job.spec.template.metadata.annotations = {}
+  job.spec.template.spec.containers = [container]
+  job.spec.template.spec.restartPolicy = 'Never'
+
+  const nodeName = await getCurrentNodeName()
+  if (useKubeScheduler()) {
+    job.spec.template.spec.affinity = await getPodAffinity(nodeName)
+  } else {
+    job.spec.template.spec.nodeName = nodeName
   }
   appPod.metadata.annotations = {}
 
@@ -581,7 +590,9 @@ export async function execCpFromPod(
       attempt++
       if (attempt >= 30) {
         throw new Error(
-          `execCpFromPod failed after ${attempt} attempts: ${JSON.stringify(error)}`
+          `execCpFromPod failed after ${attempt} attempts: ${JSON.stringify(
+            error
+          )}`
         )
       }
       await sleep(1000)
@@ -751,7 +762,9 @@ export async function waitForPodPhases(
     }
   } catch (error) {
     throw new Error(
-      `Pod ${podName} is unhealthy with phase status ${phase}: ${JSON.stringify(error)}`
+      `Pod ${podName} is unhealthy with phase status ${phase}: ${JSON.stringify(
+        error
+      )}`
     )
   }
 }
