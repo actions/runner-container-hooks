@@ -59,7 +59,9 @@ export async function createContainer(
   ]
   for (const mountVolume of mountVolumes) {
     dockerArgs.push(
-      `-v=${mountVolume.sourceVolumePath}:${mountVolume.targetVolumePath}`
+      `-v=${mountVolume.sourceVolumePath}:${mountVolume.targetVolumePath}${
+        mountVolume.readOnly ? ':ro' : ''
+      }`
     )
   }
   if (args.entryPoint) {
