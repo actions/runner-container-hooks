@@ -68,6 +68,7 @@ export function writeRunScript(
 
   const content = `#!/bin/sh -l
 set -e
+rm "$0" # remove script after running
 ${exportPath}
 cd ${workingDirectory} && \
 exec ${environmentPrefix} ${entryPoint} ${
@@ -98,6 +99,7 @@ export function writeContainerStepScript(
   }
 
   const content = `#!/bin/sh -l
+rm "$0" # remove script after running
 mv /__w/_temp/_github_home /github/home && \
 mv /__w/_temp/_github_workflow /github/workflow && \
 mv /__w/_temp/_runner_file_commands /github/file_commands && \

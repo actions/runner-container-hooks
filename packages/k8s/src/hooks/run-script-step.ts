@@ -9,12 +9,11 @@ import { dirname } from 'path'
 
 export async function runScriptStep(
   args: RunScriptStepArgs,
-  state,
-  responseFile
+  state
 ): Promise<void> {
   // Write the entrypoint first. This will be later coppied to the workflow pod
   const { entryPoint, entryPointArgs, environmentVariables } = args
-  const { containerPath } = writeRunScript(
+  const { containerPath, runnerPath } = writeRunScript(
     args.workingDirectory,
     entryPoint,
     entryPointArgs,
@@ -40,6 +39,8 @@ export async function runScriptStep(
     core.debug(`execPodStep failed: ${JSON.stringify(err)}`)
     const message = (err as any)?.response?.body?.message || err
     throw new Error(`failed to run script step: ${message}`)
+  } finally {
+    fs.rmSync(runnerPath, { force: true })
   }
 
   try {

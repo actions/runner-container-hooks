@@ -5,6 +5,7 @@ import { RunContainerStepArgs } from 'hooklib'
 import { dirname } from 'path'
 import {
   createContainerStepPod,
+  deletePod,
   execCpFromPod,
   execCpToPod,
   execPodStep,
@@ -67,51 +68,60 @@ export async function runContainerStep(
   }
   const podName = pod.metadata.name
 
-  await waitForPodPhases(
-    podName,
-    new Set([PodPhase.RUNNING]),
-    new Set([PodPhase.PENDING, PodPhase.UNKNOWN]),
-    getPrepareJobTimeoutSeconds()
-  )
-
-  const runnerWorkspace = dirname(process.env.RUNNER_WORKSPACE as string)
-  const githubWorkspace = process.env.GITHUB_WORKSPACE as string
-  const parts = githubWorkspace.split('/').slice(-2)
-  if (parts.length !== 2) {
-    throw new Error(`Invalid github workspace directory: ${githubWorkspace}`)
-  }
-  const relativeWorkspace = parts.join('/')
-
-  core.debug(
-    `Copying files from pod ${getJobPodName()} to ${runnerWorkspace}/${relativeWorkspace}`
-  )
-  await execCpFromPod(getJobPodName(), `/__w`, `${runnerWorkspace}`)
-
-  const { containerPath, runnerPath } = writeContainerStepScript(
-    `${runnerWorkspace}/__w/_temp`,
-    githubWorkspace,
-    stepContainer.entryPoint,
-    stepContainer.entryPointArgs,
-    envs
-  )
-
-  await execCpToPod(podName, `${runnerWorkspace}/__w`, '/__w')
-
-  fs.rmSync(`${runnerWorkspace}/__w`, { recursive: true, force: true })
-
   try {
-    core.debug(`Executing container step script in pod ${podName}`)
-    return await execPodStep(
-      ['/__e/sh', '-e', containerPath],
-      pod.metadata.name,
-      JOB_CONTAINER_NAME
+    await waitForPodPhases(
+      podName,
+      new Set([PodPhase.RUNNING]),
+      new Set([PodPhase.PENDING, PodPhase.UNKNOWN]),
+      getPrepareJobTimeoutSeconds()
     )
-  } catch (err) {
-    core.debug(`execPodStep failed: ${JSON.stringify(err)}`)
-    const message = (err as any)?.response?.body?.message || err
-    throw new Error(`failed to run script step: ${message}`)
+
+    const runnerWorkspace = dirname(process.env.RUNNER_WORKSPACE as string)
+    const githubWorkspace = process.env.GITHUB_WORKSPACE as string
+    const parts = githubWorkspace.split('/').slice(-2)
+    if (parts.length !== 2) {
+      throw new Error(`Invalid github workspace directory: ${githubWorkspace}`)
+    }
+    const relativeWorkspace = parts.join('/')
+
+    core.debug(
+      `Copying files from pod ${getJobPodName()} to ${runnerWorkspace}/${relativeWorkspace}`
+    )
+    await execCpFromPod(getJobPodName(), `/__w`, `${runnerWorkspace}`)
+
+    const { containerPath, runnerPath } = writeContainerStepScript(
+      `${runnerWorkspace}/__w/_temp`,
+      githubWorkspace,
+      stepContainer.entryPoint,
+      stepContainer.entryPointArgs,
+      envs
+    )
+
+    await execCpToPod(podName, `${runnerWorkspace}/__w`, '/__w')
+
+    fs.rmSync(`${runnerWorkspace}/__w`, { recursive: true, force: true })
+
+    try {
+      core.debug(`Executing container step script in pod ${podName}`)
+      return await execPodStep(
+        ['/__e/sh', '-e', containerPath],
+        pod.metadata.name,
+        JOB_CONTAINER_NAME
+      )
+    } catch (err) {
+      core.debug(`execPodStep failed: ${JSON.stringify(err)}`)
+      const message = (err as any)?.response?.body?.message || err
+      throw new Error(`failed to run script step: ${message}`)
+    } finally {
+      fs.rmSync(runnerPath, { force: true })
+    }
+  } catch (error) {
+    core.error(`Failed to run container step: ${error}`)
+    throw error
   } finally {
-    fs.rmSync(runnerPath, { recursive: true, force: true })
+    await deletePod(podName).catch(err => {
+      core.error(`Failed to delete step pod ${podName}: ${err}`)
+    })
   }
 }
 
