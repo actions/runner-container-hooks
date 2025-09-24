@@ -6,9 +6,45 @@ on:
     paths-ignore:
     - '**.md'
   workflow_dispatch:
+
 jobs:
-  build:
+  format-and-lint:
+    name: Format & Lint Checks
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install
+        name: Install dependencies
+      - run: npm run bootstrap
+        name: Bootstrap the packages
+      - run: npm run build-all
+        name: Build packages
+      - run: npm run format-check
+        name: Check formatting
+      - name: Check linter
+        run: |
+          npm run lint
+          git diff --exit-code -- . ':!packages/k8s/tests/test-kind.yaml'
+
+  docker-tests:
+    name: Docker Hook Tests
+    runs-on: ubuntu-latest
+    needs: format-and-lint
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install
+        name: Install dependencies
+      - run: npm run bootstrap
+        name: Bootstrap the packages
+      - run: npm run build-all
+        name: Build packages
+      - name: Run Docker tests
+        run: npm run test --prefix packages/docker
+
+  k8s-tests:
+    name: Kubernetes Hook Tests
+    runs-on: ubuntu-latest
+    needs: format-and-lint
     steps:
       - uses: actions/checkout@v4
       - run: sed -i "s|{{PATHTOREPO}}|$(pwd)|" packages/k8s/tests/test-kind.yaml
@@ -22,10 +58,5 @@ jobs:
         name: Bootstrap the packages
       - run: npm run build-all
         name: Build packages
-      - run: npm run format-check
-      - name: Check linter
-        run: |
-          npm run lint
-          git diff --exit-code -- ':!packages/k8s/tests/test-kind.yaml'
-      - name: Run tests
-        run: npm run test
+      - name: Run Kubernetes tests
+        run: npm run test --prefix packages/k8s
