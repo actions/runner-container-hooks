@@ -39,8 +39,7 @@ describe('e2e', () => {
     await expect(
       runScriptStep(
         scriptStepData.args as RunScriptStepArgs,
-        prepareJobOutputData.state,
-        null
+        prepareJobOutputData.state
       )
     ).resolves.not.toThrow()
 
