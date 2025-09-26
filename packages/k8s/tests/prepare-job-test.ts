@@ -3,12 +3,8 @@ import * as path from 'path'
 import { cleanupJob } from '../src/hooks'
 import { createContainerSpec, prepareJob } from '../src/hooks/prepare-job'
 import { TestHelper } from './test-setup'
-import {
-  ENV_HOOK_TEMPLATE_PATH,
-  ENV_USE_KUBE_SCHEDULER,
-  generateContainerName
-} from '../src/k8s/utils'
-import { getPodByName } from '../src/k8s'
+import { ENV_HOOK_TEMPLATE_PATH, generateContainerName } from '../src/k8s/utils'
+import { execPodStep, getPodByName } from '../src/k8s'
 import { V1Container } from '@kubernetes/client-node'
 import { JOB_CONTAINER_NAME } from '../src/hooks/constants'
 
@@ -45,19 +41,38 @@ describe('Prepare job', () => {
   })
 
   it('should prepare job with absolute path for userVolumeMount', async () => {
+    const userVolumeMount = path.join(
+      process.env.GITHUB_WORKSPACE as string,
+      'myvolume'
+    )
+    fs.mkdirSync(userVolumeMount)
+    fs.writeFileSync(path.join(userVolumeMount, 'file.txt'), 'hello')
     prepareJobData.args.container.userMountVolumes = [
       {
-        sourceVolumePath: path.join(
-          process.env.GITHUB_WORKSPACE as string,
-          '/myvolume'
-        ),
-        targetVolumePath: '/volume_mount',
+        sourceVolumePath: userVolumeMount,
+        targetVolumePath: '/__w/myvolume',
         readOnly: false
       }
     ]
     await expect(
       prepareJob(prepareJobData.args, prepareJobOutputFilePath)
     ).resolves.not.toThrow()
+
+    const content = JSON.parse(
+      fs.readFileSync(prepareJobOutputFilePath).toString()
+    )
+
+    await execPodStep(
+      [
+        'sh',
+        '-c',
+        '\'[ "$(cat /__w/myvolume/file.txt)" = "hello" ] || exit 5\''
+      ],
+      content!.state!.jobPod,
+      JOB_CONTAINER_NAME
+    ).then(output => {
+      expect(output).toBe(0)
+    })
   })
 
   it('should prepare job with envs CI and GITHUB_ACTIONS', async () => {
@@ -108,19 +123,6 @@ describe('Prepare job', () => {
     )
   })
 
-  it('should throw an exception if the user volume mount is absolute path outside of GITHUB_WORKSPACE', async () => {
-    prepareJobData.args.container.userMountVolumes = [
-      {
-        sourceVolumePath: '/somewhere/not/in/gh-workspace',
-        targetVolumePath: '/containermount',
-        readOnly: false
-      }
-    ]
-    await expect(
-      prepareJob(prepareJobData.args, prepareJobOutputFilePath)
-    ).rejects.toThrow()
-  })
-
   it('should not run prepare job without the job container', async () => {
     prepareJobData.args.container = undefined
     await expect(
@@ -166,8 +168,7 @@ describe('Prepare job', () => {
 
     expect(got.metadata?.annotations?.['annotated-by']).toBe('extension')
     expect(got.metadata?.labels?.['labeled-by']).toBe('extension')
-    expect(got.spec?.securityContext?.runAsUser).toBe(1000)
-    expect(got.spec?.securityContext?.runAsGroup).toBe(3000)
+    expect(got.spec?.restartPolicy).toBe('Never')
 
     // job container
     expect(got.spec?.containers[0].name).toBe(JOB_CONTAINER_NAME)
@@ -215,17 +216,6 @@ describe('Prepare job', () => {
     expect(content.context.container).toBeTruthy()
     expect(content.context.services).toBeTruthy()
     expect(content.context.services.length).toBe(1)
-  })
-
-  it('should not throw exception using kube scheduler', async () => {
-    // only for ReadWriteMany volumes or single node cluster
-    process.env[ENV_USE_KUBE_SCHEDULER] = 'true'
-
-    await expect(
-      prepareJob(prepareJobData.args, prepareJobOutputFilePath)
-    ).resolves.not.toThrow()
-
-    delete process.env[ENV_USE_KUBE_SCHEDULER]
   })
 
   test.each([undefined, null, []])(

@@ -1,9 +1,8 @@
 ﻿import * as fs from 'fs'
-import { containerPorts, POD_VOLUME_NAME } from '../src/k8s'
+import { containerPorts } from '../src/k8s'
 import {
-  containerVolumes,
   generateContainerName,
-  writeEntryPointScript,
+  writeRunScript,
   mergePodSpecWithOptions,
   mergeContainerWithOptions,
   readExtensionFromFile,
@@ -27,91 +26,55 @@ describe('k8s utils', () => {
 
     it('should not throw', () => {
       expect(() =>
-        writeEntryPointScript(
-          '/test',
-          'sh',
-          ['-e', 'script.sh'],
-          ['/prepend/path'],
-          {
-            SOME_ENV: 'SOME_VALUE'
-          }
-        )
+        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
+          SOME_ENV: 'SOME_VALUE'
+        })
       ).not.toThrow()
     })
 
     it('should throw if RUNNER_TEMP is not set', () => {
       delete process.env.RUNNER_TEMP
       expect(() =>
-        writeEntryPointScript(
-          '/test',
-          'sh',
-          ['-e', 'script.sh'],
-          ['/prepend/path'],
-          {
-            SOME_ENV: 'SOME_VALUE'
-          }
-        )
+        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
+          SOME_ENV: 'SOME_VALUE'
+        })
       ).toThrow()
     })
 
     it('should throw if environment variable name contains double quote', () => {
       expect(() =>
-        writeEntryPointScript(
-          '/test',
-          'sh',
-          ['-e', 'script.sh'],
-          ['/prepend/path'],
-          {
-            'SOME"_ENV': 'SOME_VALUE'
-          }
-        )
+        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
+          'SOME"_ENV': 'SOME_VALUE'
+        })
       ).toThrow()
     })
 
     it('should throw if environment variable name contains =', () => {
       expect(() =>
-        writeEntryPointScript(
-          '/test',
-          'sh',
-          ['-e', 'script.sh'],
-          ['/prepend/path'],
-          {
-            'SOME=ENV': 'SOME_VALUE'
-          }
-        )
+        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
+          'SOME=ENV': 'SOME_VALUE'
+        })
       ).toThrow()
     })
 
     it('should throw if environment variable name contains single quote', () => {
       expect(() =>
-        writeEntryPointScript(
-          '/test',
-          'sh',
-          ['-e', 'script.sh'],
-          ['/prepend/path'],
-          {
-            "SOME'_ENV": 'SOME_VALUE'
-          }
-        )
+        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
+          "SOME'_ENV": 'SOME_VALUE'
+        })
       ).toThrow()
     })
 
     it('should throw if environment variable name contains dollar', () => {
       expect(() =>
-        writeEntryPointScript(
-          '/test',
-          'sh',
-          ['-e', 'script.sh'],
-          ['/prepend/path'],
-          {
-            SOME_$_ENV: 'SOME_VALUE'
-          }
-        )
+        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
+          SOME_$_ENV: 'SOME_VALUE'
+        })
       ).toThrow()
     })
 
     it('should escape double quote, dollar and backslash in environment variable values', () => {
-      const { runnerPath } = writeEntryPointScript(
+      const { runnerPath } = writeRunScript(
         '/test',
         'sh',
         ['-e', 'script.sh'],
@@ -130,7 +93,7 @@ describe('k8s utils', () => {
     })
 
     it('should return object with containerPath and runnerPath', () => {
-      const { containerPath, runnerPath } = writeEntryPointScript(
+      const { containerPath, runnerPath } = writeRunScript(
         '/test',
         'sh',
         ['-e', 'script.sh'],
@@ -145,7 +108,7 @@ describe('k8s utils', () => {
     })
 
     it('should write entrypoint path and the file should exist', () => {
-      const { runnerPath } = writeEntryPointScript(
+      const { runnerPath } = writeRunScript(
         '/test',
         'sh',
         ['-e', 'script.sh'],
@@ -166,90 +129,6 @@ describe('k8s utils', () => {
 
     afterEach(async () => {
       await testHelper.cleanup()
-    })
-
-    it('should throw if container action and GITHUB_WORKSPACE env is not set', () => {
-      delete process.env.GITHUB_WORKSPACE
-      expect(() => containerVolumes([], true, true)).toThrow()
-      expect(() => containerVolumes([], false, true)).toThrow()
-    })
-
-    it('should always have work mount', () => {
-      let volumes = containerVolumes([], true, true)
-      expect(volumes.find(e => e.mountPath === '/__w')).toBeTruthy()
-      volumes = containerVolumes([], true, false)
-      expect(volumes.find(e => e.mountPath === '/__w')).toBeTruthy()
-      volumes = containerVolumes([], false, true)
-      expect(volumes.find(e => e.mountPath === '/__w')).toBeTruthy()
-      volumes = containerVolumes([], false, false)
-      expect(volumes.find(e => e.mountPath === '/__w')).toBeTruthy()
-    })
-
-    it('should always have /github/workflow mount if working on container job or container action', () => {
-      let volumes = containerVolumes([], true, true)
-      expect(volumes.find(e => e.mountPath === '/github/workflow')).toBeTruthy()
-      volumes = containerVolumes([], true, false)
-      expect(volumes.find(e => e.mountPath === '/github/workflow')).toBeTruthy()
-      volumes = containerVolumes([], false, true)
-      expect(volumes.find(e => e.mountPath === '/github/workflow')).toBeTruthy()
-
-      volumes = containerVolumes([], false, false)
-      expect(
-        volumes.find(e => e.mountPath === '/github/workflow')
-      ).toBeUndefined()
-    })
-
-    it('should have container action volumes', () => {
-      let volumes = containerVolumes([], true, true)
-      let workspace = volumes.find(e => e.mountPath === '/github/workspace')
-      let fileCommands = volumes.find(
-        e => e.mountPath === '/github/file_commands'
-      )
-      expect(workspace).toBeTruthy()
-      expect(workspace?.subPath).toBe('repo/repo')
-      expect(fileCommands).toBeTruthy()
-      expect(fileCommands?.subPath).toBe('_temp/_runner_file_commands')
-
-      volumes = containerVolumes([], false, true)
-      workspace = volumes.find(e => e.mountPath === '/github/workspace')
-      fileCommands = volumes.find(e => e.mountPath === '/github/file_commands')
-      expect(workspace).toBeTruthy()
-      expect(workspace?.subPath).toBe('repo/repo')
-      expect(fileCommands).toBeTruthy()
-      expect(fileCommands?.subPath).toBe('_temp/_runner_file_commands')
-    })
-
-    it('should have externals, github home mounts if job container', () => {
-      const volumes = containerVolumes()
-      expect(volumes.find(e => e.mountPath === '/__e')).toBeTruthy()
-      expect(volumes.find(e => e.mountPath === '/github/home')).toBeTruthy()
-    })
-
-    it('should throw if user volume source volume path is not in workspace', () => {
-      expect(() =>
-        containerVolumes(
-          [
-            {
-              sourceVolumePath: '/outside/of/workdir',
-              targetVolumePath: '/some/target/path',
-              readOnly: false
-            }
-          ],
-          true,
-          false
-        )
-      ).toThrow()
-    })
-
-    it(`all volumes should have name ${POD_VOLUME_NAME}`, () => {
-      let volumes = containerVolumes([], true, true)
-      expect(volumes.every(e => e.name === POD_VOLUME_NAME)).toBeTruthy()
-      volumes = containerVolumes([], true, false)
-      expect(volumes.every(e => e.name === POD_VOLUME_NAME)).toBeTruthy()
-      volumes = containerVolumes([], false, true)
-      expect(volumes.every(e => e.name === POD_VOLUME_NAME)).toBeTruthy()
-      volumes = containerVolumes([], false, false)
-      expect(volumes.every(e => e.name === POD_VOLUME_NAME)).toBeTruthy()
     })
 
     it('should parse container ports', () => {

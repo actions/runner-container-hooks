@@ -39,7 +39,7 @@ async function run(): Promise<void> {
         await cleanupJob()
         return process.exit(0)
       case Command.RunScriptStep:
-        await runScriptStep(args as RunScriptStepArgs, state, null)
+        await runScriptStep(args as RunScriptStepArgs, state)
         return process.exit(0)
       case Command.RunContainerStep:
         exitCode = await runContainerStep(args as RunContainerStepArgs)

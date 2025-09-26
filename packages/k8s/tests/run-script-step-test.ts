@@ -1,7 +1,7 @@
 import * as fs from 'fs'
 import { cleanupJob, prepareJob, runScriptStep } from '../src/hooks'
 import { TestHelper } from './test-setup'
-import { PrepareJobArgs } from 'hooklib'
+import { PrepareJobArgs, RunScriptStepArgs } from 'hooklib'
 
 jest.useRealTimers()
 
@@ -9,7 +9,9 @@ let testHelper: TestHelper
 
 let prepareJobOutputData: any
 
-let runScriptStepDefinition
+let runScriptStepDefinition: {
+  args: RunScriptStepArgs
+}
 
 describe('Run script step', () => {
   beforeEach(async () => {
@@ -20,7 +22,9 @@ describe('Run script step', () => {
     )
 
     const prepareJobData = testHelper.getPrepareJobDefinition()
-    runScriptStepDefinition = testHelper.getRunScriptStepDefinition()
+    runScriptStepDefinition = testHelper.getRunScriptStepDefinition() as {
+      args: RunScriptStepArgs
+    }
 
     await prepareJob(
       prepareJobData.args as PrepareJobArgs,
@@ -41,22 +45,14 @@ describe('Run script step', () => {
 
   it('should not throw an exception', async () => {
     await expect(
-      runScriptStep(
-        runScriptStepDefinition.args,
-        prepareJobOutputData.state,
-        null
-      )
+      runScriptStep(runScriptStepDefinition.args, prepareJobOutputData.state)
     ).resolves.not.toThrow()
   })
 
   it('should fail if the working directory does not exist', async () => {
     runScriptStepDefinition.args.workingDirectory = '/foo/bar'
     await expect(
-      runScriptStep(
-        runScriptStepDefinition.args,
-        prepareJobOutputData.state,
-        null
-      )
+      runScriptStep(runScriptStepDefinition.args, prepareJobOutputData.state)
     ).rejects.toThrow()
   })
 
@@ -68,16 +64,12 @@ describe('Run script step', () => {
       "'if [[ -z $NODE_ENV ]]; then exit 1; fi'"
     ]
     await expect(
-      runScriptStep(
-        runScriptStepDefinition.args,
-        prepareJobOutputData.state,
-        null
-      )
+      runScriptStep(runScriptStepDefinition.args, prepareJobOutputData.state)
     ).resolves.not.toThrow()
   })
 
   it('Should have path variable changed in container with prepend path string', async () => {
-    runScriptStepDefinition.args.prependPath = '/some/path'
+    runScriptStepDefinition.args.prependPath = ['/some/path']
     runScriptStepDefinition.args.entryPoint = '/bin/bash'
     runScriptStepDefinition.args.entryPointArgs = [
       '-c',
@@ -85,11 +77,7 @@ describe('Run script step', () => {
     ]
 
     await expect(
-      runScriptStep(
-        runScriptStepDefinition.args,
-        prepareJobOutputData.state,
-        null
-      )
+      runScriptStep(runScriptStepDefinition.args, prepareJobOutputData.state)
     ).resolves.not.toThrow()
   })
 
@@ -107,11 +95,7 @@ describe('Run script step', () => {
     ]
 
     await expect(
-      runScriptStep(
-        runScriptStepDefinition.args,
-        prepareJobOutputData.state,
-        null
-      )
+      runScriptStep(runScriptStepDefinition.args, prepareJobOutputData.state)
     ).resolves.not.toThrow()
   })
 
@@ -126,11 +110,7 @@ describe('Run script step', () => {
     ]
 
     await expect(
-      runScriptStep(
-        runScriptStepDefinition.args,
-        prepareJobOutputData.state,
-        null
-      )
+      runScriptStep(runScriptStepDefinition.args, prepareJobOutputData.state)
     ).resolves.not.toThrow()
   })
 })
