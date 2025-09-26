@@ -40,7 +40,11 @@ export async function runScriptStep(
     const message = (err as any)?.response?.body?.message || err
     throw new Error(`failed to run script step: ${message}`)
   } finally {
-    fs.rmSync(runnerPath, { force: true })
+    try {
+      fs.rmSync(runnerPath, { force: true })
+    } catch (removeErr) {
+      core.debug(`Failed to remove file ${runnerPath}: ${removeErr}`)
+    }
   }
 
   try {
