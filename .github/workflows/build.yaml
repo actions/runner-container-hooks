@@ -12,7 +12,7 @@ jobs:
     name: Format & Lint Checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: npm install
         name: Install dependencies
       - run: npm run bootstrap
@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: format-and-lint
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: npm install
         name: Install dependencies
       - run: npm run bootstrap
@@ -46,10 +46,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: format-and-lint
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: sed -i "s|{{PATHTOREPO}}|$(pwd)|" packages/k8s/tests/test-kind.yaml
         name: Setup kind cluster yaml config
-      - uses: helm/kind-action@v1.2.0
+      - uses: helm/kind-action@v1.12.0
         with:
           config: packages/k8s/tests/test-kind.yaml
       - run: npm install

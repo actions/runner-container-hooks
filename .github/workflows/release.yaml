@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install dependencies
         run: npm install
@@ -21,7 +21,7 @@ jobs:
       - name: Build packages
         run: npm run build-all
 
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@v8
         id: releaseVersion
         with:
           result-encoding: string
@@ -47,7 +47,7 @@ jobs:
 
       - name: Create release notes
         id: releaseNotes
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
