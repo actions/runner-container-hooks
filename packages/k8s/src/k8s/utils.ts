@@ -2,12 +2,10 @@ import * as k8s from '@kubernetes/client-node'
 import * as fs from 'fs'
 import * as yaml from 'js-yaml'
 import * as core from '@actions/core'
-import { Mount } from 'hooklib'
-import * as path from 'path'
 import { v1 as uuidv4 } from 'uuid'
-import { POD_VOLUME_NAME } from './index'
 import { CONTAINER_EXTENSION_PREFIX } from '../hooks/constants'
 import * as shlex from 'shlex'
+import { Mount } from 'hooklib'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
@@ -15,101 +13,43 @@ export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
 export const ENV_USE_KUBE_SCHEDULER = 'ACTIONS_RUNNER_USE_KUBE_SCHEDULER'
 
-export function containerVolumes(
-  userMountVolumes: Mount[] = [],
-  jobContainer = true,
-  containerAction = false
-): k8s.V1VolumeMount[] {
-  const mounts: k8s.V1VolumeMount[] = [
-    {
-      name: POD_VOLUME_NAME,
-      mountPath: '/__w'
-    }
-  ]
+export const EXTERNALS_VOLUME_NAME = 'externals'
+export const GITHUB_VOLUME_NAME = 'github'
 
-  const workspacePath = process.env.GITHUB_WORKSPACE as string
-  if (containerAction) {
-    const i = workspacePath.lastIndexOf('_work/')
-    const workspaceRelativePath = workspacePath.slice(i + '_work/'.length)
-    mounts.push(
-      {
-        name: POD_VOLUME_NAME,
-        mountPath: '/github/workspace',
-        subPath: workspaceRelativePath
-      },
-      {
-        name: POD_VOLUME_NAME,
-        mountPath: '/github/file_commands',
-        subPath: '_temp/_runner_file_commands'
-      },
-      {
-        name: POD_VOLUME_NAME,
-        mountPath: '/github/home',
-        subPath: '_temp/_github_home'
-      },
-      {
-        name: POD_VOLUME_NAME,
-        mountPath: '/github/workflow',
-        subPath: '_temp/_github_workflow'
-      }
-    )
-    return mounts
+export const CONTAINER_VOLUMES: k8s.V1VolumeMount[] = [
+  {
+    name: EXTERNALS_VOLUME_NAME,
+    mountPath: '/__e'
+  },
+  {
+    name: GITHUB_VOLUME_NAME,
+    mountPath: '/github'
   }
+]
 
-  if (!jobContainer) {
-    return mounts
+export function prepareJobScript(userVolumeMounts: Mount[]): {
+  containerPath: string
+  runnerPath: string
+} {
+  let mountDirs = userVolumeMounts.map(m => m.targetVolumePath).join(' ')
+
+  const content = `#!/bin/sh -l
+set -e
+cp -R /__w/_temp/_github_home /github/home
+cp -R /__w/_temp/_github_workflow /github/workflow
+mkdir -p ${mountDirs}
+`
+
+  const filename = `${uuidv4()}.sh`
+  const entryPointPath = `${process.env.RUNNER_TEMP}/${filename}`
+  fs.writeFileSync(entryPointPath, content)
+  return {
+    containerPath: `/__w/_temp/${filename}`,
+    runnerPath: entryPointPath
   }
-
-  mounts.push(
-    {
-      name: POD_VOLUME_NAME,
-      mountPath: '/__e',
-      subPath: 'externals'
-    },
-    {
-      name: POD_VOLUME_NAME,
-      mountPath: '/github/home',
-      subPath: '_temp/_github_home'
-    },
-    {
-      name: POD_VOLUME_NAME,
-      mountPath: '/github/workflow',
-      subPath: '_temp/_github_workflow'
-    }
-  )
-
-  if (!userMountVolumes?.length) {
-    return mounts
-  }
-
-  for (const userVolume of userMountVolumes) {
-    let sourceVolumePath = ''
-    if (path.isAbsolute(userVolume.sourceVolumePath)) {
-      if (!userVolume.sourceVolumePath.startsWith(workspacePath)) {
-        throw new Error(
-          'Volume mounts outside of the work folder are not supported'
-        )
-      }
-      // source volume path should be relative path
-      sourceVolumePath = userVolume.sourceVolumePath.slice(
-        workspacePath.length + 1
-      )
-    } else {
-      sourceVolumePath = userVolume.sourceVolumePath
-    }
-
-    mounts.push({
-      name: POD_VOLUME_NAME,
-      mountPath: userVolume.targetVolumePath,
-      subPath: sourceVolumePath,
-      readOnly: userVolume.readOnly
-    })
-  }
-
-  return mounts
 }
 
-export function writeEntryPointScript(
+export function writeRunScript(
   workingDirectory: string,
   entryPoint: string,
   entryPointArgs?: string[],
@@ -123,33 +63,12 @@ export function writeEntryPointScript(
       typeof prependPath === 'string' ? prependPath : prependPath.join(':')
     exportPath = `export PATH=${prepend}:$PATH`
   }
-  let environmentPrefix = ''
 
-  if (environmentVariables && Object.entries(environmentVariables).length) {
-    const envBuffer: string[] = []
-    for (const [key, value] of Object.entries(environmentVariables)) {
-      if (
-        key.includes(`=`) ||
-        key.includes(`'`) ||
-        key.includes(`"`) ||
-        key.includes(`$`)
-      ) {
-        throw new Error(
-          `environment key ${key} is invalid - the key must not contain =, $, ', or "`
-        )
-      }
-      envBuffer.push(
-        `"${key}=${value
-          .replace(/\\/g, '\\\\')
-          .replace(/"/g, '\\"')
-          .replace(/\$/g, '\\$')
-          .replace(/`/g, '\\`')}"`
-      )
-    }
-    environmentPrefix = `env ${envBuffer.join(' ')} `
-  }
+  let environmentPrefix = scriptEnv(environmentVariables)
 
   const content = `#!/bin/sh -l
+set -e
+rm "$0" # remove script after running
 ${exportPath}
 cd ${workingDirectory} && \
 exec ${environmentPrefix} ${entryPoint} ${
@@ -163,6 +82,73 @@ exec ${environmentPrefix} ${entryPoint} ${
     containerPath: `/__w/_temp/${filename}`,
     runnerPath: entryPointPath
   }
+}
+
+export function writeContainerStepScript(
+  dst: string,
+  workingDirectory: string,
+  entryPoint: string,
+  entryPointArgs?: string[],
+  environmentVariables?: { [key: string]: string }
+): { containerPath: string; runnerPath: string } {
+  let environmentPrefix = scriptEnv(environmentVariables)
+
+  const parts = workingDirectory.split('/').slice(-2)
+  if (parts.length !== 2) {
+    throw new Error(`Invalid working directory: ${workingDirectory}`)
+  }
+
+  const content = `#!/bin/sh -l
+rm "$0" # remove script after running
+mv /__w/_temp/_github_home /github/home && \
+mv /__w/_temp/_github_workflow /github/workflow && \
+mv /__w/_temp/_runner_file_commands /github/file_commands && \
+mv /__w/${parts.join('/')}/ /github/workspace && \
+cd /github/workspace && \
+exec ${environmentPrefix} ${entryPoint} ${
+    entryPointArgs?.length ? entryPointArgs.join(' ') : ''
+  }
+`
+  const filename = `${uuidv4()}.sh`
+  const entryPointPath = `${dst}/${filename}`
+  core.debug(`Writing container step script to ${entryPointPath}`)
+  fs.writeFileSync(entryPointPath, content)
+  return {
+    containerPath: `/__w/_temp/${filename}`,
+    runnerPath: entryPointPath
+  }
+}
+
+function scriptEnv(envs?: { [key: string]: string }): string {
+  if (!envs || !Object.entries(envs).length) {
+    return ''
+  }
+  const envBuffer: string[] = []
+  for (const [key, value] of Object.entries(envs)) {
+    if (
+      key.includes(`=`) ||
+      key.includes(`'`) ||
+      key.includes(`"`) ||
+      key.includes(`$`)
+    ) {
+      throw new Error(
+        `environment key ${key} is invalid - the key must not contain =, $, ', or "`
+      )
+    }
+    envBuffer.push(
+      `"${key}=${value
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\$/g, '\\$')
+        .replace(/`/g, '\\`')}"`
+    )
+  }
+
+  if (!envBuffer?.length) {
+    return ''
+  }
+
+  return `env ${envBuffer.join(' ')} `
 }
 
 export function generateContainerName(image: string): string {
@@ -298,4 +284,12 @@ function mergeLists<T>(base?: T[], from?: T[]): T[] {
 
 export function fixArgs(args: string[]): string[] {
   return shlex.split(args.join(' '))
+}
+
+export async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+export function listDirAllCommand(dir: string): string {
+  return `cd ${shlex.quote(dir)} && find . -not -path '*/_runner_hook_responses*' -exec stat -c '%b %n' {} \\;`
 }

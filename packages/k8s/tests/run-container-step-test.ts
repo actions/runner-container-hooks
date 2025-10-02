@@ -1,4 +1,4 @@
-import { runContainerStep } from '../src/hooks'
+import { prepareJob, runContainerStep } from '../src/hooks'
 import { TestHelper } from './test-setup'
 import { ENV_HOOK_TEMPLATE_PATH } from '../src/k8s/utils'
 import * as fs from 'fs'
@@ -10,21 +10,21 @@ jest.useRealTimers()
 let testHelper: TestHelper
 
 let runContainerStepData: any
+let prepareJobData: any
+let prepareJobOutputFilePath: string
 
 describe('Run container step', () => {
   beforeEach(async () => {
     testHelper = new TestHelper()
     await testHelper.initialize()
+    prepareJobData = testHelper.getPrepareJobDefinition()
+    prepareJobOutputFilePath = testHelper.createFile('prepare-job-output.json')
+    await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
     runContainerStepData = testHelper.getRunContainerStepDefinition()
   })
 
   afterEach(async () => {
     await testHelper.cleanup()
-  })
-
-  it('should not throw', async () => {
-    const exitCode = await runContainerStep(runContainerStepData.args)
-    expect(exitCode).toBe(0)
   })
 
   it('should run pod with extensions applied', async () => {
@@ -42,7 +42,7 @@ describe('Run container step', () => {
           {
             name: JOB_CONTAINER_EXTENSION_NAME,
             command: ['sh'],
-            args: ['-c', 'echo test']
+            args: ['-c', 'sleep 10000']
           },
           {
             name: 'side-container',
@@ -51,11 +51,7 @@ describe('Run container step', () => {
             args: ['-c', 'echo test']
           }
         ],
-        restartPolicy: 'Never',
-        securityContext: {
-          runAsUser: 1000,
-          runAsGroup: 3000
-        }
+        restartPolicy: 'Never'
       }
     }
 

@@ -4,9 +4,6 @@ metadata:
   labels:
     labeled-by: "extension"
 spec:
-  securityContext:
-    runAsUser: 1000
-    runAsGroup: 3000
   restartPolicy: Never
   containers:
   - name: $job # overwrites job container
