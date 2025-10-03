@@ -8,7 +8,7 @@
 
 ## Misc
 
-- bump all dependencies [#234] [#240] [#239] [#238] [#238]
+- bump all dependencies [#234] [#240] [#239] [#238]
 - bump actions [#254]
 
 ## SHA-256 Checksums
