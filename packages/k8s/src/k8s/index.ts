@@ -20,7 +20,8 @@ import {
   listDirAllCommand,
   sleep,
   EXTERNALS_VOLUME_NAME,
-  GITHUB_VOLUME_NAME
+  GITHUB_VOLUME_NAME,
+  PodCondition
 } from './utils'
 
 const kc = new k8s.KubeConfig()
@@ -664,6 +665,76 @@ export async function waitForPodPhases(
   }
 }
 
+export async function waitForPodState(
+  podName: string,
+  awaitingPhases: Set<PodPhase> = new Set<PodPhase>(),
+  backOffPhases: Set<PodPhase> = new Set<PodPhase>(),
+  awaitingConditions: Set<PodCondition> = new Set<PodCondition>(),
+  backOffConditions: Set<PodCondition> = new Set<PodCondition>(),
+  maxTimeSeconds: number = DEFAULT_WAIT_FOR_POD_TIME_SECONDS
+): Promise<void> {
+  const backOffManager = new BackOffManager(maxTimeSeconds)
+  let phase: PodPhase = PodPhase.UNKNOWN
+  let conditions: Set<PodCondition> = new Set<PodCondition>()
+  
+  try {
+    while (true) {
+      phase = await getPodPhase(podName)
+      conditions = await getPodConditions(podName)
+      if (awaitingPhases.has(phase)) {
+        let allConditionsMet = true
+        for (const condition of Array.from(awaitingConditions)) {
+          if (!conditions.has(condition)) {
+            allConditionsMet = false
+            break
+          }
+        }
+        if (allConditionsMet) {
+          return
+        }
+      }
+
+      if (!backOffPhases.has(phase)) {
+        throw new Error(
+          `Pod ${podName} is unhealthy with phase status ${phase} and conditions ${Array.from(conditions).join(',')}`
+        )
+      }
+      let anyBackOffCondition = false
+      for (const c of Array.from(backOffConditions)) {
+        if (conditions.has(c)) {
+          anyBackOffCondition = true
+          break
+        }
+      }
+      if (!anyBackOffCondition) {
+        throw new Error(
+          `Pod ${podName} is unhealthy with phase status ${phase} and conditions ${Array.from(conditions).join(',')}`
+        )
+      }
+      
+      await backOffManager.backOff()
+    }
+  } catch (error) {
+    throw new Error(
+      `Pod ${podName} is unhealthy with phase status ${phase} and conditions ${Array.from(conditions).join(',')}: ${JSON.stringify(error)}`
+    )
+  }
+}
+
+export async function waitForPodToBeReady(
+  podName: string,
+  maxTimeSeconds = DEFAULT_WAIT_FOR_POD_TIME_SECONDS
+): Promise<void> {
+  return await waitForPodState(
+    podName,
+    new Set<PodPhase>([PodPhase.RUNNING]),
+    new Set<PodPhase>([PodPhase.FAILED, PodPhase.SUCCEEDED, PodPhase.UNKNOWN]),
+    new Set<PodCondition>([PodCondition.READY, PodCondition.CONTAINERS_READY]),
+    new Set<PodCondition>(),
+    maxTimeSeconds
+  )
+}
+
 export function getPrepareJobTimeoutSeconds(): number {
   const envTimeoutSeconds =
     process.env['ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS']
@@ -700,6 +771,40 @@ async function getPodPhase(name: string): Promise<PodPhase> {
     return PodPhase.UNKNOWN
   }
   return pod.status?.phase as PodPhase
+}
+
+async function getPodConditions(name: string): Promise<Set<PodCondition>> {
+  const podStateLookup = new Set<string>([
+    PodCondition.SCHEDULED,
+    PodCondition.POD_READY_TO_START_CONTAINERS,
+    PodCondition.INITIALIZED,
+    PodCondition.READY,
+    PodCondition.CONTAINERS_READY,
+    PodCondition.DISRUPTION_TARGET,
+    PodCondition.POD_RESIZE_PENDING,
+    PodCondition.POD_RESIZE_IN_PROGRESS
+  ])
+  const pod = await k8sApi.readNamespacedPod({
+    name,
+    namespace: namespace()
+  })
+  
+  const conditions = new Set<PodCondition>()
+  if (!pod.status?.conditions?.length) {
+    return conditions
+  }
+
+  for (const condition of pod.status.conditions) {
+    if (
+      condition.status === 'True' &&
+      condition.type &&
+      podStateLookup.has(condition.type)
+    ) {
+      conditions.add(condition.type as PodCondition)
+    }
+  }
+
+  return conditions
 }
 
 async function isJobSucceeded(name: string): Promise<boolean> {

@@ -10,12 +10,11 @@ import {
   execCpToPod,
   execPodStep,
   getPrepareJobTimeoutSeconds,
-  waitForPodPhases
+  waitForPodToBeReady
 } from '../k8s'
 import {
   CONTAINER_VOLUMES,
   mergeContainerWithOptions,
-  PodPhase,
   readExtensionFromFile,
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
   writeContainerStepScript
@@ -69,12 +68,7 @@ export async function runContainerStep(
   const podName = pod.metadata.name
 
   try {
-    await waitForPodPhases(
-      podName,
-      new Set([PodPhase.RUNNING]),
-      new Set([PodPhase.PENDING, PodPhase.UNKNOWN]),
-      getPrepareJobTimeoutSeconds()
-    )
+    await waitForPodToBeReady(podName, getPrepareJobTimeoutSeconds())
 
     const runnerWorkspace = dirname(process.env.RUNNER_WORKSPACE as string)
     const githubWorkspace = process.env.GITHUB_WORKSPACE as string
