@@ -728,9 +728,9 @@ export async function waitForPodToBeReady(
   return await waitForPodState(
     podName,
     new Set<PodPhase>([PodPhase.RUNNING]),
-    new Set<PodPhase>([PodPhase.FAILED, PodPhase.SUCCEEDED, PodPhase.UNKNOWN]),
+    new Set<PodPhase>([PodPhase.PENDING, PodPhase.UNKNOWN]),
     new Set<PodCondition>([PodCondition.READY, PodCondition.CONTAINERS_READY]),
-    new Set<PodCondition>(),
+    new Set<PodCondition>([PodCondition.SCHEDULED, PodCondition.INITIALIZED, PodCondition.READY, PodCondition.CONTAINERS_READY]),
     maxTimeSeconds
   )
 }
