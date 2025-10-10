@@ -730,7 +730,7 @@ export async function waitForPodToBeReady(
     new Set<PodPhase>([PodPhase.RUNNING]),
     new Set<PodPhase>([PodPhase.PENDING, PodPhase.UNKNOWN]),
     new Set<PodCondition>([PodCondition.READY, PodCondition.CONTAINERS_READY]),
-    new Set<PodCondition>([PodCondition.SCHEDULED, PodCondition.INITIALIZED, PodCondition.READY, PodCondition.CONTAINERS_READY]),
+    new Set<PodCondition>([PodCondition.SCHEDULED, PodCondition.POD_READY_TO_START_CONTAINERS, PodCondition.INITIALIZED, PodCondition.READY, PodCondition.CONTAINERS_READY, PodCondition.POD_RESIZE_PENDING, PodCondition.POD_RESIZE_IN_PROGRESS]),
     maxTimeSeconds
   )
 }
