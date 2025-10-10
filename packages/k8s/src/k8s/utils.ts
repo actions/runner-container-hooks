@@ -273,6 +273,17 @@ export enum PodPhase {
   COMPLETED = 'Completed'
 }
 
+export enum PodCondition {
+  SCHEDULED = 'PodScheduled',
+  POD_READY_TO_START_CONTAINERS = 'PodReadyToStartContainers',
+  INITIALIZED = 'Initialized',
+  READY = 'Ready',
+  CONTAINERS_READY = 'ContainersReady',
+  DISRUPTION_TARGET = 'DisruptionTarget',
+  POD_RESIZE_PENDING = 'PodResizePending',
+  POD_RESIZE_IN_PROGRESS = 'PodResizeInProgress'
+}
+
 function mergeLists<T>(base?: T[], from?: T[]): T[] {
   const b: T[] = base || []
   if (!from?.length) {
