@@ -97,7 +97,7 @@ export async function createJobPod(
       image:
         process.env.ACTIONS_RUNNER_IMAGE ||
         'ghcr.io/actions/actions-runner:latest',
-      command: ['sh', '-c', 'sudo mv /home/runner/externals/* /mnt/externals'],
+      command: ['sh', '-c', 'cp -r /home/runner/externals/* /mnt/externals'],
       securityContext: {
         runAsGroup: 1001,
         runAsUser: 1001
