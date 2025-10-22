@@ -231,4 +231,16 @@ describe('Prepare job', () => {
       expect(() => content.context.services[0].image).not.toThrow()
     }
   )
+
+  it('should prepare job with container with non-root user', async () => {
+    prepareJobData.args!.container!.image =
+      'ghcr.io/actions/actions-runner:latest' // known to use user 1001
+    await expect(
+      prepareJob(prepareJobData.args!, prepareJobOutputFilePath)
+    ).resolves.not.toThrow()
+
+    const content = JSON.parse(
+      fs.readFileSync(prepareJobOutputFilePath).toString()
+    )
+  })
 })
