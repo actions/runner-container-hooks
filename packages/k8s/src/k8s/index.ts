@@ -102,7 +102,9 @@ export async function createJobPod(
       image:
         process.env.ACTIONS_RUNNER_IMAGE ||
         'ghcr.io/actions/actions-runner:latest',
-      command: ['sh', '-c', 
+      command: [
+        'sh',
+        '-c',
         `mkdir -p /mnt/externals && \\
          mkdir -p /mnt/work && \\
          mkdir -p /mnt/github && \\
@@ -375,10 +377,12 @@ export async function execCpToPod(
       const exec = new k8s.Exec(kc)
       // Use tar to extract with --no-same-owner to avoid ownership issues.
       // Then use find to fix permissions. The -m flag helps but we also need to fix permissions after.
-      const command = ['sh', '-c', 
+      const command = [
+        'sh',
+        '-c',
         `tar xf - --no-same-owner -C ${shlex.quote(containerPath)} 2>/dev/null; ` +
-        `find ${shlex.quote(containerPath)} -type f -exec chmod u+rw {} \\; 2>/dev/null; ` +
-        `find ${shlex.quote(containerPath)} -type d -exec chmod u+rwx {} \\; 2>/dev/null`
+          `find ${shlex.quote(containerPath)} -type f -exec chmod u+rw {} \\; 2>/dev/null; ` +
+          `find ${shlex.quote(containerPath)} -type d -exec chmod u+rwx {} \\; 2>/dev/null`
       ]
       const readStream = tar.pack(runnerPath)
       const errStream = new WritableStreamBuffer()
