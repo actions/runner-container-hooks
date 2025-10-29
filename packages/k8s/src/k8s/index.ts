@@ -428,11 +428,11 @@ export async function execCpToPod(
   const delay = 1000
   for (let i = 0; i < attempts; i++) {
     try {
-      const got = await execCalculateOutputHashSorted(podName, JOB_CONTAINER_NAME, [
-        'sh',
-        '-c',
-        listDirAllCommand(containerPath)
-      ])
+      const got = await execCalculateOutputHashSorted(
+        podName,
+        JOB_CONTAINER_NAME,
+        ['sh', '-c', listDirAllCommand(containerPath)]
+      )
 
       if (got !== want) {
         core.debug(
@@ -459,11 +459,11 @@ export async function execCpFromPod(
   core.debug(
     `Copying from pod ${podName} ${containerPath} to ${targetRunnerPath}`
   )
-  const want = await execCalculateOutputHashSorted(podName, JOB_CONTAINER_NAME, [
-    'sh',
-    '-c',
-    listDirAllCommand(containerPath)
-  ])
+  const want = await execCalculateOutputHashSorted(
+    podName,
+    JOB_CONTAINER_NAME,
+    ['sh', '-c', listDirAllCommand(containerPath)]
+  )
 
   let attempt = 0
   while (true) {
