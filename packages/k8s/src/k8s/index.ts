@@ -271,19 +271,18 @@ export async function execPodStep(
   })
 }
 
-export async function execCalculateOutputHash(
+export async function execCalculateOutputHashSorted(
   podName: string,
   containerName: string,
   command: string[]
 ): Promise<string> {
   const exec = new k8s.Exec(kc)
 
-  // Create a writable stream that updates a SHA-256 hash with stdout data
-  const hash = createHash('sha256')
-  const hashWriter = new stream.Writable({
+  let output = ''
+  const outputWriter = new stream.Writable({
     write(chunk, _enc, cb) {
       try {
-        hash.update(chunk.toString('utf8') as Buffer)
+        output += chunk.toString('utf8')
         cb()
       } catch (e) {
         cb(e as Error)
@@ -298,7 +297,7 @@ export async function execCalculateOutputHash(
         podName,
         containerName,
         command,
-        hashWriter, // capture stdout for hashing
+        outputWriter, // capture stdout
         process.stderr,
         null,
         false /* tty */,
@@ -320,27 +319,46 @@ export async function execCalculateOutputHash(
       .catch(e => reject(e))
   })
 
-  // finalize hash and return digest
-  hashWriter.end()
+  outputWriter.end()
 
+  // Sort lines for consistent ordering across platforms
+  const sortedOutput =
+    output
+      .split('\n')
+      .filter(line => line.length > 0)
+      .sort()
+      .join('\n') + '\n'
+
+  const hash = createHash('sha256')
+  hash.update(sortedOutput)
   return hash.digest('hex')
 }
 
-export async function localCalculateOutputHash(
+export async function localCalculateOutputHashSorted(
   commands: string[]
 ): Promise<string> {
   return await new Promise<string>((resolve, reject) => {
-    const hash = createHash('sha256')
     const child = spawn(commands[0], commands.slice(1), {
       stdio: ['ignore', 'pipe', 'ignore']
     })
 
+    let output = ''
     child.stdout.on('data', chunk => {
-      hash.update(chunk)
+      output += chunk.toString('utf8')
     })
     child.on('error', reject)
     child.on('close', (code: number) => {
       if (code === 0) {
+        // Sort lines for consistent ordering across distributions/platforms
+        const sortedOutput =
+          output
+            .split('\n')
+            .filter(line => line.length > 0)
+            .sort()
+            .join('\n') + '\n'
+
+        const hash = createHash('sha256')
+        hash.update(sortedOutput)
         resolve(hash.digest('hex'))
       } else {
         reject(new Error(`child process exited with code ${code}`))
@@ -400,7 +418,7 @@ export async function execCpToPod(
     }
   }
 
-  const want = await localCalculateOutputHash([
+  const want = await localCalculateOutputHashSorted([
     'sh',
     '-c',
     listDirAllCommand(runnerPath)
@@ -410,11 +428,11 @@ export async function execCpToPod(
   const delay = 1000
   for (let i = 0; i < attempts; i++) {
     try {
-      const got = await execCalculateOutputHash(podName, JOB_CONTAINER_NAME, [
-        'sh',
-        '-c',
-        listDirAllCommand(containerPath)
-      ])
+      const got = await execCalculateOutputHashSorted(
+        podName,
+        JOB_CONTAINER_NAME,
+        ['sh', '-c', listDirAllCommand(containerPath)]
+      )
 
       if (got !== want) {
         core.debug(
@@ -441,11 +459,11 @@ export async function execCpFromPod(
   core.debug(
     `Copying from pod ${podName} ${containerPath} to ${targetRunnerPath}`
   )
-  const want = await execCalculateOutputHash(podName, JOB_CONTAINER_NAME, [
-    'sh',
-    '-c',
-    listDirAllCommand(containerPath)
-  ])
+  const want = await execCalculateOutputHashSorted(
+    podName,
+    JOB_CONTAINER_NAME,
+    ['sh', '-c', listDirAllCommand(containerPath)]
+  )
 
   let attempt = 0
   while (true) {
@@ -506,7 +524,7 @@ export async function execCpFromPod(
   const delay = 1000
   for (let i = 0; i < attempts; i++) {
     try {
-      const got = await localCalculateOutputHash([
+      const got = await localCalculateOutputHashSorted([
         'sh',
         '-c',
         listDirAllCommand(targetRunnerPath)
