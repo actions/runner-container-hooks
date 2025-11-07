@@ -172,28 +172,17 @@ export async function createContainerStepPod(
   appPod.spec.initContainers = [
     {
       name: 'fs-init',
-      image:
-        process.env.ACTIONS_RUNNER_IMAGE ||
-        'ghcr.io/actions/actions-runner:latest',
+      image: container.image,
       command: [
-        'bash',
+        'sh',
         '-c',
-        `sudo cp $(which sh) /mnt/externals/sh \
-        && sudo cp $(which tail) /mnt/externals/tail \
-        && sudo cp $(which env) /mnt/externals/env \
-        && sudo chmod -R 777 /mnt/externals`
+        'for cmd in env tail; do command -v "$cmd" >/dev/null || { echo "Error: Missing required binary: $cmd" >&2; exit 1; }; done'
       ],
       securityContext: {
         runAsGroup: 1001,
         runAsUser: 1001,
         privileged: true
-      },
-      volumeMounts: [
-        {
-          name: EXTERNALS_VOLUME_NAME,
-          mountPath: '/mnt/externals'
-        }
-      ]
+      }
     }
   ]
 

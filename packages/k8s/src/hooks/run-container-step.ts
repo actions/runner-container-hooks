@@ -104,7 +104,7 @@ export async function runContainerStep(
     try {
       core.debug(`Executing container step script in pod ${podName}`)
       return await execPodStep(
-        ['/__e/sh', '-e', containerPath],
+        ['sh', '-e', containerPath],
         pod.metadata.name,
         JOB_CONTAINER_NAME
       )
@@ -133,7 +133,7 @@ function createContainerSpec(
   podContainer.name = JOB_CONTAINER_NAME
   podContainer.image = container.image
   podContainer.workingDir = '/__w'
-  podContainer.command = ['/__e/tail']
+  podContainer.command = ['tail']
   podContainer.args = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
 
   podContainer.volumeMounts = CONTAINER_VOLUMES
