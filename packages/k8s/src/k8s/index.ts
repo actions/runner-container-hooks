@@ -169,41 +169,10 @@ export async function createContainerStepPod(
 
   appPod.spec = new k8s.V1PodSpec()
   appPod.spec.containers = [container]
-  appPod.spec.initContainers = [
-    {
-      name: 'fs-init',
-      image:
-        process.env.ACTIONS_RUNNER_IMAGE ||
-        'ghcr.io/actions/actions-runner:latest',
-      command: [
-        'bash',
-        '-c',
-        `sudo cp $(which sh) /mnt/externals/sh \
-        && sudo cp $(which tail) /mnt/externals/tail \
-        && sudo cp $(which env) /mnt/externals/env \
-        && sudo chmod -R 777 /mnt/externals`
-      ],
-      securityContext: {
-        runAsGroup: 1001,
-        runAsUser: 1001,
-        privileged: true
-      },
-      volumeMounts: [
-        {
-          name: EXTERNALS_VOLUME_NAME,
-          mountPath: '/mnt/externals'
-        }
-      ]
-    }
-  ]
 
   appPod.spec.restartPolicy = 'Never'
 
   appPod.spec.volumes = [
-    {
-      name: EXTERNALS_VOLUME_NAME,
-      emptyDir: {}
-    },
     {
       name: GITHUB_VOLUME_NAME,
       emptyDir: {}
