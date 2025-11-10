@@ -169,22 +169,6 @@ export async function createContainerStepPod(
 
   appPod.spec = new k8s.V1PodSpec()
   appPod.spec.containers = [container]
-  appPod.spec.initContainers = [
-    {
-      name: 'fs-init',
-      image: container.image,
-      command: [
-        'sh',
-        '-c',
-        'for cmd in env tail; do command -v "$cmd" >/dev/null || { echo "Error: Missing required binary: $cmd" >&2; exit 1; }; done'
-      ],
-      securityContext: {
-        runAsGroup: 1001,
-        runAsUser: 1001,
-        privileged: true
-      }
-    }
-  ]
 
   appPod.spec.restartPolicy = 'Never'
 
