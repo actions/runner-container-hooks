@@ -15,11 +15,16 @@ export const ENV_USE_KUBE_SCHEDULER = 'ACTIONS_RUNNER_USE_KUBE_SCHEDULER'
 
 export const EXTERNALS_VOLUME_NAME = 'externals'
 export const GITHUB_VOLUME_NAME = 'github'
+export const WORK_VOLUME = 'work'
 
 export const CONTAINER_VOLUMES: k8s.V1VolumeMount[] = [
   {
     name: EXTERNALS_VOLUME_NAME,
     mountPath: '/__e'
+  },
+  {
+    name: WORK_VOLUME,
+    mountPath: '/__w'
   },
   {
     name: GITHUB_VOLUME_NAME,
