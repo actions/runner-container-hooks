@@ -96,6 +96,17 @@ export async function createJobPod(
   appPod.spec.securityContext = {
     fsGroup: 1001
   }
+
+  // Extract working directory from GITHUB_WORKSPACE
+  // GITHUB_WORKSPACE is like /__w/repo-name/repo-name
+  const githubWorkspace = process.env.GITHUB_WORKSPACE as string
+  const workingDirPath = githubWorkspace
+    ? githubWorkspace.split('/').slice(-2).join('/')
+    : ''
+  const mkdirWorkspace = workingDirPath
+    ? `mkdir -p /mnt/work/${workingDirPath} && \\`
+    : ''
+
   appPod.spec.initContainers = [
     {
       name: 'fs-init',
@@ -107,6 +118,7 @@ export async function createJobPod(
         '-c',
         `mkdir -p /mnt/externals && \\
          mkdir -p /mnt/work && \\
+         ${mkdirWorkspace}
          mkdir -p /mnt/github && \\
          mv /home/runner/externals/* /mnt/externals/`
       ],
