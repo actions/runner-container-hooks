@@ -239,8 +239,12 @@ describe('Prepare job', () => {
       prepareJob(prepareJobData.args, prepareJobOutputFilePath)
     ).resolves.not.toThrow()
 
-    JSON.parse(
+    const content = JSON.parse(
       fs.readFileSync(prepareJobOutputFilePath).toString()
-    ).resolves.not.toThrow()
+    )
+    expect(content.state.jobPod).toBeTruthy()
+    expect(content.context.container.image).toBe(
+      'ghcr.io/actions/actions-runner:latest'
+    )
   })
 })
