@@ -20,8 +20,10 @@ import {
   listDirAllCommand,
   sleep,
   EXTERNALS_VOLUME_NAME,
-  GITHUB_VOLUME_NAME
+  GITHUB_VOLUME_NAME,
+  WORK_VOLUME
 } from './utils'
+import * as shlex from 'shlex'
 
 const kc = new k8s.KubeConfig()
 
@@ -91,13 +93,23 @@ export async function createJobPod(
 
   appPod.spec = new k8s.V1PodSpec()
   appPod.spec.containers = containers
+  appPod.spec.securityContext = {
+    fsGroup: 1001
+  }
   appPod.spec.initContainers = [
     {
       name: 'fs-init',
       image:
         process.env.ACTIONS_RUNNER_IMAGE ||
         'ghcr.io/actions/actions-runner:latest',
-      command: ['sh', '-c', 'mv /home/runner/externals/* /mnt/externals'],
+      command: [
+        'sh',
+        '-c',
+        `mkdir -p /mnt/externals && \\
+         mkdir -p /mnt/work && \\
+         mkdir -p /mnt/github && \\
+         mv /home/runner/externals/* /mnt/externals/`
+      ],
       securityContext: {
         runAsGroup: 1001,
         runAsUser: 1001
@@ -106,6 +118,14 @@ export async function createJobPod(
         {
           name: EXTERNALS_VOLUME_NAME,
           mountPath: '/mnt/externals'
+        },
+        {
+          name: WORK_VOLUME,
+          mountPath: '/mnt/work'
+        },
+        {
+          name: GITHUB_VOLUME_NAME,
+          mountPath: '/mnt/github'
         }
       ]
     }
@@ -120,6 +140,10 @@ export async function createJobPod(
     },
     {
       name: GITHUB_VOLUME_NAME,
+      emptyDir: {}
+    },
+    {
+      name: WORK_VOLUME,
       emptyDir: {}
     }
   ]
@@ -179,6 +203,10 @@ export async function createContainerStepPod(
     },
     {
       name: GITHUB_VOLUME_NAME,
+      emptyDir: {}
+    },
+    {
+      name: WORK_VOLUME,
       emptyDir: {}
     }
   ]
@@ -351,7 +379,15 @@ export async function execCpToPod(
   while (true) {
     try {
       const exec = new k8s.Exec(kc)
-      const command = ['tar', 'xf', '-', '-C', containerPath]
+      // Use tar to extract with --no-same-owner to avoid ownership issues.
+      // Then use find to fix permissions. The -m flag helps but we also need to fix permissions after.
+      const command = [
+        'sh',
+        '-c',
+        `tar xf - --no-same-owner -C ${shlex.quote(containerPath)} 2>/dev/null; ` +
+          `find ${shlex.quote(containerPath)} -type f -exec chmod u+rw {} \\; 2>/dev/null; ` +
+          `find ${shlex.quote(containerPath)} -type d -exec chmod u+rwx {} \\; 2>/dev/null`
+      ]
       const readStream = tar.pack(runnerPath)
       const errStream = new WritableStreamBuffer()
       await new Promise((resolve, reject) => {
@@ -369,7 +405,7 @@ export async function execCpToPod(
               if (errStream.size()) {
                 reject(
                   new Error(
-                    `Error from cpFromPod - details: \n ${errStream.getContentsAsString()}`
+                    `Error from execCpToPod - status: ${status.status}, details: \n ${errStream.getContentsAsString()}`
                   )
                 )
               }

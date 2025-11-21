@@ -26,6 +26,7 @@ describe('e2e', () => {
   afterEach(async () => {
     await testHelper.cleanup()
   })
+
   it('should prepare job, run script step, run container step then cleanup without errors', async () => {
     await expect(
       prepareJob(prepareJobData.args, prepareJobOutputFilePath)
