@@ -101,9 +101,17 @@ export async function createJobPod(
   // GITHUB_WORKSPACE is like /__w/repo-name/repo-name
   const githubWorkspace = process.env.GITHUB_WORKSPACE
   const workingDirPath = githubWorkspace?.split('/').slice(-2).join('/') ?? ''
-  const mkdirWorkspace = workingDirPath
-    ? `mkdir -p /mnt/work/${workingDirPath} && \\`
-    : ''
+
+  const initCommands = [
+    'mkdir -p /mnt/externals',
+    'mkdir -p /mnt/work',
+    'mkdir -p /mnt/github',
+    'mv /home/runner/externals/* /mnt/externals/'
+  ]
+
+  if (workingDirPath) {
+    initCommands.push(`mkdir -p /mnt/work/${workingDirPath}`)
+  }
 
   appPod.spec.initContainers = [
     {
@@ -111,15 +119,7 @@ export async function createJobPod(
       image:
         process.env.ACTIONS_RUNNER_IMAGE ||
         'ghcr.io/actions/actions-runner:latest',
-      command: [
-        'sh',
-        '-c',
-        `mkdir -p /mnt/externals && \\
-         mkdir -p /mnt/work && \\
-         ${mkdirWorkspace}
-         mkdir -p /mnt/github && \\
-         mv /home/runner/externals/* /mnt/externals/`
-      ],
+      command: ['sh', '-c', initCommands.join(' && ')],
       securityContext: {
         runAsGroup: 1001,
         runAsUser: 1001
