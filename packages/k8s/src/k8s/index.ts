@@ -99,10 +99,8 @@ export async function createJobPod(
 
   // Extract working directory from GITHUB_WORKSPACE
   // GITHUB_WORKSPACE is like /__w/repo-name/repo-name
-  const githubWorkspace = process.env.GITHUB_WORKSPACE as string
-  const workingDirPath = githubWorkspace
-    ? githubWorkspace.split('/').slice(-2).join('/')
-    : ''
+  const githubWorkspace = process.env.GITHUB_WORKSPACE
+  const workingDirPath = githubWorkspace?.split('/').slice(-2).join('/') ?? ''
   const mkdirWorkspace = workingDirPath
     ? `mkdir -p /mnt/work/${workingDirPath} && \\`
     : ''
