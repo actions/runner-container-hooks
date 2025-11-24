@@ -427,16 +427,16 @@ export async function execCpToPod(
     }
   }
 
-  const want = await localCalculateOutputHashSorted([
-    'sh',
-    '-c',
-    listDirAllCommand(runnerPath)
-  ])
-
   let attempts = 15
   const delay = 1000
   for (let i = 0; i < attempts; i++) {
     try {
+      const want = await localCalculateOutputHashSorted([
+        'sh',
+        '-c',
+        listDirAllCommand(runnerPath)
+      ])
+
       const got = await execCalculateOutputHashSorted(
         podName,
         JOB_CONTAINER_NAME,
@@ -467,11 +467,6 @@ export async function execCpFromPod(
   const targetRunnerPath = `${parentRunnerPath}/${path.basename(containerPath)}`
   core.debug(
     `Copying from pod ${podName} ${containerPath} to ${targetRunnerPath}`
-  )
-  const want = await execCalculateOutputHashSorted(
-    podName,
-    JOB_CONTAINER_NAME,
-    ['sh', '-c', listDirAllCommand(containerPath)]
   )
 
   let attempt = 0
@@ -533,6 +528,12 @@ export async function execCpFromPod(
   const delay = 1000
   for (let i = 0; i < attempts; i++) {
     try {
+      const want = await execCalculateOutputHashSorted(
+        podName,
+        JOB_CONTAINER_NAME,
+        ['sh', '-c', listDirAllCommand(containerPath)]
+      )
+
       const got = await localCalculateOutputHashSorted([
         'sh',
         '-c',
