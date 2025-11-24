@@ -296,5 +296,5 @@ export async function sleep(ms: number): Promise<void> {
 }
 
 export function listDirAllCommand(dir: string): string {
-  return `cd ${shlex.quote(dir)} && find . -not -path '*/_runner_hook_responses*' -exec stat -c '%b %n' {} \\;`
+  return `cd ${shlex.quote(dir)} && find . -not -path '*/_runner_hook_responses*' -exec stat -c '%s %n' {} \\;`
 }
