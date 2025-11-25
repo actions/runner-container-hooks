@@ -6,6 +6,7 @@ import { execCpFromPod, execCpToPod, execPodStep } from '../k8s'
 import { writeRunScript, sleep, listDirAllCommand } from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
 import { dirname } from 'path'
+import * as shlex from 'shlex'
 
 export async function runScriptStep(
   args: RunScriptStepArgs,
@@ -25,6 +26,23 @@ export async function runScriptStep(
   const containerTemp = '/__w/_temp'
   const runnerTemp = `${workdir}/_temp`
   await execCpToPod(state.jobPod, runnerTemp, containerTemp)
+
+  // Copy GitHub directories from temp to /github
+  const setupCommands = [
+    'mkdir -p /github',
+    'cp -r /__w/_temp/_github_home /github/home',
+    'cp -r /__w/_temp/_github_workflow /github/workflow'
+  ]
+
+  try {
+    await execPodStep(
+      ['sh', '-c', shlex.quote(setupCommands.join(' && '))],
+      state.jobPod,
+      JOB_CONTAINER_NAME
+    )
+  } catch (err) {
+    core.debug(`Failed to copy GitHub directories: ${JSON.stringify(err)}`)
+  }
 
   // Execute the entrypoint script
   args.entryPoint = 'sh'
