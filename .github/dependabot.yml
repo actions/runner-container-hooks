@@ -1,0 +1,28 @@
+version: 2
+
+updates:
+  # Group updates into a single PR per workspace package
+  - package-ecosystem: npm
+    directory: "/packages/docker"
+    schedule:
+      interval: weekly
+    groups:
+      all-dependencies:
+        patterns:
+          - "*"
+  - package-ecosystem: npm
+    directory: "/packages/hooklib"
+    schedule:
+      interval: weekly
+    groups:
+      all-dependencies:
+        patterns:
+          - "*"
+  - package-ecosystem: npm
+    directory: "/packages/k8s"
+    schedule:
+      interval: weekly
+    groups:
+      all-dependencies:
+        patterns:
+          - "*"
