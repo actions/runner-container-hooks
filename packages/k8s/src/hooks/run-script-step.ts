@@ -23,25 +23,37 @@ export async function runScriptStep(
   )
 
   const workdir = dirname(process.env.RUNNER_WORKSPACE as string)
-  const containerTemp = '/__w/_temp'
   const runnerTemp = `${workdir}/_temp`
-  await execCpToPod(state.jobPod, runnerTemp, containerTemp)
+  const containerTemp = '/__w/_temp'
+  const containerTempSrc = '/__w/_temp_pre'
+  // Stage runner temp inside container, then merge into /__w/_temp
+  await execCpToPod(state.jobPod, runnerTemp, containerTempSrc)
 
   // Copy GitHub directories from temp to /github
-  const setupCommands = [
-    'mkdir -p /github',
-    'cp -r /__w/_temp/_github_home /github/home',
-    'cp -r /__w/_temp/_github_workflow /github/workflow'
+  // Merge strategy:
+  // - Overwrite files in _runner_file_commands
+  // - Append files not already present elsewhere
+  const mergeCommands = [
+    'set -e',
+    'mkdir -p /__w/_temp /__w/_temp_pre',
+    'SRC=/__w/_temp_pre',
+    'DST=/__w/_temp',
+    // Overwrite _runner_file_commands
+    '[ -d "$SRC/_runner_file_commands" ] && mkdir -p "$DST/_runner_file_commands" && cp -a "$SRC/_runner_file_commands/." "$DST/_runner_file_commands/" || true',
+    // Append other files if missing
+    'find "$SRC" -type f ! -path "*/_runner_file_commands/*" | while read -r f; do rel=${f#"$SRC/"}; target="$DST/$rel"; dir=$(dirname "$target"); if [ ! -e "$target" ]; then mkdir -p "$dir"; cp -a "$f" "$target"; fi; done'
   ]
 
   try {
     await execPodStep(
-      ['sh', '-c', shlex.quote(setupCommands.join(' && '))],
+      ['sh', '-c', shlex.quote(mergeCommands.join(' && '))],
       state.jobPod,
       JOB_CONTAINER_NAME
     )
   } catch (err) {
-    core.debug(`Failed to copy GitHub directories: ${JSON.stringify(err)}`)
+    core.debug(`Failed to merge temp directories: ${JSON.stringify(err)}`)
+    const message = (err as any)?.response?.body?.message || err
+    throw new Error(`failed to merge temp dirs: ${message}`)
   }
 
   // Execute the entrypoint script
@@ -69,11 +81,7 @@ export async function runScriptStep(
     core.debug(
       `Copying from job pod '${state.jobPod}' ${containerTemp} to ${runnerTemp}`
     )
-    await execCpFromPod(
-      state.jobPod,
-      `${containerTemp}/_runner_file_commands`,
-      `${runnerTemp}`
-    )
+    await execCpFromPod(state.jobPod, containerTemp, `${workdir}`)
   } catch (error) {
     core.warning('Failed to copy _temp from pod')
   }
