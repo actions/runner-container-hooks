@@ -69,7 +69,11 @@ export async function runScriptStep(
     core.debug(
       `Copying from job pod '${state.jobPod}' ${containerTemp} to ${runnerTemp}`
     )
-    await execCpFromPod(state.jobPod, containerTemp, workdir)
+    await execCpFromPod(
+      state.jobPod,
+      `${containerTemp}/_runner_file_commands`,
+      `${runnerTemp}`
+    )
   } catch (error) {
     core.warning('Failed to copy _temp from pod')
   }
