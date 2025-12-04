@@ -26,7 +26,20 @@ export async function runScriptStep(
   const runnerTemp = `${workdir}/_temp`
   const containerTemp = '/__w/_temp'
   const containerTempSrc = '/__w/_temp_pre'
-  // Stage runner temp inside container, then merge into /__w/_temp
+  // Ensure base and staging dirs exist before copying
+  try {
+    await execPodStep(
+      [
+        'sh',
+        '-c',
+        'mkdir -p /__w && mkdir -p /__w/_temp && mkdir -p /__w/_temp_pre'
+      ],
+      state.jobPod,
+      JOB_CONTAINER_NAME
+    )
+  } catch (err) {
+    core.debug(`Failed to create temp dirs in container: ${JSON.stringify(err)}`)
+  }
   await execCpToPod(state.jobPod, runnerTemp, containerTempSrc)
 
   // Copy GitHub directories from temp to /github
@@ -46,7 +59,7 @@ export async function runScriptStep(
 
   try {
     await execPodStep(
-      ['sh', '-c', shlex.quote(mergeCommands.join(' && '))],
+      ['sh', '-c', mergeCommands.join(' && ')],
       state.jobPod,
       JOB_CONTAINER_NAME
     )

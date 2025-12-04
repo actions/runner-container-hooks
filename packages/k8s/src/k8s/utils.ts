@@ -288,6 +288,11 @@ function mergeLists<T>(base?: T[], from?: T[]): T[] {
 }
 
 export function fixArgs(args: string[]): string[] {
+  // Preserve shell command strings passed via `sh -c` without re-tokenizing.
+  // Retokenizing would split the script into multiple args, breaking `sh -c`.
+  if (args.length >= 2 && args[0] === 'sh' && args[1] === '-c') {
+    return args
+  }
   return shlex.split(args.join(' '))
 }
 

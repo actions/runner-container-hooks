@@ -342,7 +342,6 @@ export async function execCalculateOutputHashSorted(
 
   const hash = createHash('sha256')
   hash.update(sortedOutput)
-  console.log(`sortedOutput: ${sortedOutput}`)
   return hash.digest('hex')
 }
 
@@ -371,7 +370,6 @@ export async function localCalculateOutputHashSorted(
 
         const hash = createHash('sha256')
         hash.update(sortedOutput)
-        console.log(`sortedOutput: ${sortedOutput}`)
         resolve(hash.digest('hex'))
       } else {
         reject(new Error(`child process exited with code ${code}`))
@@ -833,7 +831,7 @@ export async function isPodContainerAlpine(
       [
         'sh',
         '-c',
-        `'[ $(cat /etc/*release* | grep -i -e "^ID=*alpine*" -c) != 0 ] || exit 1'`
+        `[ $(cat /etc/*release* | grep -i -e "^ID=*alpine*" -c) != 0 ] || exit 1`
       ],
       podName,
       containerName
