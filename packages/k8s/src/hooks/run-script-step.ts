@@ -38,7 +38,9 @@ export async function runScriptStep(
       JOB_CONTAINER_NAME
     )
   } catch (err) {
-    core.debug(`Failed to create temp dirs in container: ${JSON.stringify(err)}`)
+    core.debug(
+      `Failed to create temp dirs in container: ${JSON.stringify(err)}`
+    )
   }
   await execCpToPod(state.jobPod, runnerTemp, containerTempSrc)
 
