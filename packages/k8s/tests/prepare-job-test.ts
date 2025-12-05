@@ -45,7 +45,7 @@ describe('Prepare job', () => {
       process.env.GITHUB_WORKSPACE as string,
       'myvolume'
     )
-    fs.mkdirSync(userVolumeMount)
+    fs.mkdirSync(userVolumeMount, { recursive: true })
     fs.writeFileSync(path.join(userVolumeMount, 'file.txt'), 'hello')
     prepareJobData.args.container.userMountVolumes = [
       {
@@ -63,11 +63,7 @@ describe('Prepare job', () => {
     )
 
     await execPodStep(
-      [
-        'sh',
-        '-c',
-        '\'[ "$(cat /__w/myvolume/file.txt)" = "hello" ] || exit 5\''
-      ],
+      ['sh', '-c', '[ "$(cat /__w/myvolume/file.txt)" = "hello" ] || exit 5'],
       content!.state!.jobPod,
       JOB_CONTAINER_NAME
     ).then(output => {
