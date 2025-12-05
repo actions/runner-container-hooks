@@ -98,7 +98,7 @@ export async function runScriptStep(
     )
     await execCpFromPod(
       state.jobPod,
-      `${containerTemp}/_github_file_commands`,
+      `${containerTemp}/_runner_file_commands`,
       `${workdir}/_temp`
     )
   } catch (error) {
