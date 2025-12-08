@@ -27,21 +27,15 @@ export async function runScriptStep(
   const containerTemp = '/__w/_temp'
   const containerTempSrc = '/__w/_temp_pre'
   // Ensure base and staging dirs exist before copying
-  try {
-    await execPodStep(
-      [
-        'sh',
-        '-c',
-        'mkdir -p /__w && mkdir -p /__w/_temp && mkdir -p /__w/_temp_pre'
-      ],
-      state.jobPod,
-      JOB_CONTAINER_NAME
-    )
-  } catch (err) {
-    core.debug(
-      `Failed to create temp dirs in container: ${JSON.stringify(err)}`
-    )
-  }
+  await execPodStep(
+    [
+      'sh',
+      '-c',
+      'mkdir -p /__w && mkdir -p /__w/_temp && mkdir -p /__w/_temp_pre'
+    ],
+    state.jobPod,
+    JOB_CONTAINER_NAME
+  )
   await execCpToPod(state.jobPod, runnerTemp, containerTempSrc)
 
   // Copy GitHub directories from temp to /github
