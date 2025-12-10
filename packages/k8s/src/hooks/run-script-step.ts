@@ -50,9 +50,9 @@ export async function runScriptStep(
     // Overwrite _runner_file_commands
     `find "$SRC" -type f ! -path "*/_runner_file_commands/*" -exec sh -c '
     rel="\${1#$2/}"
-    target="$3/\$rel"
-    mkdir -p "\$(dirname "\$target")"
-    cp -a "\$1" "\$target"
+    target="$3/$rel"
+    mkdir -p "$(dirname "$target")"
+    cp -a "$1" "$target"
   ' _ {} "$SRC" "$DST" \\;`,
     // Remove _temp_pre after merging
     'rm -rf /__w/_temp_pre'
