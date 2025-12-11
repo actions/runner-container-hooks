@@ -48,6 +48,7 @@ export async function runScriptStep(
     'SRC=/__w/_temp_pre',
     'DST=/__w/_temp',
     // Overwrite _runner_file_commands
+    'cp -a "$SRC/_runner_file_commands/." "$DST/_runner_file_commands"',
     `find "$SRC" -type f ! -path "*/_runner_file_commands/*" -exec sh -c '
     rel="\${1#$2/}"
     target="$3/$rel"
