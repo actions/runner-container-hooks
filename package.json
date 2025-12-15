@@ -12,7 +12,6 @@
     "format": "prettier --write '**/*.ts'",
     "format-check": "prettier --check '**/*.ts'",
     "lint": "eslint packages/**/*.ts",
-    "lint:fix": "eslint packages/**/*.ts --fix",
     "build-all": "npm run build --prefix packages/hooklib && npm run build --prefix packages/k8s && npm run build --prefix packages/docker"
   },
   "repository": {
@@ -38,7 +37,6 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@actions/github": "^6.0.0",
     "eslint-plugin-jest": "^29.0.1"
   }
 }
