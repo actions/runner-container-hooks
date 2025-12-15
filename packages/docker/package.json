@@ -14,20 +14,20 @@
   "license": "MIT",
   "dependencies": {
     "@actions/core": "^1.11.1",
-    "@actions/exec": "^1.1.1",
+    "@actions/exec": "^2.0.0",
     "hooklib": "file:../hooklib",
     "shlex": "^3.0.0",
-    "uuid": "^11.1.0"
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.25.2",
-    "@babel/preset-env": "^7.25.4",
+    "@babel/core": "^7.28.5",
+    "@babel/preset-env": "^7.28.5",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.14",
-    "@typescript-eslint/parser": "^8.37.0",
+    "@typescript-eslint/parser": "^8.49.0",
     "@vercel/ncc": "^0.38.3",
     "jest": "^30.0.4",
-    "ts-jest": "^29.4.0",
+    "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"
