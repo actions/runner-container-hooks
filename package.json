@@ -38,6 +38,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "@actions/github": "^6.0.0",
     "eslint-plugin-jest": "^29.0.1"
   }
 }
