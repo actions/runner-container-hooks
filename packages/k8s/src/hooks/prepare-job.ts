@@ -49,10 +49,7 @@ export async function prepareJob(
 
   let container: k8s.V1Container | undefined = undefined
   if (args.container?.image) {
-<<<<<<< HEAD
-=======
     core.info(`Using image '${args.container.image}' for job image`)
->>>>>>> a3d6427 (feat: label job pods with context info)
     container = createContainerSpec(
       args.container,
       JOB_CONTAINER_NAME,

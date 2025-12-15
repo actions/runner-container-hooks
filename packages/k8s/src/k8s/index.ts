@@ -109,7 +109,8 @@ function getArcContextLabels(): { [key: string]: string } {
   )
 }
 
-export async function createPod(
+export async function createJobPod(
+  name: string,
   jobContainer?: k8s.V1Container,
   services?: k8s.V1Container[],
   registry?: Registry,
@@ -248,20 +249,11 @@ export async function createContainerStepPod(
 
   const instanceLabel = new RunnerInstanceLabel()
   const arcLabels = getArcContextLabels()
-  appPod.metadata.labels = arcLabels
-  job.spec.template.spec = new k8s.V1PodSpec()
-  job.spec.template.metadata = new k8s.V1ObjectMeta()
-  job.spec.template.metadata.labels = arcLabels
-  job.spec.template.metadata.annotations = {}
-  job.spec.template.spec.containers = [container]
-  job.spec.template.spec.restartPolicy = 'Never'
-
-  const nodeName = await getCurrentNodeName()
-  if (useKubeScheduler()) {
-    job.spec.template.spec.affinity = await getPodAffinity(nodeName)
-  } else {
-    job.spec.template.spec.nodeName = nodeName
+  appPod.metadata.labels = {
+    [instanceLabel.key]: instanceLabel.value,
+    ...arcLabels
   }
+
   appPod.metadata.annotations = {}
 
   appPod.spec = new k8s.V1PodSpec()
