@@ -98,10 +98,9 @@ export async function prepareJob(
 
   const runnerWorkspace = dirname(process.env.RUNNER_WORKSPACE as string)
 
-  let prepareScript: { containerPath: string; runnerPath: string } | undefined
-  if (args.container?.userMountVolumes?.length) {
-    prepareScript = prepareJobScript(args.container.userMountVolumes || [])
-  }
+  // Always create prepare script to copy GitHub workspace directories
+  // The script handles both required GitHub directories and optional user mounts
+  const prepareScript = prepareJobScript(args.container?.userMountVolumes || [])
 
   try {
     await waitForPodPhases(
@@ -117,25 +116,25 @@ export async function prepareJob(
 
   await execCpToPod(createdPod.metadata.name, runnerWorkspace, '/__w')
 
-  if (prepareScript) {
-    await execPodStep(
-      ['sh', '-e', prepareScript.containerPath],
-      createdPod.metadata.name,
-      JOB_CONTAINER_NAME
-    )
+  // Always execute prepare script to ensure GitHub workspace directories are copied
+  await execPodStep(
+    ['sh', '-e', prepareScript.containerPath],
+    createdPod.metadata.name,
+    JOB_CONTAINER_NAME
+  )
 
-    const promises: Promise<void>[] = []
-    for (const vol of args?.container?.userMountVolumes || []) {
-      promises.push(
-        execCpToPod(
-          createdPod.metadata.name,
-          vol.sourceVolumePath,
-          vol.targetVolumePath
-        )
+  // Copy user mount volumes if any are defined
+  const promises: Promise<void>[] = []
+  for (const vol of args?.container?.userMountVolumes || []) {
+    promises.push(
+      execCpToPod(
+        createdPod.metadata.name,
+        vol.sourceVolumePath,
+        vol.targetVolumePath
       )
-    }
-    await Promise.all(promises)
+    )
   }
+  await Promise.all(promises)
 
   core.debug('Job pod is ready for traffic')
 
