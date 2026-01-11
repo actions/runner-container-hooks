@@ -157,14 +157,14 @@ function scriptEnv(envs?: { [key: string]: string }): string {
 }
 
 export function generateContainerName(service: ServiceContainerInfo): string {
-  const nameWithTag = service.image.split('/').pop()
-  const name = nameWithTag?.split(':')[0]
+  const imageNameWithTag = service.image.split('/').pop()
+  const imageName = imageNameWithTag?.split(':')[0]
 
-  if (!name) {
+  if (!imageName) {
     throw new Error(`Image definition '${service.image}' is invalid`)
   }
 
-  return `${service.contextName}_${name}`
+  return `${service.contextName}_${imageName}`
 }
 
 // Overwrite or append based on container options
