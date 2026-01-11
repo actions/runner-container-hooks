@@ -201,30 +201,52 @@ describe('k8s utils', () => {
   })
 
   describe('generate container name', () => {
-    it('should return the container name from image string', () => {
+    it('should return the container name from "contextName" and "image" strings combined', () => {
       expect(
-        generateContainerName('public.ecr.aws/localstack/localstack')
-      ).toEqual('localstack')
+        generateContainerName({
+          contextName: 'localstack',
+          image: 'public.ecr.aws/localstack/localstack'
+        })
+      ).toEqual('localstack_localstack')
       expect(
-        generateContainerName(
-          'public.ecr.aws/url/with/multiple/slashes/postgres:latest'
-        )
-      ).toEqual('postgres')
-      expect(generateContainerName('postgres')).toEqual('postgres')
-      expect(generateContainerName('postgres:latest')).toEqual('postgres')
-      expect(generateContainerName('localstack/localstack')).toEqual(
-        'localstack'
-      )
-      expect(generateContainerName('localstack/localstack:latest')).toEqual(
-        'localstack'
-      )
+        generateContainerName({
+          contextName: 'postgres',
+          image: 'public.ecr.aws/url/with/multiple/slashes/postgres:latest'
+        })
+      ).toEqual('postgres_postgres')
+      expect(
+        generateContainerName({ contextName: 'postgres1', image: 'postgres' })
+      ).toEqual('postgres1_postgres')
+      expect(
+        generateContainerName({
+          contextName: 'postgres',
+          image: 'postgres:latest'
+        })
+      ).toEqual('postgres_postgres')
+      expect(
+        generateContainerName({
+          contextName: 'localstack1',
+          image: 'localstack/localstack'
+        })
+      ).toEqual('localstack1_localstack')
+      expect(
+        generateContainerName({
+          contextName: 'localstack2',
+          image: 'localstack/localstack:latest'
+        })
+      ).toEqual('localstack2_localstack')
     })
 
     it('should throw on invalid image string', () => {
       expect(() =>
-        generateContainerName('localstack/localstack/:latest')
+        generateContainerName({
+          contextName: 'invalid',
+          image: 'localstack/localstack/:latest'
+        })
       ).toThrow()
-      expect(() => generateContainerName(':latest')).toThrow()
+      expect(() =>
+        generateContainerName({ contextName: 'invalid', image: ':latest' })
+      ).toThrow()
     })
   })
 

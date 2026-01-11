@@ -5,7 +5,7 @@ import * as core from '@actions/core'
 import { v1 as uuidv4 } from 'uuid'
 import { CONTAINER_EXTENSION_PREFIX } from '../hooks/constants'
 import * as shlex from 'shlex'
-import { Mount } from 'hooklib'
+import { Mount, ServiceContainerInfo } from 'hooklib'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
@@ -156,15 +156,15 @@ function scriptEnv(envs?: { [key: string]: string }): string {
   return `env ${envBuffer.join(' ')} `
 }
 
-export function generateContainerName(image: string): string {
-  const nameWithTag = image.split('/').pop()
+export function generateContainerName(service: ServiceContainerInfo): string {
+  const nameWithTag = service.image.split('/').pop()
   const name = nameWithTag?.split(':')[0]
 
   if (!name) {
-    throw new Error(`Image definition '${image}' is invalid`)
+    throw new Error(`Image definition '${service.image}' is invalid`)
   }
 
-  return name
+  return `${service.contextName}_${name}`
 }
 
 // Overwrite or append based on container options
