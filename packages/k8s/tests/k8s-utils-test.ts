@@ -207,34 +207,34 @@ describe('k8s utils', () => {
           contextName: 'localstack',
           image: 'public.ecr.aws/localstack/localstack'
         })
-      ).toEqual('localstack_localstack')
+      ).toEqual('localstack-localstack')
       expect(
         generateContainerName({
           contextName: 'postgres',
           image: 'public.ecr.aws/url/with/multiple/slashes/postgres:latest'
         })
-      ).toEqual('postgres_postgres')
+      ).toEqual('postgres-postgres')
       expect(
         generateContainerName({ contextName: 'postgres1', image: 'postgres' })
-      ).toEqual('postgres1_postgres')
+      ).toEqual('postgres1-postgres')
       expect(
         generateContainerName({
           contextName: 'postgres',
           image: 'postgres:latest'
         })
-      ).toEqual('postgres_postgres')
+      ).toEqual('postgres-postgres')
       expect(
         generateContainerName({
           contextName: 'localstack1',
           image: 'localstack/localstack'
         })
-      ).toEqual('localstack1_localstack')
+      ).toEqual('localstack1-localstack')
       expect(
         generateContainerName({
           contextName: 'localstack2',
           image: 'localstack/localstack:latest'
         })
-      ).toEqual('localstack2_localstack')
+      ).toEqual('localstack2-localstack')
     })
 
     it('should throw on invalid image string', () => {

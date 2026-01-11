@@ -164,7 +164,7 @@ export function generateContainerName(service: ServiceContainerInfo): string {
     throw new Error(`Image definition '${service.image}' is invalid`)
   }
 
-  return `${service.contextName}_${imageName}`
+  return `${service.contextName}-${imageName}`
 }
 
 // Overwrite or append based on container options
