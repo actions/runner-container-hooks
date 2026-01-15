@@ -13,7 +13,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@actions/core": "^1.11.1",
+    "@actions/core": "^2.0.2",
     "@actions/exec": "^1.1.1",
     "@actions/io": "^1.1.3",
     "@kubernetes/client-node": "^1.3.0",
