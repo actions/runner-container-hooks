@@ -14,7 +14,7 @@
   "license": "MIT",
   "dependencies": {
     "@actions/core": "^2.0.2",
-    "@actions/exec": "^1.1.1",
+    "@actions/exec": "^2.0.0",
     "hooklib": "file:../hooklib",
     "shlex": "^3.0.0",
     "uuid": "^11.1.0"
