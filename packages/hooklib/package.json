@@ -14,7 +14,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^24.0.14",
+    "@types/node": "^25.0.9",
     "@zeit/ncc": "^0.22.3",
     "eslint": "^9.31.0",
     "eslint-plugin-github": "^6.0.0",
