@@ -243,4 +243,29 @@ describe('Prepare job', () => {
       'ghcr.io/actions/actions-runner:latest'
     )
   })
+
+  it('should create unique service container names when images collide', async () => {
+    // make two services with the same image
+    const svc = JSON.parse(JSON.stringify(prepareJobData.args.services[0]))
+    prepareJobData.args.services = [svc, JSON.parse(JSON.stringify(svc))]
+    // ensure registries are null as TestHelper expects
+    prepareJobData.args.services.forEach((s: any) => (s.registry = null))
+
+    await expect(
+      prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+    ).resolves.not.toThrow()
+
+    const content = JSON.parse(
+      fs.readFileSync(prepareJobOutputFilePath).toString()
+    )
+
+    expect(content.context.services).toBeTruthy()
+    expect(content.context.services.length).toBe(2)
+
+    const got = await getPodByName(content.state.jobPod)
+    const names = (got.spec?.containers || []).map(c => c.name)
+
+    // when images collide, names should be suffixed with -0, -1
+    expect(names).toEqual(expect.arrayContaining(['redis-0', 'redis-1']))
+  })
 })
