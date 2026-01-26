@@ -245,9 +245,17 @@ describe('Prepare job', () => {
   })
 
   it('should create unique service container names when images collide', async () => {
+    // Use fixed, non-colliding high ports. (Kubernetes hostPort must be unique per node.)
+    prepareJobData.args.container.portMappings = ['31080:8080']
+
     // make two services with the same image
     const svc = JSON.parse(JSON.stringify(prepareJobData.args.services[0]))
-    prepareJobData.args.services = [svc, JSON.parse(JSON.stringify(svc))]
+    const svc2 = JSON.parse(JSON.stringify(svc))
+    // Ensure unique host ports so the pod spec is valid even with two services.
+    // (Kubernetes hostPort must be unique per node.)
+    svc.portMappings = ['31081:80', '31082:8080']
+    svc2.portMappings = ['31083:80', '31084:8080']
+    prepareJobData.args.services = [svc, svc2]
     // ensure registries are null as TestHelper expects
     prepareJobData.args.services.forEach((s: any) => (s.registry = null))
 
