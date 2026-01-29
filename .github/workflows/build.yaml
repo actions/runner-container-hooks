@@ -13,7 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: npm install
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
         name: Install dependencies
       - run: npm run bootstrap
         name: Bootstrap the packages
@@ -32,7 +36,11 @@ jobs:
     needs: format-and-lint
     steps:
       - uses: actions/checkout@v5
-      - run: npm install
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
         name: Install dependencies
       - run: npm run bootstrap
         name: Bootstrap the packages
@@ -47,6 +55,10 @@ jobs:
     needs: format-and-lint
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
       - run: sed -i "s|{{PATHTOREPO}}|$(pwd)|" packages/k8s/tests/test-kind.yaml
         name: Setup kind cluster yaml config
       - uses: helm/kind-action@v1.12.0
