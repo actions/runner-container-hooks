@@ -2,7 +2,7 @@
 
 ## Bugs
 
-- Change command to remove sudo to fix fs-init inital container [#263]
+- Change command to remove sudo to fix fs-init initial container [#263]
 - Sort 'find' output before hashing for consistency [#267]
 - feat: check if required binaries are present [#272]
 - Allow non-root container [#264]
