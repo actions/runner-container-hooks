@@ -43,7 +43,7 @@ const RETRYABLE_NETWORK_CODES = new Set([
 const MAX_RETRIES = 3
 const RETRY_BASE_DELAY_MS = 1000
 
-function isRetryableError(err: unknown): boolean {
+export function isRetryableError(err: unknown): boolean {
   if (err instanceof k8s.ApiException) {
     return RETRYABLE_STATUS_CODES.has(err.code)
   }
@@ -67,7 +67,7 @@ function retryDelay(attempt: number): number {
   return RETRY_BASE_DELAY_MS * 2 ** attempt * (0.5 + Math.random())
 }
 
-function retryAfterDelay(err: k8s.ApiException<unknown>, attempt: number): number {
+export function retryAfterDelay(err: k8s.ApiException<unknown>, attempt: number): number {
   const headerRetrySeconds = err.headers?.['retry-after'] ?? err.headers?.['Retry-After']
   if (!headerRetrySeconds) {
     return retryDelay(attempt)
