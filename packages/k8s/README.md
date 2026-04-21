@@ -30,6 +30,27 @@ rules:
 - The `ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER` env should be set to true to prevent the runner from running any jobs outside of a container
 - The runner pod should map a persistent volume claim into the `_work` directory
     - The `ACTIONS_RUNNER_CLAIM_NAME` env should be set to the persistent volume claim that contains the runner's working directory, otherwise it defaults to `${ACTIONS_RUNNER_POD_NAME}-work`
+- The `ACTIONS_RUNNER_USE_KUBE_SCHEDULER` env can be set to `true` to enable the Kubernetes scheduler for job pods. When set to `true`, the hook uses `nodeAffinity` to ensure job pods are scheduled correctly (essential for `ReadWriteOnce` volumes). If not set, the hook defaults to a legacy mode where job pods are pinned to the same node as the runner pod using `nodeName`.
+
+## Storage Guidance
+The K8s hooks require a shared volume between the runner pod and the job pods to share the workspace and other internal directories.
+
+### RWX (Recommended)
+The preferred way to configure storage is using a `ReadWriteMany` (RWX) Persistent Volume Claim. While job pods are always pinned to the runner's node, RWX provides better operational flexibility by allowing multiple pods to access the same workspace simultaneously.
+
+To migrate from RWO to RWX:
+1. Provision a new `ReadWriteMany` StorageClass if one is not available.
+2. Update your PVC definition to use `accessModes: [ReadWriteMany]`.
+3. Set `ACTIONS_RUNNER_USE_KUBE_SCHEDULER=true` to enable the scheduler-based node pinning (via affinity) instead of the default `nodeName` pinning.
+
+### RWO Fallback (Affinity-based)
+If `ReadWriteMany` storage is not available, you can use `ReadWriteOnce` (RWO) storage. In this mode, all job pods must be scheduled on the same node as the runner pod that owns the PVC.
+
+To enable this safely:
+1. Ensure `ACTIONS_RUNNER_USE_KUBE_SCHEDULER` is set to `true`.
+2. The hooks will automatically add a `nodeAffinity` to the job pods, ensuring they are scheduled on the same node as the runner pod (`kubernetes.io/hostname` match).
+
+> **Note:** We do not recommend manually setting `nodeName` in the pod template, as the hooks handle node placement automatically via affinity when the scheduler is enabled.
 - Some actions runner env's are expected to be set. These are set automatically by the runner.
     - `RUNNER_WORKSPACE` is expected to be set to the workspace of the runner
     - `GITHUB_WORKSPACE` is expected to be set to the workspace of the job

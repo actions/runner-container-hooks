@@ -1,31 +1,23 @@
 import * as core from '@actions/core'
-import * as fs from 'fs'
 import * as k8s from '@kubernetes/client-node'
 import { RunContainerStepArgs } from 'hooklib'
-import { dirname } from 'path'
 import {
-  createContainerStepPod,
-  deletePod,
-  execCpFromPod,
-  execCpToPod,
-  execPodStep,
-  getPrepareJobTimeoutSeconds,
+  createJob,
+  createSecretForEnvs,
+  getContainerJobPodName,
+  getPodLogs,
+  getPodStatus,
+  waitForJobToComplete,
   waitForPodPhases
 } from '../k8s'
 import {
-  CONTAINER_VOLUMES,
+  containerVolumes,
+  fixArgs,
   mergeContainerWithOptions,
   PodPhase,
-  readExtensionFromFile,
-  DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
-  writeContainerStepScript
+  readExtensionFromFile
 } from '../k8s/utils'
-import {
-  getJobPodName,
-  getStepPodName,
-  JOB_CONTAINER_EXTENSION_NAME,
-  JOB_CONTAINER_NAME
-} from './constants'
+import { JOB_CONTAINER_EXTENSION_NAME, JOB_CONTAINER_NAME } from './constants'
 
 export async function runContainerStep(
   stepContainer: RunContainerStepArgs
@@ -34,109 +26,118 @@ export async function runContainerStep(
     throw new Error('Building container actions is not currently supported')
   }
 
-  if (!stepContainer.entryPoint) {
-    throw new Error(
-      'failed to start the container since the entrypoint is overwritten'
-    )
-  }
-
-  const envs = stepContainer.environmentVariables || {}
-  envs['GITHUB_ACTIONS'] = 'true'
-  if (!('CI' in envs)) {
-    envs.CI = 'true'
+  let secretName: string | undefined = undefined
+  if (stepContainer.environmentVariables) {
+    try {
+      const envs = JSON.parse(
+        JSON.stringify(stepContainer.environmentVariables)
+      )
+      envs['GITHUB_ACTIONS'] = 'true'
+      if (!('CI' in envs)) {
+        envs.CI = 'true'
+      }
+      secretName = await createSecretForEnvs(envs)
+    } catch (err) {
+      core.debug(`createSecretForEnvs failed: ${JSON.stringify(err)}`)
+      const message = (err as any)?.response?.body?.message || err
+      throw new Error(`failed to create script environment: ${message}`)
+    }
   }
 
   const extension = readExtensionFromFile()
 
-  const container = createContainerSpec(stepContainer, extension)
+  core.debug(`Created secret ${secretName} for container job envs`)
+  const container = createContainerSpec(stepContainer, secretName, extension)
 
-  let pod: k8s.V1Pod
+  let job: k8s.V1Job
   try {
-    pod = await createContainerStepPod(getStepPodName(), container, extension)
+    job = await createJob(container, extension)
   } catch (err) {
     core.debug(`createJob failed: ${JSON.stringify(err)}`)
     const message = (err as any)?.response?.body?.message || err
     throw new Error(`failed to run script step: ${message}`)
   }
 
-  if (!pod.metadata?.name) {
+  if (!job.metadata?.name) {
     throw new Error(
       `Expected job ${JSON.stringify(
-        pod
+        job
       )} to have correctly set the metadata.name`
     )
   }
-  const podName = pod.metadata.name
+  core.debug(`Job created, waiting for pod to start: ${job.metadata?.name}`)
 
+  let podName: string
   try {
-    await waitForPodPhases(
-      podName,
-      new Set([PodPhase.RUNNING]),
-      new Set([PodPhase.PENDING, PodPhase.UNKNOWN]),
-      getPrepareJobTimeoutSeconds()
-    )
-
-    const runnerWorkspace = dirname(process.env.RUNNER_WORKSPACE as string)
-    const githubWorkspace = process.env.GITHUB_WORKSPACE as string
-    const parts = githubWorkspace.split('/').slice(-2)
-    if (parts.length !== 2) {
-      throw new Error(`Invalid github workspace directory: ${githubWorkspace}`)
-    }
-    const relativeWorkspace = parts.join('/')
-
-    core.debug(
-      `Copying files from pod ${getJobPodName()} to ${runnerWorkspace}/${relativeWorkspace}`
-    )
-    await execCpFromPod(getJobPodName(), `/__w`, `${runnerWorkspace}`)
-
-    const { containerPath, runnerPath } = writeContainerStepScript(
-      `${runnerWorkspace}/__w/_temp`,
-      githubWorkspace,
-      stepContainer.entryPoint,
-      stepContainer.entryPointArgs,
-      envs
-    )
-
-    await execCpToPod(podName, `${runnerWorkspace}/__w`, '/__w')
-
-    fs.rmSync(`${runnerWorkspace}/__w`, { recursive: true, force: true })
-
-    try {
-      core.debug(`Executing container step script in pod ${podName}`)
-      return await execPodStep(
-        ['sh', '-e', containerPath],
-        pod.metadata.name,
-        JOB_CONTAINER_NAME
-      )
-    } catch (err) {
-      core.debug(`execPodStep failed: ${JSON.stringify(err)}`)
-      const message = (err as any)?.response?.body?.message || err
-      throw new Error(`failed to run script step: ${message}`)
-    } finally {
-      fs.rmSync(runnerPath, { force: true })
-    }
-  } catch (error) {
-    core.error(`Failed to run container step: ${error}`)
-    throw error
-  } finally {
-    await deletePod(podName).catch(err => {
-      core.error(`Failed to delete step pod ${podName}: ${err}`)
-    })
+    podName = await getContainerJobPodName(job.metadata.name)
+  } catch (err) {
+    core.debug(`getContainerJobPodName failed: ${JSON.stringify(err)}`)
+    const message = (err as any)?.response?.body?.message || err
+    throw new Error(`failed to get container job pod name: ${message}`)
   }
+
+  await waitForPodPhases(
+    podName,
+    new Set([
+      PodPhase.COMPLETED,
+      PodPhase.RUNNING,
+      PodPhase.SUCCEEDED,
+      PodPhase.FAILED
+    ]),
+    new Set([PodPhase.PENDING, PodPhase.UNKNOWN])
+  )
+  core.debug('Container step is running or complete, pulling logs')
+
+  await getPodLogs(podName, JOB_CONTAINER_NAME)
+
+  core.debug('Waiting for container job to complete')
+  await waitForJobToComplete(job.metadata.name)
+
+  const status = await getPodStatus(podName)
+  if (status?.phase === 'Succeeded') {
+    return 0
+  }
+  if (!status?.containerStatuses?.length) {
+    core.error(
+      `Can't determine container status from response:  ${JSON.stringify(
+        status
+      )}`
+    )
+    return 1
+  }
+  const exitCode =
+    status.containerStatuses[status.containerStatuses.length - 1].state
+      ?.terminated?.exitCode
+  return Number(exitCode) || 1
 }
 
 function createContainerSpec(
   container: RunContainerStepArgs,
+  secretName?: string,
   extension?: k8s.V1PodTemplateSpec
 ): k8s.V1Container {
   const podContainer = new k8s.V1Container()
   podContainer.name = JOB_CONTAINER_NAME
   podContainer.image = container.image
-  podContainer.workingDir = '/__w'
-  podContainer.command = ['tail']
-  podContainer.args = DEFAULT_CONTAINER_ENTRY_POINT_ARGS
+  podContainer.workingDir = container.workingDirectory
+  podContainer.command = container.entryPoint
+    ? [container.entryPoint]
+    : undefined
+  podContainer.args = container.entryPointArgs?.length
+    ? fixArgs(container.entryPointArgs)
+    : undefined
 
-  podContainer.volumeMounts = CONTAINER_VOLUMES
+  if (secretName) {
+    podContainer.envFrom = [
+      {
+        secretRef: {
+          name: secretName,
+          optional: false
+        }
+      }
+    ]
+  }
+  podContainer.volumeMounts = containerVolumes(undefined, false, true)
 
   if (!extension) {
     return podContainer

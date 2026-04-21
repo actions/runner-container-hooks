@@ -6,6 +6,8 @@ import { v1 as uuidv4 } from 'uuid'
 import { CONTAINER_EXTENSION_PREFIX } from '../hooks/constants'
 import * as shlex from 'shlex'
 import { Mount } from 'hooklib'
+import * as path from 'path'
+import { POD_VOLUME_NAME } from './index'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
@@ -13,24 +15,98 @@ export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
 export const ENV_USE_KUBE_SCHEDULER = 'ACTIONS_RUNNER_USE_KUBE_SCHEDULER'
 
-export const EXTERNALS_VOLUME_NAME = 'externals'
-export const GITHUB_VOLUME_NAME = 'github'
-export const WORK_VOLUME = 'work'
+export function containerVolumes(
+  userMountVolumes: Mount[] = [],
+  jobContainer = true,
+  containerAction = false
+): k8s.V1VolumeMount[] {
+  const mounts: k8s.V1VolumeMount[] = [
+    {
+      name: POD_VOLUME_NAME,
+      mountPath: '/__w'
+    }
+  ]
 
-export const CONTAINER_VOLUMES: k8s.V1VolumeMount[] = [
-  {
-    name: EXTERNALS_VOLUME_NAME,
-    mountPath: '/__e'
-  },
-  {
-    name: WORK_VOLUME,
-    mountPath: '/__w'
-  },
-  {
-    name: GITHUB_VOLUME_NAME,
-    mountPath: '/github'
+  const workspacePath = process.env.GITHUB_WORKSPACE as string
+  if (containerAction) {
+    const i = workspacePath.lastIndexOf('_work/')
+    const workspaceRelativePath = workspacePath.slice(i + '_work/'.length)
+    mounts.push(
+      {
+        name: POD_VOLUME_NAME,
+        mountPath: '/github/workspace',
+        subPath: workspaceRelativePath
+      },
+      {
+        name: POD_VOLUME_NAME,
+        mountPath: '/github/file_commands',
+        subPath: '_temp/_runner_file_commands'
+      },
+      {
+        name: POD_VOLUME_NAME,
+        mountPath: '/github/home',
+        subPath: '_temp/_github_home'
+      },
+      {
+        name: POD_VOLUME_NAME,
+        mountPath: '/github/workflow',
+        subPath: '_temp/_github_workflow'
+      }
+    )
+    return mounts
   }
-]
+
+  if (!jobContainer) {
+    return mounts
+  }
+
+  mounts.push(
+    {
+      name: POD_VOLUME_NAME,
+      mountPath: '/__e',
+      subPath: 'externals'
+    },
+    {
+      name: POD_VOLUME_NAME,
+      mountPath: '/github/home',
+      subPath: '_temp/_github_home'
+    },
+    {
+      name: POD_VOLUME_NAME,
+      mountPath: '/github/workflow',
+      subPath: '_temp/_github_workflow'
+    }
+  )
+
+  if (!userMountVolumes?.length) {
+    return mounts
+  }
+
+  for (const userVolume of userMountVolumes) {
+    let sourceVolumePath = ''
+    if (path.isAbsolute(userVolume.sourceVolumePath)) {
+      if (!userVolume.sourceVolumePath.startsWith(workspacePath)) {
+        throw new Error(
+          'Volume mounts outside of the work folder are not supported'
+        )
+      }
+      sourceVolumePath = userVolume.sourceVolumePath.slice(
+        workspacePath.length + 1
+      )
+    } else {
+      sourceVolumePath = userVolume.sourceVolumePath
+    }
+
+    mounts.push({
+      name: POD_VOLUME_NAME,
+      mountPath: userVolume.targetVolumePath,
+      subPath: sourceVolumePath,
+      readOnly: userVolume.readOnly
+    })
+  }
+
+  return mounts
+}
 
 export function prepareJobScript(userVolumeMounts: Mount[]): {
   containerPath: string
@@ -45,6 +121,38 @@ cp -R /__w/_temp/_github_workflow /github/workflow
 mkdir -p ${mountDirs}
 `
 
+  const filename = `${uuidv4()}.sh`
+  const entryPointPath = `${process.env.RUNNER_TEMP}/${filename}`
+  fs.writeFileSync(entryPointPath, content)
+  return {
+    containerPath: `/__w/_temp/${filename}`,
+    runnerPath: entryPointPath
+  }
+}
+
+export function writeEntryPointScript(
+  workingDirectory: string,
+  entryPoint: string,
+  entryPointArgs?: string[],
+  prependPath?: string[],
+  environmentVariables?: { [key: string]: string }
+): { containerPath: string; runnerPath: string } {
+  let exportPath = ''
+  if (prependPath?.length) {
+    const prepend =
+      typeof prependPath === 'string' ? prependPath : prependPath.join(':')
+    exportPath = `export PATH=${prepend}:$PATH`
+  }
+
+  const environmentPrefix = scriptEnv(environmentVariables)
+
+  const content = `#!/bin/sh -l
+${exportPath}
+cd ${workingDirectory} && \\
+exec ${environmentPrefix} ${entryPoint} ${
+    entryPointArgs?.length ? entryPointArgs.join(' ') : ''
+  }
+`
   const filename = `${uuidv4()}.sh`
   const entryPointPath = `${process.env.RUNNER_TEMP}/${filename}`
   fs.writeFileSync(entryPointPath, content)
@@ -288,18 +396,5 @@ function mergeLists<T>(base?: T[], from?: T[]): T[] {
 }
 
 export function fixArgs(args: string[]): string[] {
-  // Preserve shell command strings passed via `sh -c` without re-tokenizing.
-  // Retokenizing would split the script into multiple args, breaking `sh -c`.
-  if (args.length >= 2 && args[0] === 'sh' && args[1] === '-c') {
-    return args
-  }
   return shlex.split(args.join(' '))
-}
-
-export async function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-export function listDirAllCommand(dir: string): string {
-  return `cd ${shlex.quote(dir)} && find . -type f -not -path '*/_runner_hook_responses*' -exec stat -c '%s %n' {} \\;`
 }
