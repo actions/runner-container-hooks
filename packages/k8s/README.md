@@ -36,12 +36,12 @@ rules:
 The K8s hooks require a shared volume between the runner pod and the job pods to share the workspace and other internal directories.
 
 ### RWX (Recommended)
-The preferred way to configure storage is using a `ReadWriteMany` (RWX) Persistent Volume Claim. While job pods are always pinned to the runner's node, RWX provides better operational flexibility by allowing multiple pods to access the same workspace simultaneously.
+The preferred way to configure storage is using a `ReadWriteMany` (RWX) Persistent Volume Claim. RWX allows the Kubernetes scheduler to place job pods on any node in the cluster, maximizing resource availability and flexibility.
 
 To migrate from RWO to RWX:
 1. Provision a new `ReadWriteMany` StorageClass if one is not available.
 2. Update your PVC definition to use `accessModes: [ReadWriteMany]`.
-3. Set `ACTIONS_RUNNER_USE_KUBE_SCHEDULER=true` to enable the scheduler-based node pinning (via affinity) instead of the default `nodeName` pinning.
+3. Remove the `ACTIONS_RUNNER_USE_KUBE_SCHEDULER` environment variable, as affinity is no longer required for pod placement.
 
 ### RWO Fallback (Affinity-based)
 If `ReadWriteMany` storage is not available, you can use `ReadWriteOnce` (RWO) storage. In this mode, all job pods must be scheduled on the same node as the runner pod that owns the PVC.
