@@ -8,7 +8,6 @@ import {
   getSecretName,
   getStepPodName,
   getVolumeClaimName,
-  JOB_CONTAINER_NAME,
   RunnerInstanceLabel
 } from '../hooks/constants'
 import {
@@ -362,7 +361,8 @@ export async function pruneSecrets(): Promise<void> {
 
   await Promise.all(
     secretList.items.map(
-      secret => secret.metadata?.name && deleteSecret(secret.metadata.name)
+      async secret =>
+        secret.metadata?.name && deleteSecret(secret.metadata.name)
     )
   )
 }
@@ -478,7 +478,9 @@ export async function prunePods(): Promise<void> {
   }
 
   await Promise.all(
-    podList.items.map(pod => pod.metadata?.name && deletePod(pod.metadata.name))
+    podList.items.map(
+      async pod => pod.metadata?.name && deletePod(pod.metadata.name)
+    )
   )
 }
 
@@ -528,7 +530,7 @@ export async function isPodContainerAlpine(
       podName,
       containerName
     )
-  } catch (err) {
+  } catch {
     isAlpine = false
   }
 
@@ -650,7 +652,7 @@ export function containerPorts(
   return ports
 }
 
-export async function getPodByName(name): Promise<k8s.V1Pod> {
+export async function getPodByName(name: string): Promise<k8s.V1Pod> {
   return await k8sApi.readNamespacedPod({
     name,
     namespace: namespace()
