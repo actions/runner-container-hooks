@@ -419,7 +419,7 @@ export async function execPodStep(
             await closeWebSocket()
             resolve(resp.code || 0)
           } else {
-            core.error(
+            core.debug(
               `[execPodStep] Failure: ${JSON.stringify({ message: resp?.message, details: resp?.details })}`
             )
             await closeWebSocket()
