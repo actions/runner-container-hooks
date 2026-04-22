@@ -21,16 +21,16 @@ For environments where RWX is unavailable or undesirable, we support a `ReadWrit
 ### Operational Guidance
 
 1. **Preferred Model (RWX):** Operators should configure the runner with a PVC supporting `ReadWriteMany`.
-2. **Fallback Model (RWO):** If using `ReadWriteOnce`, operators must enable the Kubernetes scheduler integration by setting `ACTIONS_RUNNER_USE_KUBE_SCHEDULER=true`.
-3. **Node Selection:** When scheduler integration is enabled, the hook applies a `requiredDuringSchedulingIgnoredDuringExecution` node affinity targeting the runner's current node (`kubernetes.io/hostname`).
+2. **Fallback Model (RWO):** If using `ReadWriteOnce`, the Kubernetes scheduler integration is enabled by default. Operators can optionally disable it by setting `ACTIONS_RUNNER_DISABLE_KUBE_SCHEDULER=true` (not recommended).
+3. **Node Selection:** By default, the hook applies a `requiredDuringSchedulingIgnoredDuringExecution` node affinity targeting the runner's current node (`kubernetes.io/hostname`).
 4. **Implementation Details:** 
    - The hook determines the node name via `getCurrentNodeName()` and applies affinity in `packages/k8s/src/k8s/index.ts` (lines 101, 165).
-   - The scheduler behavior is toggled by the `ACTIONS_RUNNER_USE_KUBE_SCHEDULER` environment variable, as defined in `packages/k8s/src/k8s/utils.ts` (line 16).
+   - The scheduler is enabled by default. Setting `ACTIONS_RUNNER_DISABLE_KUBE_SCHEDULER=true` disables it, as defined in `packages/k8s/src/k8s/utils.ts` (line 16).
    - The PVC claim name defaults to `${ACTIONS_RUNNER_POD_NAME}-work` unless overridden by `ACTIONS_RUNNER_CLAIM_NAME` (`packages/k8s/src/hooks/constants.ts`, lines 27-33).
 
 ### Non-Recommendations
 
-We explicitly do **not** recommend the use of `spec.nodeName` for operator-driven scheduling. While the hook uses `nodeName` as a legacy fallback when `ACTIONS_RUNNER_USE_KUBE_SCHEDULER` is not set to `true` (`packages/k8s/src/k8s/index.ts`, lines 103, 167), this bypasses the Kubernetes scheduler and can lead to scheduling failures or resource imbalances. Operators should always prefer the affinity-based approach for RWO volumes.
+We explicitly do **not** recommend the use of `spec.nodeName` for operator-driven scheduling. While the hook uses `nodeName` as a legacy fallback when `ACTIONS_RUNNER_DISABLE_KUBE_SCHEDULER` is set to `true` (`packages/k8s/src/k8s/index.ts`, lines 103, 167), this bypasses the Kubernetes scheduler and can lead to scheduling failures or resource imbalances. Operators should prefer the default affinity-based approach for RWO volumes.
 
 ## Alternatives
 
@@ -40,13 +40,13 @@ We explicitly do **not** recommend the use of `spec.nodeName` for operator-drive
 ## Consequences
 
 - **Flexibility:** RWX users benefit from the ability to schedule job pods on any node in the cluster, maximizing resource utilization.
-- **Node Coupling:** RWO users remain coupled to the node where the runner pod is running. The hook ensures job pods are scheduled on the same node via affinity to maintain workspace integrity.
-- **Configuration:** Operators must be aware of the `ACTIONS_RUNNER_USE_KUBE_SCHEDULER` toggle when using RWO. This toggle controls whether the hook uses `nodeName` (bypassing the scheduler) or node affinity (using the scheduler) to pin the pod to the runner's node. RWX configurations do not require this toggle for basic operation.
+- **Node Coupling:** RWO users remain coupled to the node where the runner pod is running. The hook ensures job pods are scheduled on the same node via affinity (enabled by default) to maintain workspace integrity.
+- **Configuration:** Operators using RWO can rely on the default affinity-based scheduling. Setting `ACTIONS_RUNNER_DISABLE_KUBE_SCHEDULER=true` will fall back to legacy `nodeName` pinning (not recommended). RWX configurations do not require any special configuration for basic operation.
 
 ## Migration Guidance
 
-Operators migrating from an RWO setup that relied on default `nodeName` behavior to a more robust affinity-based setup should:
-1. Ensure the runner pod has the `ACTIONS_RUNNER_USE_KUBE_SCHEDULER` environment variable set to `true`.
+Operators migrating from an RWO setup that relied on legacy `nodeName` behavior can continue by setting `ACTIONS_RUNNER_DISABLE_KUBE_SCHEDULER=true`, but should migrate to the default affinity-based scheduling for better scheduler integration:
+1. Remove the `ACTIONS_RUNNER_DISABLE_KUBE_SCHEDULER` environment variable to use the default affinity-based scheduling.
 2. Verify that the runner's ServiceAccount has the necessary permissions to list pods (to determine its own node).
 
 ## Non-Goals

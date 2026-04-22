@@ -3,7 +3,7 @@ import { cleanupJob } from '../src/hooks'
 import { prepareJob } from '../src/hooks/prepare-job'
 import { TestHelper } from './test-setup'
 import { getPodByName } from '../src/k8s'
-import { ENV_USE_KUBE_SCHEDULER } from '../src/k8s/utils'
+import { ENV_DISABLE_KUBE_SCHEDULER } from '../src/k8s/utils'
 
 jest.useRealTimers()
 
@@ -22,12 +22,10 @@ describe('RWO Affinity Behavior (Scheduler Mode)', () => {
   afterEach(async () => {
     await cleanupJob()
     await testHelper.cleanup()
-    delete process.env[ENV_USE_KUBE_SCHEDULER]
+    delete process.env[ENV_DISABLE_KUBE_SCHEDULER]
   })
 
-  it('should add nodeAffinity with hostname selector when scheduler mode is enabled', async () => {
-    process.env[ENV_USE_KUBE_SCHEDULER] = 'true'
-
+  it('should add nodeAffinity with hostname selector by default', async () => {
     await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
 
     const content = JSON.parse(
@@ -65,7 +63,7 @@ describe('RWO Affinity Behavior (Scheduler Mode)', () => {
   })
 
   it('should NOT add nodeAffinity when scheduler mode is disabled', async () => {
-    process.env[ENV_USE_KUBE_SCHEDULER] = 'false'
+    process.env[ENV_DISABLE_KUBE_SCHEDULER] = 'true'
 
     await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
 
@@ -82,9 +80,7 @@ describe('RWO Affinity Behavior (Scheduler Mode)', () => {
     expect(pod.spec?.nodeName).toBeDefined()
   })
 
-  it('should fail assertion if affinity block is missing when scheduler mode is enabled', async () => {
-    process.env[ENV_USE_KUBE_SCHEDULER] = 'true'
-
+  it('should fail assertion if affinity block is missing by default', async () => {
     await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
 
     const content = JSON.parse(
@@ -113,9 +109,7 @@ describe('RWO Affinity Behavior (Scheduler Mode)', () => {
     ).toBeGreaterThan(0)
   })
 
-  it('should use correct node name from runner pod in affinity values', async () => {
-    process.env[ENV_USE_KUBE_SCHEDULER] = 'true'
-
+  it('should use correct node name from runner pod in affinity values by default', async () => {
     const runnerPodName = process.env.ACTIONS_RUNNER_POD_NAME
 
     await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
