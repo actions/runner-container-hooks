@@ -27,21 +27,19 @@ export async function runContainerStep(
   }
 
   let secretName: string | undefined = undefined
-  if (stepContainer.environmentVariables) {
-    try {
-      const envs = JSON.parse(
-        JSON.stringify(stepContainer.environmentVariables)
-      )
-      envs['GITHUB_ACTIONS'] = 'true'
-      if (!('CI' in envs)) {
-        envs.CI = 'true'
-      }
-      secretName = await createSecretForEnvs(envs)
-    } catch (err) {
-      core.debug(`createSecretForEnvs failed: ${JSON.stringify(err)}`)
-      const message = (err as any)?.response?.body?.message || err
-      throw new Error(`failed to create script environment: ${message}`)
+  try {
+    const envs = JSON.parse(
+      JSON.stringify(stepContainer.environmentVariables ?? {})
+    )
+    envs['GITHUB_ACTIONS'] = 'true'
+    if (!('CI' in envs)) {
+      envs.CI = 'true'
     }
+    secretName = await createSecretForEnvs(envs)
+  } catch (err) {
+    core.debug(`createSecretForEnvs failed: ${JSON.stringify(err)}`)
+    const message = (err as any)?.response?.body?.message || err
+    throw new Error(`failed to create script environment: ${message}`)
   }
 
   const extension = readExtensionFromFile()
