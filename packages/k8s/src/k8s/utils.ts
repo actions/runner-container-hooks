@@ -91,9 +91,14 @@ export function containerVolumes(
           'Volume mounts outside of the work folder are not supported'
         )
       }
-      sourceVolumePath = userVolume.sourceVolumePath.slice(
+      const i = workspacePath.lastIndexOf('_work/')
+      const workspaceRelativePath = workspacePath.slice(i + '_work/'.length)
+      const sourceRelativePath = userVolume.sourceVolumePath.slice(
         workspacePath.length + 1
       )
+      sourceVolumePath = sourceRelativePath
+        ? path.posix.join(workspaceRelativePath, sourceRelativePath)
+        : workspaceRelativePath
     } else {
       sourceVolumePath = userVolume.sourceVolumePath
     }
@@ -397,5 +402,8 @@ function mergeLists<T>(base?: T[], from?: T[]): T[] {
 }
 
 export function fixArgs(args: string[]): string[] {
+  if (args.length >= 2 && args[0] === 'sh' && args[1] === '-c') {
+    return args
+  }
   return shlex.split(args.join(' '))
 }

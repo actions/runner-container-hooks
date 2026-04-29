@@ -1,28 +1,28 @@
-import {
-  isRWXTestEnabled,
-  getRWXStorageClass,
-  RWX_SKIP_MESSAGE
-} from './test-setup'
+import * as k8s from '@kubernetes/client-node'
+
+const kc = new k8s.KubeConfig()
+kc.loadFromDefault()
+const k8sApi = kc.makeApiClient(k8s.StorageV1Api)
 
 describe('RWX Test Contract Demo', () => {
-  const describeOrSkip = isRWXTestEnabled() ? describe : describe.skip
-
-  describeOrSkip('RWX volume tests', () => {
-    it('should use RWX storage class when enabled', () => {
-      const storageClass = getRWXStorageClass()
-      expect(storageClass).toBeDefined()
-      expect(typeof storageClass).toBe('string')
+  describe('RWX volume tests', () => {
+    it('should have at least one available storage class', async () => {
+      const list = await k8sApi.listStorageClass()
+      expect(list.items.length).toBeGreaterThan(0)
     })
 
-    it('should verify both env vars are required', () => {
-      expect(process.env.ACTIONS_RUNNER_K8S_TEST_ENABLE_RWX).toBe('true')
-      expect(
-        process.env.ACTIONS_RUNNER_K8S_TEST_RWX_STORAGE_CLASS
-      ).toBeDefined()
+    it('should have at least one default storage class in cluster', async () => {
+      const list = await k8sApi.listStorageClass()
+      const hasDefault = list.items.some(sc => {
+        const annotations = sc.metadata?.annotations || {}
+        return (
+          annotations['storageclass.kubernetes.io/is-default-class'] ===
+            'true' ||
+          annotations['storageclass.beta.kubernetes.io/is-default-class'] ===
+            'true'
+        )
+      })
+      expect(hasDefault).toBe(true)
     })
   })
-
-  if (!isRWXTestEnabled()) {
-    it(RWX_SKIP_MESSAGE, () => {})
-  }
 })

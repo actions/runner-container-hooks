@@ -42,7 +42,7 @@ describe('Run container step', () => {
           {
             name: JOB_CONTAINER_EXTENSION_NAME,
             command: ['sh'],
-            args: ['-c', 'sleep 10000']
+            args: ['-c', 'echo test']
           },
           {
             name: 'side-container',
@@ -61,6 +61,10 @@ describe('Run container step', () => {
     await expect(
       runContainerStep(runContainerStepData.args)
     ).resolves.not.toThrow()
+    delete process.env[ENV_HOOK_TEMPLATE_PATH]
+  })
+
+  afterEach(() => {
     delete process.env[ENV_HOOK_TEMPLATE_PATH]
   })
 
