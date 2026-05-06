@@ -3,7 +3,7 @@ import { cleanupJob } from '../src/hooks'
 import { prepareJob } from '../src/hooks/prepare-job'
 import { TestHelper } from './test-setup'
 import { getPodByName } from '../src/k8s'
-import { ENV_DISABLE_KUBE_SCHEDULER } from '../src/k8s/utils'
+import { ENV_HOOK_RWO } from '../src/k8s/utils'
 
 jest.useRealTimers()
 
@@ -11,7 +11,7 @@ let testHelper: TestHelper
 let prepareJobData: any
 let prepareJobOutputFilePath: string
 
-describe('RWO Affinity Behavior (Scheduler Mode)', () => {
+describe('RWO Affinity Behavior', () => {
   beforeEach(async () => {
     testHelper = new TestHelper()
     await testHelper.initialize()
@@ -22,10 +22,10 @@ describe('RWO Affinity Behavior (Scheduler Mode)', () => {
   afterEach(async () => {
     await cleanupJob()
     await testHelper.cleanup()
-    delete process.env[ENV_DISABLE_KUBE_SCHEDULER]
+    delete process.env[ENV_HOOK_RWO]
   })
 
-  it('should add nodeAffinity with hostname selector by default', async () => {
+  it('should add preferred nodeAffinity with hostname selector by default', async () => {
     await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
 
     const content = JSON.parse(
@@ -39,17 +39,17 @@ describe('RWO Affinity Behavior (Scheduler Mode)', () => {
 
     const nodeAffinity = pod.spec?.affinity?.nodeAffinity
     expect(
-      nodeAffinity?.requiredDuringSchedulingIgnoredDuringExecution
+      nodeAffinity?.preferredDuringSchedulingIgnoredDuringExecution
     ).toBeDefined()
 
-    const nodeSelectorTerms =
-      nodeAffinity?.requiredDuringSchedulingIgnoredDuringExecution
-        ?.nodeSelectorTerms
+    const preferred =
+      nodeAffinity?.preferredDuringSchedulingIgnoredDuringExecution
 
-    expect(nodeSelectorTerms).toBeDefined()
-    expect(nodeSelectorTerms?.length).toBeGreaterThan(0)
+    expect(preferred).toBeDefined()
+    expect(preferred?.length).toBeGreaterThan(0)
+    expect(preferred?.[0]?.weight).toBe(100)
 
-    const matchExpressions = nodeSelectorTerms?.[0].matchExpressions
+    const matchExpressions = preferred?.[0]?.preference?.matchExpressions
     expect(matchExpressions).toBeDefined()
     expect(matchExpressions?.length).toBeGreaterThan(0)
 
@@ -62,25 +62,9 @@ describe('RWO Affinity Behavior (Scheduler Mode)', () => {
     expect(hostnameExpression?.values?.[0]).toBeTruthy()
   })
 
-  it('should NOT add nodeAffinity when scheduler mode is disabled', async () => {
-    process.env[ENV_DISABLE_KUBE_SCHEDULER] = 'true'
+  it('should add required nodeAffinity when ACTIONS_RUNNER_HOOK_RWO=true', async () => {
+    process.env[ENV_HOOK_RWO] = 'true'
 
-    await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
-
-    const content = JSON.parse(
-      fs.readFileSync(prepareJobOutputFilePath).toString()
-    )
-
-    const pod = await getPodByName(content.state.jobPod)
-
-    if (pod.spec?.affinity) {
-      expect(pod.spec.affinity.nodeAffinity).toBeUndefined()
-    }
-
-    expect(pod.spec?.nodeName).toBeDefined()
-  })
-
-  it('should fail assertion if affinity block is missing by default', async () => {
     await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
 
     const content = JSON.parse(
@@ -95,21 +79,52 @@ describe('RWO Affinity Behavior (Scheduler Mode)', () => {
       pod.spec?.affinity?.nodeAffinity
         ?.requiredDuringSchedulingIgnoredDuringExecution
     ).toBeDefined()
-
-    const nodeSelectorTerms =
+    expect(
       pod.spec?.affinity?.nodeAffinity
-        ?.requiredDuringSchedulingIgnoredDuringExecution?.nodeSelectorTerms
+        ?.preferredDuringSchedulingIgnoredDuringExecution
+    ).toBeUndefined()
 
-    expect(nodeSelectorTerms?.[0]?.matchExpressions?.[0]?.key).toBe(
+    const requiredValues =
+      pod.spec?.affinity?.nodeAffinity
+        ?.requiredDuringSchedulingIgnoredDuringExecution?.nodeSelectorTerms?.[0]
+        ?.matchExpressions?.[0]?.values
+
+    expect(requiredValues).toBeDefined()
+    expect(requiredValues?.length).toBeGreaterThan(0)
+  })
+
+  it('should not require node affinity by default', async () => {
+    await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+
+    const content = JSON.parse(
+      fs.readFileSync(prepareJobOutputFilePath).toString()
+    )
+
+    const pod = await getPodByName(content.state.jobPod)
+
+    expect(pod.spec?.affinity).toBeDefined()
+    expect(pod.spec?.affinity?.nodeAffinity).toBeDefined()
+    expect(
+      pod.spec?.affinity?.nodeAffinity
+        ?.requiredDuringSchedulingIgnoredDuringExecution
+    ).toBeUndefined()
+
+    const preferred =
+      pod.spec?.affinity?.nodeAffinity
+        ?.preferredDuringSchedulingIgnoredDuringExecution
+
+    expect(preferred?.[0]?.preference?.matchExpressions?.[0]?.key).toBe(
       'kubernetes.io/hostname'
     )
-    expect(nodeSelectorTerms?.[0]?.matchExpressions?.[0]?.operator).toBe('In')
+    expect(preferred?.[0]?.preference?.matchExpressions?.[0]?.operator).toBe(
+      'In'
+    )
     expect(
-      nodeSelectorTerms?.[0]?.matchExpressions?.[0]?.values?.length
+      preferred?.[0]?.preference?.matchExpressions?.[0]?.values?.length
     ).toBeGreaterThan(0)
   })
 
-  it('should use correct node name from runner pod in affinity values by default', async () => {
+  it('should use correct runner node name in preferred affinity values by default', async () => {
     const runnerPodName = process.env.ACTIONS_RUNNER_POD_NAME
 
     await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
@@ -124,7 +139,7 @@ describe('RWO Affinity Behavior (Scheduler Mode)', () => {
 
     const affinityValues =
       jobPod.spec?.affinity?.nodeAffinity
-        ?.requiredDuringSchedulingIgnoredDuringExecution?.nodeSelectorTerms?.[0]
+        ?.preferredDuringSchedulingIgnoredDuringExecution?.[0]?.preference
         ?.matchExpressions?.[0]?.values
 
     expect(affinityValues).toBeDefined()

@@ -14,7 +14,7 @@ import {
   PodPhase,
   mergePodSpecWithOptions,
   mergeObjectMeta,
-  useKubeScheduler,
+  useRwoRequiredAffinity,
   fixArgs
 } from './utils'
 
@@ -96,11 +96,7 @@ export async function createPod(
   appPod.spec.restartPolicy = 'Never'
 
   const nodeName = await getCurrentNodeName()
-  if (useKubeScheduler()) {
-    appPod.spec.affinity = await getPodAffinity(nodeName)
-  } else {
-    appPod.spec.nodeName = nodeName
-  }
+  appPod.spec.affinity = await getPodAffinity(nodeName, useRwoRequiredAffinity())
   const claimName = getVolumeClaimName()
   appPod.spec.volumes = [
     {
@@ -160,11 +156,10 @@ export async function createJob(
   job.spec.template.spec.restartPolicy = 'Never'
 
   const nodeName = await getCurrentNodeName()
-  if (useKubeScheduler()) {
-    job.spec.template.spec.affinity = await getPodAffinity(nodeName)
-  } else {
-    job.spec.template.spec.nodeName = nodeName
-  }
+  job.spec.template.spec.affinity = await getPodAffinity(
+    nodeName,
+    useRwoRequiredAffinity()
+  )
 
   const claimName = getVolumeClaimName()
   job.spec.template.spec.volumes = [
@@ -564,14 +559,35 @@ async function getCurrentNodeName(): Promise<string> {
   return nodeName
 }
 
-async function getPodAffinity(nodeName: string): Promise<k8s.V1Affinity> {
+async function getPodAffinity(
+  nodeName: string,
+  requiredDuringScheduling: boolean
+): Promise<k8s.V1Affinity> {
   const affinity = new k8s.V1Affinity()
   affinity.nodeAffinity = new k8s.V1NodeAffinity()
-  affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution =
-    new k8s.V1NodeSelector()
-  affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms =
-    [
-      {
+
+  if (requiredDuringScheduling) {
+    affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution =
+      new k8s.V1NodeSelector()
+    affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms =
+      [
+        {
+          matchExpressions: [
+            {
+              key: 'kubernetes.io/hostname',
+              operator: 'In',
+              values: [nodeName]
+            }
+          ]
+        }
+      ]
+    return affinity
+  }
+
+  affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution = [
+    {
+      weight: 100,
+      preference: {
         matchExpressions: [
           {
             key: 'kubernetes.io/hostname',
@@ -580,7 +596,9 @@ async function getPodAffinity(nodeName: string): Promise<k8s.V1Affinity> {
           }
         ]
       }
-    ]
+    }
+  ]
+
   return affinity
 }
 
