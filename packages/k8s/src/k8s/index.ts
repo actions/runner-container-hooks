@@ -96,7 +96,10 @@ export async function createPod(
   appPod.spec.restartPolicy = 'Never'
 
   const nodeName = await getCurrentNodeName()
-  appPod.spec.affinity = await getPodAffinity(nodeName, useRwoRequiredAffinity())
+  appPod.spec.affinity = await getPodAffinity(
+    nodeName,
+    useRwoRequiredAffinity()
+  )
   const claimName = getVolumeClaimName()
   appPod.spec.volumes = [
     {

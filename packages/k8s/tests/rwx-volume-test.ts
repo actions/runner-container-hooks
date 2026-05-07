@@ -83,7 +83,9 @@ describe('RWX Volume Tests', () => {
         gracePeriodSeconds: 0
       })
       .catch(() => undefined)
-    await k8sApi.deletePersistentVolume({ name: rwxPvName }).catch(() => undefined)
+    await k8sApi
+      .deletePersistentVolume({ name: rwxPvName })
+      .catch(() => undefined)
     await k8sStorageApi
       .deleteStorageClass({ name: rwxStorageClassName })
       .catch(() => undefined)
