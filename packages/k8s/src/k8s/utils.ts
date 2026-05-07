@@ -113,28 +113,6 @@ export function containerVolumes(
   return mounts
 }
 
-export function prepareJobScript(userVolumeMounts: Mount[]): {
-  containerPath: string
-  runnerPath: string
-} {
-  let mountDirs = userVolumeMounts.map(m => m.targetVolumePath).join(' ')
-
-  const content = `#!/bin/sh -l
-set -e
-cp -R /__w/_temp/_github_home /github/home
-cp -R /__w/_temp/_github_workflow /github/workflow
-mkdir -p ${mountDirs}
-`
-
-  const filename = `${uuidv4()}.sh`
-  const entryPointPath = `${process.env.RUNNER_TEMP}/${filename}`
-  fs.writeFileSync(entryPointPath, content)
-  return {
-    containerPath: `/__w/_temp/${filename}`,
-    runnerPath: entryPointPath
-  }
-}
-
 export function writeEntryPointScript(
   workingDirectory: string,
   entryPoint: string,
@@ -154,41 +132,6 @@ export function writeEntryPointScript(
   const content = `#!/bin/sh -l
 ${exportPath}
 cd ${workingDirectory} && \\
-exec ${environmentPrefix} ${entryPoint} ${
-    entryPointArgs?.length ? entryPointArgs.join(' ') : ''
-  }
-`
-  const filename = `${uuidv4()}.sh`
-  const entryPointPath = `${process.env.RUNNER_TEMP}/${filename}`
-  fs.writeFileSync(entryPointPath, content)
-  return {
-    containerPath: `/__w/_temp/${filename}`,
-    runnerPath: entryPointPath
-  }
-}
-
-export function writeRunScript(
-  workingDirectory: string,
-  entryPoint: string,
-  entryPointArgs?: string[],
-  prependPath?: string[],
-  environmentVariables?: { [key: string]: string }
-): { containerPath: string; runnerPath: string } {
-  let exportPath = ''
-  if (prependPath?.length) {
-    // TODO: remove compatibility with typeof prependPath === 'string' as we bump to next major version, the hooks will lose PrependPath compat with runners 2.293.0 and older
-    const prepend =
-      typeof prependPath === 'string' ? prependPath : prependPath.join(':')
-    exportPath = `export PATH=${prepend}:$PATH`
-  }
-
-  let environmentPrefix = scriptEnv(environmentVariables)
-
-  const content = `#!/bin/sh -l
-set -e
-rm "$0" # remove script after running
-${exportPath}
-cd ${workingDirectory} && \
 exec ${environmentPrefix} ${entryPoint} ${
     entryPointArgs?.length ? entryPointArgs.join(' ') : ''
   }

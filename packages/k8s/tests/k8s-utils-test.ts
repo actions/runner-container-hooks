@@ -2,7 +2,6 @@
 import { containerPorts } from '../src/k8s'
 import {
   generateContainerName,
-  writeRunScript,
   mergePodSpecWithOptions,
   mergeContainerWithOptions,
   readExtensionFromFile,
@@ -14,113 +13,6 @@ import { TestHelper } from './test-setup'
 let testHelper: TestHelper
 
 describe('k8s utils', () => {
-  describe('write entrypoint', () => {
-    beforeEach(async () => {
-      testHelper = new TestHelper()
-      await testHelper.initialize()
-    })
-
-    afterEach(async () => {
-      await testHelper.cleanup()
-    })
-
-    it('should not throw', () => {
-      expect(() =>
-        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
-          SOME_ENV: 'SOME_VALUE'
-        })
-      ).not.toThrow()
-    })
-
-    it('should throw if RUNNER_TEMP is not set', () => {
-      delete process.env.RUNNER_TEMP
-      expect(() =>
-        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
-          SOME_ENV: 'SOME_VALUE'
-        })
-      ).toThrow()
-    })
-
-    it('should throw if environment variable name contains double quote', () => {
-      expect(() =>
-        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
-          'SOME"_ENV': 'SOME_VALUE'
-        })
-      ).toThrow()
-    })
-
-    it('should throw if environment variable name contains =', () => {
-      expect(() =>
-        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
-          'SOME=ENV': 'SOME_VALUE'
-        })
-      ).toThrow()
-    })
-
-    it('should throw if environment variable name contains single quote', () => {
-      expect(() =>
-        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
-          "SOME'_ENV": 'SOME_VALUE'
-        })
-      ).toThrow()
-    })
-
-    it('should throw if environment variable name contains dollar', () => {
-      expect(() =>
-        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
-          SOME_$_ENV: 'SOME_VALUE'
-        })
-      ).toThrow()
-    })
-
-    it('should escape double quote, dollar and backslash in environment variable values', () => {
-      const { runnerPath } = writeRunScript(
-        '/test',
-        'sh',
-        ['-e', 'script.sh'],
-        ['/prepend/path'],
-        {
-          DQUOTE: '"',
-          BACK_SLASH: '\\',
-          DOLLAR: '$'
-        }
-      )
-      expect(fs.existsSync(runnerPath)).toBe(true)
-      const script = fs.readFileSync(runnerPath, 'utf8')
-      expect(script).toContain('"DQUOTE=\\"')
-      expect(script).toContain('"BACK_SLASH=\\\\"')
-      expect(script).toContain('"DOLLAR=\\$"')
-    })
-
-    it('should return object with containerPath and runnerPath', () => {
-      const { containerPath, runnerPath } = writeRunScript(
-        '/test',
-        'sh',
-        ['-e', 'script.sh'],
-        ['/prepend/path'],
-        {
-          SOME_ENV: 'SOME_VALUE'
-        }
-      )
-      expect(containerPath).toMatch(/\/__w\/_temp\/.*\.sh/)
-      const re = new RegExp(`${process.env.RUNNER_TEMP}/.*\\.sh`)
-      expect(runnerPath).toMatch(re)
-    })
-
-    it('should write entrypoint path and the file should exist', () => {
-      const { runnerPath } = writeRunScript(
-        '/test',
-        'sh',
-        ['-e', 'script.sh'],
-        ['/prepend/path'],
-        {
-          SOME_ENV: 'SOME_VALUE'
-        }
-      )
-      expect(fs.existsSync(runnerPath)).toBe(true)
-    })
-  })
-
   describe('container volumes', () => {
     beforeEach(async () => {
       testHelper = new TestHelper()
