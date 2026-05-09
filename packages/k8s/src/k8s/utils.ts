@@ -344,6 +344,9 @@ function mergeLists<T>(base?: T[], from?: T[]): T[] {
 }
 
 export function fixArgs(args: string[]): string[] {
+  if (args.length >= 3 && args[0] === 'sh' && args[1] === '-c') {
+    return [args[0], args[1], args.slice(2).join(' ')]
+  }
   if (args.length >= 2 && args[0] === 'sh' && args[1] === '-c') {
     return args
   }
