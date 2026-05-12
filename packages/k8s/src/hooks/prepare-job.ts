@@ -1,4 +1,5 @@
 import * as core from '@actions/core'
+import * as io from '@actions/io'
 import * as k8s from '@kubernetes/client-node'
 import {
   JobContainerInfo,
@@ -7,33 +8,26 @@ import {
   writeToResponseFile,
   ServiceContainerInfo
 } from 'hooklib'
+import path from 'path'
 import {
   containerPorts,
-  createJobPod,
+  createPod,
   isPodContainerAlpine,
   prunePods,
   waitForPodPhases,
-  getPrepareJobTimeoutSeconds,
-  execCpToPod,
-  execPodStep
+  getPrepareJobTimeoutSeconds
 } from '../k8s'
 import {
-  CONTAINER_VOLUMES,
+  containerVolumes,
   DEFAULT_CONTAINER_ENTRY_POINT,
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
   generateContainerName,
   mergeContainerWithOptions,
   readExtensionFromFile,
   PodPhase,
-  fixArgs,
-  prepareJobScript
+  fixArgs
 } from '../k8s/utils'
-import {
-  CONTAINER_EXTENSION_PREFIX,
-  getJobPodName,
-  JOB_CONTAINER_NAME
-} from './constants'
-import { dirname } from 'path'
+import { CONTAINER_EXTENSION_PREFIX, JOB_CONTAINER_NAME } from './constants'
 
 export async function prepareJob(
   args: PrepareJobArgs,
@@ -46,6 +40,7 @@ export async function prepareJob(
   await prunePods()
 
   const extension = readExtensionFromFile()
+  await copyExternalsToRoot()
 
   let container: k8s.V1Container | undefined = undefined
   if (args.container?.image) {
@@ -75,8 +70,7 @@ export async function prepareJob(
 
   let createdPod: k8s.V1Pod | undefined = undefined
   try {
-    createdPod = await createJobPod(
-      getJobPodName(),
+    createdPod = await createPod(
       container,
       services,
       args.container.registry,
@@ -96,13 +90,6 @@ export async function prepareJob(
     `Job pod created, waiting for it to come online ${createdPod?.metadata?.name}`
   )
 
-  const runnerWorkspace = dirname(process.env.RUNNER_WORKSPACE as string)
-
-  let prepareScript: { containerPath: string; runnerPath: string } | undefined
-  if (args.container?.userMountVolumes?.length) {
-    prepareScript = prepareJobScript(args.container.userMountVolumes || [])
-  }
-
   try {
     await waitForPodPhases(
       createdPod.metadata.name,
@@ -113,28 +100,6 @@ export async function prepareJob(
   } catch (err) {
     await prunePods()
     throw new Error(`pod failed to come online with error: ${err}`)
-  }
-
-  await execCpToPod(createdPod.metadata.name, runnerWorkspace, '/__w')
-
-  if (prepareScript) {
-    await execPodStep(
-      ['sh', '-e', prepareScript.containerPath],
-      createdPod.metadata.name,
-      JOB_CONTAINER_NAME
-    )
-
-    const promises: Promise<void>[] = []
-    for (const vol of args?.container?.userMountVolumes || []) {
-      promises.push(
-        execCpToPod(
-          createdPod.metadata.name,
-          vol.sourceVolumePath,
-          vol.targetVolumePath
-        )
-      )
-    }
-    await Promise.all(promises)
   }
 
   core.debug('Job pod is ready for traffic')
@@ -180,8 +145,10 @@ function generateResponseFile(
     const mainContainerContextPorts: ContextPorts = {}
     if (mainContainer?.ports) {
       for (const port of mainContainer.ports) {
-        mainContainerContextPorts[port.containerPort] =
-          mainContainerContextPorts.hostPort
+        if (port.containerPort && port.hostPort) {
+          mainContainerContextPorts[port.containerPort.toString()] =
+            port.hostPort.toString()
+        }
       }
     }
 
@@ -217,6 +184,17 @@ function generateResponseFile(
   writeToResponseFile(responseFile, JSON.stringify(response))
 }
 
+async function copyExternalsToRoot(): Promise<void> {
+  const workspace = process.env['RUNNER_WORKSPACE']
+  if (workspace) {
+    await io.cp(
+      path.join(workspace, '../../externals'),
+      path.join(workspace, '../externals'),
+      { force: true, recursive: true, copySourceDirectory: false }
+    )
+  }
+}
+
 export function createContainerSpec(
   container: JobContainerInfo | ServiceContainerInfo,
   name: string,
@@ -250,7 +228,7 @@ export function createContainerSpec(
     container['environmentVariables'] || {}
   )) {
     if (value && key !== 'HOME') {
-      podContainer.env.push({ name: key, value })
+      podContainer.env.push({ name: key, value: value })
     }
   }
 
@@ -266,7 +244,10 @@ export function createContainerSpec(
     })
   }
 
-  podContainer.volumeMounts = CONTAINER_VOLUMES
+  podContainer.volumeMounts = containerVolumes(
+    container['userMountVolumes'],
+    jobContainer
+  )
 
   if (!extension) {
     return podContainer

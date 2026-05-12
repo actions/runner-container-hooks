@@ -1,29 +1,22 @@
 import * as core from '@actions/core'
-import * as path from 'path'
-import { spawn } from 'child_process'
 import * as k8s from '@kubernetes/client-node'
-import tar from 'tar-fs'
 import * as stream from 'stream'
-import { WritableStreamBuffer } from 'stream-buffers'
-import { createHash } from 'crypto'
 import type { ContainerInfo, Registry } from 'hooklib'
 import {
+  getJobPodName,
+  getRunnerPodName,
   getSecretName,
-  JOB_CONTAINER_NAME,
+  getStepPodName,
+  getVolumeClaimName,
   RunnerInstanceLabel
 } from '../hooks/constants'
 import {
   PodPhase,
   mergePodSpecWithOptions,
   mergeObjectMeta,
-  fixArgs,
-  listDirAllCommand,
-  sleep,
-  EXTERNALS_VOLUME_NAME,
-  GITHUB_VOLUME_NAME,
-  WORK_VOLUME
+  useRwoRequiredAffinity,
+  fixArgs
 } from './utils'
-import * as shlex from 'shlex'
 
 const kc = new k8s.KubeConfig()
 
@@ -34,6 +27,8 @@ const k8sBatchV1Api = kc.makeApiClient(k8s.BatchV1Api)
 const k8sAuthorizationV1Api = kc.makeApiClient(k8s.AuthorizationV1Api)
 
 const DEFAULT_WAIT_FOR_POD_TIME_SECONDS = 10 * 60 // 10 min
+
+export const POD_VOLUME_NAME = 'work'
 
 export const requiredPermissions = [
   {
@@ -55,6 +50,12 @@ export const requiredPermissions = [
     subresource: 'log'
   },
   {
+    group: 'batch',
+    verbs: ['get', 'list', 'create', 'delete'],
+    resource: 'jobs',
+    subresource: ''
+  },
+  {
     group: '',
     verbs: ['create', 'delete', 'get', 'list'],
     resource: 'secrets',
@@ -62,8 +63,7 @@ export const requiredPermissions = [
   }
 ]
 
-export async function createJobPod(
-  name: string,
+export async function createPod(
   jobContainer?: k8s.V1Container,
   services?: k8s.V1Container[],
   registry?: Registry,
@@ -83,7 +83,7 @@ export async function createJobPod(
   appPod.kind = 'Pod'
 
   appPod.metadata = new k8s.V1ObjectMeta()
-  appPod.metadata.name = name
+  appPod.metadata.name = getJobPodName()
 
   const instanceLabel = new RunnerInstanceLabel()
   appPod.metadata.labels = {
@@ -93,68 +93,18 @@ export async function createJobPod(
 
   appPod.spec = new k8s.V1PodSpec()
   appPod.spec.containers = containers
-  appPod.spec.securityContext = {
-    fsGroup: 1001
-  }
-
-  // Extract working directory from GITHUB_WORKSPACE
-  // GITHUB_WORKSPACE is like /__w/repo-name/repo-name
-  const githubWorkspace = process.env.GITHUB_WORKSPACE
-  const workingDirPath = githubWorkspace?.split('/').slice(-2).join('/') ?? ''
-
-  const initCommands = [
-    'mkdir -p /mnt/externals',
-    'mkdir -p /mnt/work',
-    'mkdir -p /mnt/github',
-    'mv /home/runner/externals/* /mnt/externals/'
-  ]
-
-  if (workingDirPath) {
-    initCommands.push(`mkdir -p /mnt/work/${workingDirPath}`)
-  }
-
-  appPod.spec.initContainers = [
-    {
-      name: 'fs-init',
-      image:
-        process.env.ACTIONS_RUNNER_IMAGE ||
-        'ghcr.io/actions/actions-runner:latest',
-      command: ['sh', '-c', initCommands.join(' && ')],
-      securityContext: {
-        runAsGroup: 1001,
-        runAsUser: 1001
-      },
-      volumeMounts: [
-        {
-          name: EXTERNALS_VOLUME_NAME,
-          mountPath: '/mnt/externals'
-        },
-        {
-          name: WORK_VOLUME,
-          mountPath: '/mnt/work'
-        },
-        {
-          name: GITHUB_VOLUME_NAME,
-          mountPath: '/mnt/github'
-        }
-      ]
-    }
-  ]
-
   appPod.spec.restartPolicy = 'Never'
 
+  const nodeName = await getCurrentNodeName()
+  appPod.spec.affinity = await getPodAffinity(
+    nodeName,
+    useRwoRequiredAffinity()
+  )
+  const claimName = getVolumeClaimName()
   appPod.spec.volumes = [
     {
-      name: EXTERNALS_VOLUME_NAME,
-      emptyDir: {}
-    },
-    {
-      name: GITHUB_VOLUME_NAME,
-      emptyDir: {}
-    },
-    {
-      name: WORK_VOLUME,
-      emptyDir: {}
+      name: POD_VOLUME_NAME,
+      persistentVolumeClaim: { claimName }
     }
   ]
 
@@ -182,62 +132,89 @@ export async function createJobPod(
   })
 }
 
-export async function createContainerStepPod(
-  name: string,
+export async function createJob(
   container: k8s.V1Container,
   extension?: k8s.V1PodTemplateSpec
-): Promise<k8s.V1Pod> {
-  const appPod = new k8s.V1Pod()
+): Promise<k8s.V1Job> {
+  const runnerInstanceLabel = new RunnerInstanceLabel()
 
-  appPod.apiVersion = 'v1'
-  appPod.kind = 'Pod'
+  const job = new k8s.V1Job()
+  job.apiVersion = 'batch/v1'
+  job.kind = 'Job'
+  job.metadata = new k8s.V1ObjectMeta()
+  job.metadata.name = getStepPodName()
+  job.metadata.labels = { [runnerInstanceLabel.key]: runnerInstanceLabel.value }
+  job.metadata.annotations = {}
 
-  appPod.metadata = new k8s.V1ObjectMeta()
-  appPod.metadata.name = name
+  job.spec = new k8s.V1JobSpec()
+  job.spec.ttlSecondsAfterFinished = 300
+  job.spec.backoffLimit = 0
+  job.spec.template = new k8s.V1PodTemplateSpec()
 
-  const instanceLabel = new RunnerInstanceLabel()
-  appPod.metadata.labels = {
-    [instanceLabel.key]: instanceLabel.value
-  }
-  appPod.metadata.annotations = {}
+  job.spec.template.spec = new k8s.V1PodSpec()
+  job.spec.template.metadata = new k8s.V1ObjectMeta()
+  job.spec.template.metadata.labels = {}
+  job.spec.template.metadata.annotations = {}
+  job.spec.template.spec.containers = [container]
+  job.spec.template.spec.restartPolicy = 'Never'
 
-  appPod.spec = new k8s.V1PodSpec()
-  appPod.spec.containers = [container]
+  const nodeName = await getCurrentNodeName()
+  job.spec.template.spec.affinity = await getPodAffinity(
+    nodeName,
+    useRwoRequiredAffinity()
+  )
 
-  appPod.spec.restartPolicy = 'Never'
-
-  appPod.spec.volumes = [
+  const claimName = getVolumeClaimName()
+  job.spec.template.spec.volumes = [
     {
-      name: EXTERNALS_VOLUME_NAME,
-      emptyDir: {}
-    },
-    {
-      name: GITHUB_VOLUME_NAME,
-      emptyDir: {}
-    },
-    {
-      name: WORK_VOLUME,
-      emptyDir: {}
+      name: POD_VOLUME_NAME,
+      persistentVolumeClaim: { claimName }
     }
   ]
 
-  if (extension?.metadata) {
-    mergeObjectMeta(appPod, extension.metadata)
+  if (extension) {
+    if (extension.metadata) {
+      mergeObjectMeta(job, extension.metadata)
+      mergeObjectMeta(job.spec.template, extension.metadata)
+    }
+    if (extension.spec) {
+      mergePodSpecWithOptions(job.spec.template.spec, extension.spec)
+    }
   }
 
-  if (extension?.spec) {
-    mergePodSpecWithOptions(appPod.spec, extension.spec)
-  }
-
-  return await k8sApi.createNamespacedPod({
+  return await k8sBatchV1Api.createNamespacedJob({
     namespace: namespace(),
-    body: appPod
+    body: job
   })
 }
 
-export async function deletePod(name: string): Promise<void> {
+export async function getContainerJobPodName(jobName: string): Promise<string> {
+  const selector = `job-name=${jobName}`
+  const backOffManager = new BackOffManager(60)
+  while (true) {
+    const podList = await k8sApi.listNamespacedPod({
+      namespace: namespace(),
+      labelSelector: selector,
+      limit: 1
+    })
+
+    if (!podList.items?.length) {
+      await backOffManager.backOff()
+      continue
+    }
+
+    if (!podList.items[0].metadata?.name) {
+      throw new Error(
+        `Failed to determine the name of the pod for job ${jobName}`
+      )
+    }
+    return podList.items[0].metadata.name
+  }
+}
+
+export async function deletePod(podName: string): Promise<void> {
   await k8sApi.deleteNamespacedPod({
-    name,
+    name: podName,
     namespace: namespace(),
     gracePeriodSeconds: 0
   })
@@ -264,7 +241,6 @@ export async function execPodStep(
         stdin ?? null,
         false /* tty */,
         resp => {
-          core.debug(`execPodStep response: ${JSON.stringify(resp)}`)
           if (resp.status === 'Success') {
             resolve(resp.code || 0)
           } else {
@@ -280,290 +256,6 @@ export async function execPodStep(
       )
       .catch(e => reject(e))
   })
-}
-
-export async function execCalculateOutputHashSorted(
-  podName: string,
-  containerName: string,
-  command: string[]
-): Promise<string> {
-  const exec = new k8s.Exec(kc)
-
-  let output = ''
-  const outputWriter = new stream.Writable({
-    write(chunk, _enc, cb) {
-      try {
-        output += chunk.toString('utf8')
-        cb()
-      } catch (e) {
-        cb(e as Error)
-      }
-    }
-  })
-
-  await new Promise<void>((resolve, reject) => {
-    exec
-      .exec(
-        namespace(),
-        podName,
-        containerName,
-        command,
-        outputWriter, // capture stdout
-        process.stderr,
-        null,
-        false /* tty */,
-        resp => {
-          core.debug(`internalExecOutput response: ${JSON.stringify(resp)}`)
-          if (resp.status === 'Success') {
-            resolve()
-          } else {
-            core.debug(
-              JSON.stringify({
-                message: resp?.message,
-                details: resp?.details
-              })
-            )
-            reject(new Error(resp?.message || 'internalExecOutput failed'))
-          }
-        }
-      )
-      .catch(e => reject(e))
-  })
-
-  outputWriter.end()
-
-  // Sort lines for consistent ordering across platforms
-  const sortedOutput =
-    output
-      .split('\n')
-      .filter(line => line.length > 0)
-      .sort()
-      .join('\n') + '\n'
-
-  const hash = createHash('sha256')
-  hash.update(sortedOutput)
-  return hash.digest('hex')
-}
-
-export async function localCalculateOutputHashSorted(
-  commands: string[]
-): Promise<string> {
-  return await new Promise<string>((resolve, reject) => {
-    const child = spawn(commands[0], commands.slice(1), {
-      stdio: ['ignore', 'pipe', 'ignore']
-    })
-
-    let output = ''
-    child.stdout.on('data', chunk => {
-      output += chunk.toString('utf8')
-    })
-    child.on('error', reject)
-    child.on('close', (code: number) => {
-      if (code === 0) {
-        // Sort lines for consistent ordering across distributions/platforms
-        const sortedOutput =
-          output
-            .split('\n')
-            .filter(line => line.length > 0)
-            .sort()
-            .join('\n') + '\n'
-
-        const hash = createHash('sha256')
-        hash.update(sortedOutput)
-        resolve(hash.digest('hex'))
-      } else {
-        reject(new Error(`child process exited with code ${code}`))
-      }
-    })
-  })
-}
-
-export async function execCpToPod(
-  podName: string,
-  runnerPath: string,
-  containerPath: string
-): Promise<void> {
-  core.debug(`Copying ${runnerPath} to pod ${podName} at ${containerPath}`)
-
-  let attempt = 0
-  while (true) {
-    try {
-      const exec = new k8s.Exec(kc)
-      // Use tar to extract with --no-same-owner to avoid ownership issues.
-      // Then use find to fix permissions. The -m flag helps but we also need to fix permissions after.
-      const command = [
-        'sh',
-        '-c',
-        `tar xf - --no-same-owner -C ${shlex.quote(containerPath)} 2>/dev/null; ` +
-          `find ${shlex.quote(containerPath)} -type f -exec chmod u+rw {} \\; 2>/dev/null; ` +
-          `find ${shlex.quote(containerPath)} -type d -exec chmod u+rwx {} \\; 2>/dev/null`
-      ]
-      const readStream = tar.pack(runnerPath)
-      const errStream = new WritableStreamBuffer()
-      await new Promise((resolve, reject) => {
-        exec
-          .exec(
-            namespace(),
-            podName,
-            JOB_CONTAINER_NAME,
-            command,
-            null,
-            errStream,
-            readStream,
-            false,
-            async status => {
-              if (errStream.size()) {
-                reject(
-                  new Error(
-                    `Error from execCpToPod - status: ${status.status}, details: \n ${errStream.getContentsAsString()}`
-                  )
-                )
-              }
-              resolve(status)
-            }
-          )
-          .catch(e => reject(e))
-      })
-      break
-    } catch (error) {
-      core.debug(`cpToPod: Attempt ${attempt + 1} failed: ${error}`)
-      attempt++
-      if (attempt >= 30) {
-        throw new Error(
-          `cpToPod failed after ${attempt} attempts: ${JSON.stringify(error)}`
-        )
-      }
-      await sleep(1000)
-    }
-  }
-
-  let attempts = 15
-  const delay = 1000
-  for (let i = 0; i < attempts; i++) {
-    try {
-      const want = await localCalculateOutputHashSorted([
-        'sh',
-        '-c',
-        listDirAllCommand(runnerPath)
-      ])
-
-      const got = await execCalculateOutputHashSorted(
-        podName,
-        JOB_CONTAINER_NAME,
-        ['sh', '-c', listDirAllCommand(containerPath)]
-      )
-
-      if (got !== want) {
-        core.debug(
-          `The hash of the directory does not match the expected value; want='${want}' got='${got}'`
-        )
-        await sleep(delay)
-        continue
-      }
-
-      break
-    } catch (error) {
-      core.debug(`Attempt ${i + 1} failed: ${error}`)
-      await sleep(delay)
-    }
-  }
-}
-
-export async function execCpFromPod(
-  podName: string,
-  containerPath: string,
-  parentRunnerPath: string
-): Promise<void> {
-  const targetRunnerPath = `${parentRunnerPath}/${path.basename(containerPath)}`
-  core.debug(
-    `Copying from pod ${podName} ${containerPath} to ${targetRunnerPath}`
-  )
-
-  let attempt = 0
-  while (true) {
-    try {
-      // make temporary directory
-      const exec = new k8s.Exec(kc)
-      const containerPaths = containerPath.split('/')
-      const dirname = containerPaths.pop() as string
-      const command = [
-        'tar',
-        'cf',
-        '-',
-        '-C',
-        containerPaths.join('/') || '/',
-        dirname
-      ]
-      const writerStream = tar.extract(parentRunnerPath)
-      const errStream = new WritableStreamBuffer()
-
-      await new Promise((resolve, reject) => {
-        exec
-          .exec(
-            namespace(),
-            podName,
-            JOB_CONTAINER_NAME,
-            command,
-            writerStream,
-            errStream,
-            null,
-            false,
-            async status => {
-              if (errStream.size()) {
-                reject(
-                  new Error(
-                    `Error from cpFromPod - details: \n ${errStream.getContentsAsString()}`
-                  )
-                )
-              }
-              resolve(status)
-            }
-          )
-          .catch(e => reject(e))
-      })
-      break
-    } catch (error) {
-      core.debug(`Attempt ${attempt + 1} failed: ${error}`)
-      attempt++
-      if (attempt >= 30) {
-        throw new Error(
-          `execCpFromPod failed after ${attempt} attempts: ${JSON.stringify(error)}`
-        )
-      }
-      await sleep(1000)
-    }
-  }
-
-  let attempts = 15
-  const delay = 1000
-  for (let i = 0; i < attempts; i++) {
-    try {
-      const want = await execCalculateOutputHashSorted(
-        podName,
-        JOB_CONTAINER_NAME,
-        ['sh', '-c', listDirAllCommand(containerPath)]
-      )
-
-      const got = await localCalculateOutputHashSorted([
-        'sh',
-        '-c',
-        listDirAllCommand(targetRunnerPath)
-      ])
-
-      if (got !== want) {
-        core.debug(
-          `The hash of the directory does not match the expected value; want='${want}' got='${got}'`
-        )
-        await sleep(delay)
-        continue
-      }
-
-      break
-    } catch (error) {
-      core.debug(`Attempt ${i + 1} failed: ${error}`)
-      await sleep(delay)
-    }
-  }
 }
 
 export async function waitForJobToComplete(jobName: string): Promise<void> {
@@ -649,9 +341,9 @@ export async function createSecretForEnvs(envs: {
   return secretName
 }
 
-export async function deleteSecret(name: string): Promise<void> {
+export async function deleteSecret(secretName: string): Promise<void> {
   await k8sApi.deleteNamespacedSecret({
-    name,
+    name: secretName,
     namespace: namespace()
   })
 }
@@ -668,7 +360,7 @@ export async function pruneSecrets(): Promise<void> {
   await Promise.all(
     secretList.items.map(
       async secret =>
-        secret.metadata?.name && (await deleteSecret(secret.metadata.name))
+        secret.metadata?.name && deleteSecret(secret.metadata.name)
     )
   )
 }
@@ -785,7 +477,7 @@ export async function prunePods(): Promise<void> {
 
   await Promise.all(
     podList.items.map(
-      async pod => pod.metadata?.name && (await deletePod(pod.metadata.name))
+      async pod => pod.metadata?.name && deletePod(pod.metadata.name)
     )
   )
 }
@@ -831,7 +523,7 @@ export async function isPodContainerAlpine(
       [
         'sh',
         '-c',
-        `[ $(cat /etc/*release* | grep -i -e "^ID=*alpine*" -c) != 0 ] || exit 1`
+        '[ $(cat /etc/*release* | grep -i -e "^ID=*alpine*" -c) != 0 ] || exit 1'
       ],
       podName,
       containerName
@@ -855,6 +547,62 @@ export function namespace(): string {
     )
   }
   return context.namespace
+}
+
+async function getCurrentNodeName(): Promise<string> {
+  const resp = await k8sApi.readNamespacedPod({
+    name: getRunnerPodName(),
+    namespace: namespace()
+  })
+
+  const nodeName = resp.spec?.nodeName
+  if (!nodeName) {
+    throw new Error('Failed to determine node name')
+  }
+  return nodeName
+}
+
+async function getPodAffinity(
+  nodeName: string,
+  requiredDuringScheduling: boolean
+): Promise<k8s.V1Affinity> {
+  const affinity = new k8s.V1Affinity()
+  affinity.nodeAffinity = new k8s.V1NodeAffinity()
+
+  if (requiredDuringScheduling) {
+    affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution =
+      new k8s.V1NodeSelector()
+    affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms =
+      [
+        {
+          matchExpressions: [
+            {
+              key: 'kubernetes.io/hostname',
+              operator: 'In',
+              values: [nodeName]
+            }
+          ]
+        }
+      ]
+    return affinity
+  }
+
+  affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution = [
+    {
+      weight: 100,
+      preference: {
+        matchExpressions: [
+          {
+            key: 'kubernetes.io/hostname',
+            operator: 'In',
+            values: [nodeName]
+          }
+        ]
+      }
+    }
+  ]
+
+  return affinity
 }
 
 class BackOffManager {
@@ -925,7 +673,7 @@ export function containerPorts(
   return ports
 }
 
-export async function getPodByName(name): Promise<k8s.V1Pod> {
+export async function getPodByName(name: string): Promise<k8s.V1Pod> {
   return await k8sApi.readNamespacedPod({
     name,
     namespace: namespace()

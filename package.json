@@ -8,7 +8,9 @@
   },
   "scripts": {
     "test": "npm run test --prefix packages/docker && npm run test --prefix packages/k8s",
-    "bootstrap": "npm install --prefix packages/hooklib && npm ci --prefix packages/k8s && npm ci --prefix packages/docker",
+    "test:docker": "npm run test --prefix packages/docker",
+    "test:k8s": "npm run test --prefix packages/k8s",
+    "bootstrap": "npm ci --prefix packages/hooklib && npm ci --prefix packages/k8s && npm ci --prefix packages/docker",
     "format": "prettier --write '**/*.ts'",
     "format-check": "prettier --check '**/*.ts'",
     "lint": "eslint packages/**/*.ts",
