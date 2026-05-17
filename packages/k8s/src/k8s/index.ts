@@ -258,14 +258,21 @@ export async function execPodStep(
   core.debug(`[execPodStep] Fixed command: ${JSON.stringify(command)}`)
 
   // Heartbeat constants matching kubectl's Go implementation
-  const PING_PERIOD_MS = parseInt(
-    process.env.ACTIONS_RUNNER_HEARTBEAT_PERIOD_MS || '5000',
-    10
+  const DEFAULT_PING_PERIOD_MS = 5000
+  const parsePositiveMsEnv = (
+    value: string | undefined,
+    fallback: number
+  ): number => {
+    const parsed = Number.parseInt(value ?? '', 10)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+  }
+  const PING_PERIOD_MS = parsePositiveMsEnv(
+    process.env.ACTIONS_RUNNER_HEARTBEAT_PERIOD_MS,
+    DEFAULT_PING_PERIOD_MS
   )
-  const PING_READ_DEADLINE_MS = parseInt(
-    process.env.ACTIONS_RUNNER_HEARTBEAT_DEADLINE_MS ||
-      String(PING_PERIOD_MS * 12 + 1000),
-    10
+  const PING_READ_DEADLINE_MS = parsePositiveMsEnv(
+    process.env.ACTIONS_RUNNER_HEARTBEAT_DEADLINE_MS,
+    PING_PERIOD_MS * 12 + 1000
   )
   core.debug(
     `[execPodStep] Heartbeat config: PING_PERIOD_MS=${PING_PERIOD_MS}, PING_READ_DEADLINE_MS=${PING_READ_DEADLINE_MS}`
