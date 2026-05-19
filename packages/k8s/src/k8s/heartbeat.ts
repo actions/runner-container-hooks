@@ -79,11 +79,17 @@ export class WebSocketHeartbeat {
       }, this.pongDeadlineMs)
     }
 
+    // Arm the deadline only after the first ping is sent, not immediately on
+    // start, so a slow CONNECTING socket cannot time out before any exchange.
+    let deadlineArmed = false
+
     ws.on('pong', () => {
       if (this.shouldLog()) {
         core.debug('[Heartbeat] Pong received')
       }
-      resetPongTimeout()
+      if (deadlineArmed) {
+        resetPongTimeout()
+      }
     })
 
     ws.on('error', (err: Error) => {
@@ -96,8 +102,6 @@ export class WebSocketHeartbeat {
       this.stop()
     })
 
-    resetPongTimeout()
-
     // WebSocket readyState: 0 = CONNECTING, 1 = OPEN, 2 = CLOSING, 3 = CLOSED
     this.pingInterval = setInterval(() => {
       if (ws.readyState === 0) {
@@ -107,6 +111,10 @@ export class WebSocketHeartbeat {
       if (ws.readyState === 1) {
         try {
           ws.ping()
+          if (!deadlineArmed) {
+            deadlineArmed = true
+            resetPongTimeout()
+          }
           if (this.shouldLog()) {
             core.debug('[Heartbeat] Ping sent')
           }

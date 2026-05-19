@@ -100,14 +100,16 @@ describe('WebSocketHeartbeat', () => {
   })
 
   describe('pong timeout', () => {
-    it('closes the socket and rejects the promise when no pong is received', () => {
+    it('closes the socket and rejects the promise when no pong is received after first ping', () => {
       const ws = new MockWebSocket(1)
       const reject = jest.fn()
-      const hb = new WebSocketHeartbeat(100, 500)
+      // pingPeriodMs=100, pongDeadlineMs=200
+      // t=100: first ping sent → deadline armed, fires at t=300
+      const hb = new WebSocketHeartbeat(100, 200)
 
       hb.start(ws, reject)
 
-      jest.advanceTimersByTime(600) // exceed pong deadline
+      jest.advanceTimersByTime(350) // past first ping + deadline
 
       expect(ws.close).toHaveBeenCalledTimes(1)
       expect(reject).toHaveBeenCalledTimes(1)
@@ -115,17 +117,34 @@ describe('WebSocketHeartbeat', () => {
       expect(reject.mock.calls[0][0].message).toMatch(/heartbeat timeout/)
     })
 
+    it('does not reject while the socket is still CONNECTING, even past pongDeadlineMs', () => {
+      const ws = new MockWebSocket(0) // CONNECTING — never transitions
+      const reject = jest.fn()
+      const hb = new WebSocketHeartbeat(100, 200)
+
+      hb.start(ws, reject)
+
+      // Advance well past what the deadline would have been if armed at start
+      jest.advanceTimersByTime(1000)
+
+      expect(reject).not.toHaveBeenCalled()
+
+      hb.stop()
+    })
+
     it('resets the pong deadline when a pong is received', () => {
       const ws = new MockWebSocket(1)
       const reject = jest.fn()
+      // pingPeriodMs=100, pongDeadlineMs=500
+      // t=100: first ping → deadline at t=600
       const hb = new WebSocketHeartbeat(100, 500)
 
       hb.start(ws, reject)
 
-      jest.advanceTimersByTime(400) // close to deadline but not past it
-      ws.emit('pong') // pong received — should reset the clock
+      jest.advanceTimersByTime(400) // t=400, deadline at t=600
+      ws.emit('pong') // reset deadline → now fires at t=900
 
-      jest.advanceTimersByTime(400) // would have timed out without the reset
+      jest.advanceTimersByTime(400) // t=800, deadline not yet reached
 
       expect(reject).not.toHaveBeenCalled()
 
