@@ -297,7 +297,10 @@ export async function execPodStep(
           // Close WebSocket and wait for it before resolving/rejecting
           const closeWebSocket = async (): Promise<void> => {
             const socket = ws
-            if (socket && (socket.readyState === 1 || socket.readyState === 0)) {
+            if (
+              socket &&
+              (socket.readyState === 1 || socket.readyState === 0)
+            ) {
               return new Promise<void>(closeResolve => {
                 const closeTimeout = setTimeout(() => {
                   core.warning(
