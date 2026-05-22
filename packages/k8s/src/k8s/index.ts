@@ -79,7 +79,7 @@ export function retryAfterDelay(err: k8s.ApiException<unknown>, attempt: number)
   }
 
   // Cap the delay to 30 seconds
-  const maxDelaySeconds = 30;
+  const maxDelaySeconds = 30
   return Math.min(seconds * 1000, maxDelaySeconds * 1000)
 }
 
@@ -101,7 +101,22 @@ function describeError(err: unknown): string {
   return String(err)
 }
 
-function withRetryClient<T extends object>(client: T): T {
+// WARNING: at-least-once delivery for writes.
+//
+// This proxy retries EVERY method on the wrapped client when isRetryableError
+// returns true, including non-idempotent writes (createNamespaced*,
+// patchNamespaced*, replaceNamespaced*). A 5xx from an intermediary or an
+// ECONNRESET *after* the server has already committed a POST will cause a
+// retry; on the next attempt the server returns 409 AlreadyExists, which then
+// surfaces to the caller as a hard failure even though the original write
+// succeeded.
+//
+// Every caller that POSTs/PUTs/PATCHes through this wrapped client MUST handle
+// 409 explicitly (see createJobPod, createContainerStepPod, createDockerSecret,
+// createSecretForEnvs for the existing call sites). If you add a new write
+// caller and skip the 409 fallback, you will get spurious failures under
+// transient network conditions.
+export function withRetryClient<T extends object>(client: T): T {
   const callWithRetry = async (
     fn: (...args: unknown[]) => unknown,
     name: string,
@@ -119,7 +134,7 @@ function withRetryClient<T extends object>(client: T): T {
             ? retryAfterDelay(err, attempt)
             : retryDelay(attempt)
         core.warning(
-          `K8s API call ${name} failed (${describeError(err)}), retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${MAX_RETRIES})`
+          `K8s API call ${name} failed (${describeError(err)}), retrying in ${Math.round(delay)}ms (retry ${attempt + 1} of ${MAX_RETRIES})`
         )
         await sleep(delay)
       }
@@ -756,13 +771,33 @@ export async function createDockerSecret(
       body: secret
     })
   } catch (err) {
-    if (err instanceof k8s.ApiException && err.code === 409) {
-      return await k8sApi.readNamespacedSecret({
-        name: secretName,
-        namespace: namespace()
-      })
+    if (!(err instanceof k8s.ApiException && err.code === 409)) {
+      throw err
     }
-    throw err
+    // 409 here is almost certainly the retry-induced case: our POST committed
+    // server-side, an intermediary returned 5xx / ECONNRESET, withRetryClient
+    // retried, and the second attempt saw the secret we just created. Verify
+    // the existing secret's data matches what we tried to write before
+    // returning it — otherwise the pod will pull images with stale
+    // credentials. Secrets are immutable (set above), so we cannot
+    // replace/patch on mismatch; surface the collision instead.
+    const existing = await k8sApi.readNamespacedSecret({
+      name: secretName,
+      namespace: namespace()
+    })
+    const existingData = existing.data ?? {}
+    const desiredData = secret.data ?? {}
+    const desiredKeys = Object.keys(desiredData)
+    const existingKeys = Object.keys(existingData)
+    const mismatch =
+      desiredKeys.length !== existingKeys.length ||
+      desiredKeys.some(k => existingData[k] !== desiredData[k])
+    if (mismatch) {
+      throw new Error(
+        `docker secret ${secretName} already exists with data that does not match the requested registry credentials; refusing to use stale secret`
+      )
+    }
+    return existing
   }
 }
 
@@ -795,6 +830,29 @@ export async function createSecretForEnvs(envs: {
   } catch (err) {
     if (!(err instanceof k8s.ApiException && err.code === 409)) {
       throw err
+    }
+    // 409 here is almost certainly the retry-induced case: our POST committed
+    // server-side, an intermediary returned 5xx / ECONNRESET, withRetryClient
+    // retried, and the second attempt saw the secret we just created. Verify
+    // the existing secret's data matches what we tried to write before
+    // claiming success — otherwise the caller will mount stale env values.
+    // Secrets are immutable (set above), so we cannot replace/patch on
+    // mismatch; surface the collision instead.
+    const existing = await k8sApi.readNamespacedSecret({
+      name: secretName,
+      namespace: namespace()
+    })
+    const existingData = existing.data ?? {}
+    const desiredData = secret.data ?? {}
+    const desiredKeys = Object.keys(desiredData)
+    const existingKeys = Object.keys(existingData)
+    const mismatch =
+      desiredKeys.length !== existingKeys.length ||
+      desiredKeys.some(k => existingData[k] !== desiredData[k])
+    if (mismatch) {
+      throw new Error(
+        `secret ${secretName} already exists with data that does not match the requested envs; refusing to mount stale secret`
+      )
     }
   }
 
