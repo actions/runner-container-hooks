@@ -163,7 +163,7 @@ describe('WebSocketHeartbeat', () => {
       jest.advanceTimersByTime(50)
       hb.stop()
 
-      const pingCountAtStop = (ws.ping as jest.Mock).mock.calls.length
+      const pingCountAtStop = ws.ping.mock.calls.length
 
       jest.advanceTimersByTime(1000) // well past both intervals
 
