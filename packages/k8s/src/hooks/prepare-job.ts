@@ -21,6 +21,7 @@ import {
   CONTAINER_VOLUMES,
   DEFAULT_CONTAINER_ENTRY_POINT,
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
+  formatError,
   generateContainerName,
   mergeContainerWithOptions,
   readExtensionFromFile,
@@ -84,7 +85,7 @@ export async function prepareJob(
     )
   } catch (err) {
     await prunePods()
-    core.debug(`createPod failed: ${JSON.stringify(err)}`)
+    core.debug(`createPod failed: ${formatError(err)}`)
     const message = (err as any)?.response?.body?.message || err
     throw new Error(`failed to create job pod: ${message}`)
   }
@@ -146,9 +147,7 @@ export async function prepareJob(
       JOB_CONTAINER_NAME
     )
   } catch (err) {
-    core.debug(
-      `Failed to determine if the pod is alpine: ${JSON.stringify(err)}`
-    )
+    core.debug(`Failed to determine if the pod is alpine: ${formatError(err)}`)
     const message = (err as any)?.response?.body?.message || err
     throw new Error(`failed to determine if the pod is alpine: ${message}`)
   }
