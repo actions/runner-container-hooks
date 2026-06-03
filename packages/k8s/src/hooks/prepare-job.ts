@@ -62,7 +62,7 @@ export async function prepareJob(
     services = args.services.map(service => {
       return createContainerSpec(
         service,
-        generateContainerName(service.image),
+        generateContainerName(service),
         false,
         extension
       )
@@ -193,7 +193,7 @@ function generateResponseFile(
 
   if (args.services?.length) {
     const serviceContainerNames =
-      args.services?.map(s => generateContainerName(s.image)) || []
+      args.services?.map(s => generateContainerName(s)) || []
 
     response.context['services'] = appPod?.spec?.containers
       ?.filter(c => serviceContainerNames.includes(c.name))
