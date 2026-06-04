@@ -54,9 +54,9 @@ export async function runContainerStep(
   try {
     pod = await createContainerStepPod(getStepPodName(), container, extension)
   } catch (err) {
-    core.debug(`createJob failed: ${JSON.stringify(err)}`)
+    core.debug(`createContainerStepPod failed: ${JSON.stringify(err)}`)
     const message = (err as any)?.response?.body?.message || err
-    throw new Error(`failed to run script step: ${message}`)
+    throw new Error(`failed to run container step: ${message}`)
   }
 
   if (!pod.metadata?.name) {
@@ -111,7 +111,7 @@ export async function runContainerStep(
     } catch (err) {
       core.debug(`execPodStep failed: ${JSON.stringify(err)}`)
       const message = (err as any)?.response?.body?.message || err
-      throw new Error(`failed to run script step: ${message}`)
+      throw new Error(`failed to run container step: ${message}`)
     } finally {
       fs.rmSync(runnerPath, { force: true })
     }
