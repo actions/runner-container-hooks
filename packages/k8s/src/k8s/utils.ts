@@ -331,7 +331,7 @@ export function formatError(err: unknown): string {
   }
 
   if (err instanceof Error) {
-    return err.stack ?? err.message
+    return err.message
   }
 
   // Primitives serialise more readably via String() than JSON.stringify
