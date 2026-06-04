@@ -71,8 +71,8 @@ export async function runScriptStep(
       JOB_CONTAINER_NAME
     )
   } catch (err) {
-    core.debug(`Failed to merge temp directories: ${formatError(err)}`)
-    const message = (err as any)?.response?.body?.message || err
+    const message = formatError(err)
+    core.debug(`Failed to merge temp directories: ${message}`)
     throw new Error(`failed to merge temp dirs: ${message}`)
   }
 
@@ -86,8 +86,8 @@ export async function runScriptStep(
       JOB_CONTAINER_NAME
     )
   } catch (err) {
-    core.debug(`execPodStep failed: ${formatError(err)}`)
-    const message = (err as any)?.response?.body?.message || err
+    const message = formatError(err)
+    core.debug(`execPodStep failed: ${message}`)
     throw new Error(`failed to run script step: ${message}`)
   } finally {
     try {

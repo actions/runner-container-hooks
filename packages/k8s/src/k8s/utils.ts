@@ -334,15 +334,23 @@ export function formatError(err: unknown): string {
     return err.message
   }
 
-  // Primitives serialise more readably via String() than JSON.stringify
-  // (which would quote strings and refuse to handle symbols).
-  if (typeof err !== 'object') {
-    return String(err)
+  if (typeof err === 'object') {
+    // Non-Error objects sometimes carry a top-level message (axios-style
+    // errors, hand-rolled error-likes). Extract before the JSON.stringify
+    // branch so a circular ref doesn't reduce the diagnostic to
+    // "[object Object]".
+    const msg = (err as { message?: unknown }).message
+    if (typeof msg === 'string') {
+      return msg
+    }
+    try {
+      return JSON.stringify(err)
+    } catch {
+      return String(err)
+    }
   }
 
-  try {
-    return JSON.stringify(err)
-  } catch {
-    return String(err)
-  }
+  // Primitives serialise more readably via String() than JSON.stringify
+  // (which would quote strings and refuse to handle symbols).
+  return String(err)
 }

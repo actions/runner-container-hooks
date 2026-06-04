@@ -1,11 +1,9 @@
 import { formatError } from '../src/k8s/utils'
 
 describe('formatError', () => {
-  it('returns the message of a standard Error (or stack when available)', () => {
+  it('returns the message of a standard Error', () => {
     const err = new Error('connection refused')
-    const out = formatError(err)
-    // err.stack starts with 'Error: connection refused' in V8; either form is fine.
-    expect(out).toContain('connection refused')
+    expect(formatError(err)).toBe('connection refused')
   })
 
   it('extracts response.body.message from @kubernetes/client-node errors', () => {
@@ -46,17 +44,19 @@ describe('formatError', () => {
     const circularErr: any = {
       message: 'k8s exec failed',
       response: { req: { socket } }
-      // no response.body — exercises the Error/JSON.stringify fallbacks
+      // no response.body — exercises the top-level-message branch.
     }
 
     expect(() => formatError(circularErr)).not.toThrow()
-    expect(typeof formatError(circularErr)).toBe('string')
+    expect(formatError(circularErr)).toBe('k8s exec failed')
   })
 
-  it('returns the message field when present on a plain object', () => {
-    // Many K8s client errors carry a top-level message even without body.
-    const err = new Error('top-level msg only')
-    expect(formatError(err)).toContain('top-level msg only')
+  it('returns the message field when present on a plain (non-Error) object', () => {
+    // Some throwables expose a top-level .message without being an Error
+    // (axios-style errors, hand-rolled error-likes from third parties).
+    expect(formatError({ message: 'top-level msg only' })).toBe(
+      'top-level msg only'
+    )
   })
 
   it('handles string throwables', () => {
