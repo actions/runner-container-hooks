@@ -75,13 +75,35 @@ export async function runScriptStep(
   args.entryPoint = 'sh'
   args.entryPointArgs = ['-e', containerPath]
   try {
-    await execPodStep(
-      [args.entryPoint, ...args.entryPointArgs],
-      state.jobPod,
-      JOB_CONTAINER_NAME
-    )
+    await (async function () {
+      const retries = 3
+      const delayMs = 5000
+
+      function attempt(n: number): Promise<void> {
+        return execPodStep(
+          [args.entryPoint, ...args.entryPointArgs],
+          state.jobPod,
+          JOB_CONTAINER_NAME
+        ).catch((e: any) => {
+          const msg = String(e?.message || e)
+          const is404 =
+            msg.indexOf('404') !== -1 ||
+            msg.indexOf('Unexpected server response') !== -1
+
+          if (is404 && n > 1) {
+            core.debug('execPodStep got 404, retrying...')
+            return new Promise<void>(r => setTimeout(r, delayMs)).then(() =>
+              attempt(n - 1)
+            )
+          }
+          throw e
+        })
+      }
+
+      return attempt(retries)
+    })()
   } catch (err) {
-    core.debug(`execPodStep failed: ${JSON.stringify(err)}`)
+    core.debug(`execPodStep failed: ${(err as any)?.message || String(err)}`)
     const message = (err as any)?.response?.body?.message || err
     throw new Error(`failed to run script step: ${message}`)
   } finally {
