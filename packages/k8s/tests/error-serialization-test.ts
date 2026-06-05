@@ -16,13 +16,14 @@ jest.mock('@kubernetes/client-node', () => {
         }
         return { readNamespacedPod: mockReadNamespacedPod }
       }),
-      getContexts: jest
-        .fn()
-        .mockReturnValue([{ namespace: 'test-namespace' }])
+      getContexts: jest.fn().mockReturnValue([{ namespace: 'test-namespace' }])
     })),
     Exec: jest.fn().mockImplementation(() => ({ exec: mockExec })),
+    // eslint-disable-next-line @typescript-eslint/no-extraneous-class
     CoreV1Api: class CoreV1Api {},
+    // eslint-disable-next-line @typescript-eslint/no-extraneous-class
     BatchV1Api: class BatchV1Api {},
+    // eslint-disable-next-line @typescript-eslint/no-extraneous-class
     AuthorizationV1Api: class AuthorizationV1Api {},
     Log: jest.fn()
   }
@@ -125,9 +126,7 @@ describe('error serialization', () => {
     })
 
     it('should include Error.message when API call throws', async () => {
-      mockReadNamespacedJob.mockRejectedValue(
-        new Error('403 Forbidden')
-      )
+      mockReadNamespacedJob.mockRejectedValue(new Error('403 Forbidden'))
 
       await expect(waitForJobToComplete('my-job')).rejects.toThrow(
         'job my-job has failed: 403 Forbidden'
@@ -155,15 +154,11 @@ describe('error serialization', () => {
           new Set([PodPhase.RUNNING]),
           new Set([PodPhase.PENDING])
         )
-      ).rejects.toThrow(
-        /Pod test-pod is unhealthy with phase status Failed/
-      )
+      ).rejects.toThrow(/Pod test-pod is unhealthy with phase status Failed/)
     })
 
     it('should include Error.message when API call throws', async () => {
-      mockReadNamespacedPod.mockRejectedValue(
-        new Error('network timeout')
-      )
+      mockReadNamespacedPod.mockRejectedValue(new Error('network timeout'))
 
       await expect(
         waitForPodPhases(
@@ -177,9 +172,7 @@ describe('error serialization', () => {
     })
 
     it('should not produce empty braces from Error objects', async () => {
-      mockReadNamespacedPod.mockRejectedValue(
-        new Error('socket hang up')
-      )
+      mockReadNamespacedPod.mockRejectedValue(new Error('socket hang up'))
 
       try {
         await waitForPodPhases(

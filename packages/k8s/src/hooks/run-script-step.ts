@@ -3,7 +3,12 @@ import * as fs from 'fs'
 import * as core from '@actions/core'
 import { RunScriptStepArgs } from 'hooklib'
 import { execCpFromPod, execCpToPod, execPodStep } from '../k8s'
-import { writeRunScript, sleep, listDirAllCommand } from '../k8s/utils'
+import {
+  formatError,
+  writeRunScript,
+  sleep,
+  listDirAllCommand
+} from '../k8s/utils'
 import { JOB_CONTAINER_NAME } from './constants'
 import { dirname } from 'path'
 import * as shlex from 'shlex'
@@ -66,8 +71,8 @@ export async function runScriptStep(
       JOB_CONTAINER_NAME
     )
   } catch (err) {
-    core.debug(`Failed to merge temp directories: ${JSON.stringify(err)}`)
-    const message = (err as any)?.response?.body?.message || err
+    const message = formatError(err)
+    core.debug(`Failed to merge temp directories: ${message}`)
     throw new Error(`failed to merge temp dirs: ${message}`)
   }
 
@@ -81,8 +86,8 @@ export async function runScriptStep(
       JOB_CONTAINER_NAME
     )
   } catch (err) {
-    core.debug(`execPodStep failed: ${JSON.stringify(err)}`)
-    const message = (err as any)?.response?.body?.message || err
+    const message = formatError(err)
+    core.debug(`execPodStep failed: ${message}`)
     throw new Error(`failed to run script step: ${message}`)
   } finally {
     try {

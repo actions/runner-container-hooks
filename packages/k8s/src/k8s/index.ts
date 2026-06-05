@@ -14,6 +14,7 @@ import {
 } from '../hooks/constants'
 import {
   PodPhase,
+  formatError,
   mergePodSpecWithOptions,
   mergeObjectMeta,
   fixArgs,
@@ -517,7 +518,7 @@ export async function execCpToPod(
       attempt++
       if (attempt >= 30) {
         throw new Error(
-          `cpToPod failed after ${attempt} attempts: ${error instanceof Error ? error.message : String(error)}`
+          `cpToPod failed after ${attempt} attempts: ${formatError(error)}`
         )
       }
       await sleep(1000)
@@ -614,7 +615,7 @@ export async function execCpFromPod(
       attempt++
       if (attempt >= 30) {
         throw new Error(
-          `execCpFromPod failed after ${attempt} attempts: ${error instanceof Error ? error.message : String(error)}`
+          `execCpFromPod failed after ${attempt} attempts: ${formatError(error)}`
         )
       }
       await sleep(1000)
@@ -661,7 +662,7 @@ export async function waitForJobToComplete(jobName: string): Promise<void> {
         return
       }
     } catch (error) {
-      throw new Error(`job ${jobName} has failed: ${error instanceof Error ? error.message : String(error)}`)
+      throw new Error(`job ${jobName} has failed: ${formatError(error)}`)
     }
     await backOffManager.backOff()
   }
@@ -784,7 +785,7 @@ export async function waitForPodPhases(
     }
   } catch (error) {
     throw new Error(
-      `Pod ${podName} is unhealthy with phase status ${phase}: ${error instanceof Error ? error.message : String(error)}`
+      `Pod ${podName} is unhealthy with phase status ${phase}: ${formatError(error)}`
     )
   }
 }

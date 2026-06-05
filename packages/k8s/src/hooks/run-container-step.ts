@@ -14,6 +14,7 @@ import {
 } from '../k8s'
 import {
   CONTAINER_VOLUMES,
+  formatError,
   mergeContainerWithOptions,
   PodPhase,
   readExtensionFromFile,
@@ -54,8 +55,8 @@ export async function runContainerStep(
   try {
     pod = await createContainerStepPod(getStepPodName(), container, extension)
   } catch (err) {
-    core.debug(`createContainerStepPod failed: ${JSON.stringify(err)}`)
-    const message = (err as any)?.response?.body?.message || err
+    const message = formatError(err)
+    core.debug(`createContainerStepPod failed: ${message}`)
     throw new Error(`failed to run container step: ${message}`)
   }
 
@@ -109,8 +110,8 @@ export async function runContainerStep(
         JOB_CONTAINER_NAME
       )
     } catch (err) {
-      core.debug(`execPodStep failed: ${JSON.stringify(err)}`)
-      const message = (err as any)?.response?.body?.message || err
+      const message = formatError(err)
+      core.debug(`execPodStep failed: ${message}`)
       throw new Error(`failed to run container step: ${message}`)
     } finally {
       fs.rmSync(runnerPath, { force: true })
