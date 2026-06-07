@@ -6,6 +6,7 @@ import {
   mergePodSpecWithOptions,
   mergeContainerWithOptions,
   readExtensionFromFile,
+  listDirAllCommand,
   ENV_HOOK_TEMPLATE_PATH
 } from '../src/k8s/utils'
 import * as k8s from '@kubernetes/client-node'
@@ -405,5 +406,33 @@ spec:
     mergePodSpecWithOptions(base, from)
 
     expect(base).toStrictEqual(expected)
+  })
+
+  describe('listDirAllCommand', () => {
+    it('should use batched exec (+ not \\;)', () => {
+      const cmd = listDirAllCommand('/workspace')
+      expect(cmd).toContain('{} +')
+      expect(cmd).not.toContain('\\;')
+    })
+
+    it('should include end-of-options marker before filenames', () => {
+      const cmd = listDirAllCommand('/workspace')
+      expect(cmd).toMatch(/stat -c '%s %n' -- \{\} \+/)
+    })
+
+    it('should quote the directory path', () => {
+      const cmd = listDirAllCommand('/path with spaces')
+      expect(cmd).toContain("'/path with spaces'")
+    })
+
+    it('should exclude _runner_hook_responses', () => {
+      const cmd = listDirAllCommand('/workspace')
+      expect(cmd).toContain("-not -path '*/_runner_hook_responses*'")
+    })
+
+    it('should only find regular files', () => {
+      const cmd = listDirAllCommand('/workspace')
+      expect(cmd).toContain('-type f')
+    })
   })
 })
