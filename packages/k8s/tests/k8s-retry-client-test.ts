@@ -60,9 +60,11 @@ import {
   withRetryClient
 } from '../src/k8s'
 
-const fakeApi = (k8s as unknown as {
-  __getFakeApi: () => Record<string, jest.Mock>
-}).__getFakeApi()
+const fakeApi = (
+  k8s as unknown as {
+    __getFakeApi: () => Record<string, jest.Mock>
+  }
+).__getFakeApi()
 const mockedSleep = sleep as jest.Mock
 
 function apiException(
@@ -209,9 +211,9 @@ describe('idempotent write fallbacks', () => {
 
     it('rethrows non-409 errors without reading', async () => {
       fakeApi.createNamespacedSecret.mockRejectedValue(apiException(403))
-      await expect(
-        createSecretForEnvs({ FOO: 'bar' })
-      ).rejects.toBeInstanceOf(k8s.ApiException)
+      await expect(createSecretForEnvs({ FOO: 'bar' })).rejects.toBeInstanceOf(
+        k8s.ApiException
+      )
       expect(fakeApi.readNamespacedSecret).not.toHaveBeenCalled()
     })
   })
@@ -228,12 +230,12 @@ describe('idempotent write fallbacks', () => {
       // passes — this exercises the matching branch without re-deriving the
       // function's dockerconfigjson encoding here.
       let attempted: { data?: Record<string, string> } = {}
-      fakeApi.createNamespacedSecret.mockImplementation(async (req: {
-        body: { data?: Record<string, string> }
-      }) => {
-        attempted = req.body
-        throw apiException(409)
-      })
+      fakeApi.createNamespacedSecret.mockImplementation(
+        async (req: { body: { data?: Record<string, string> } }) => {
+          attempted = req.body
+          throw apiException(409)
+        }
+      )
       fakeApi.readNamespacedSecret.mockImplementation(async () => ({
         data: attempted.data
       }))

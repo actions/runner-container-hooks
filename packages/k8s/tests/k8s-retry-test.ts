@@ -101,18 +101,12 @@ describe('retryAfterDelay', () => {
   })
 
   it('uses lowercase retry-after header value in seconds', () => {
-    const delay = retryAfterDelay(
-      apiException(429, { 'retry-after': '5' }),
-      0
-    )
+    const delay = retryAfterDelay(apiException(429, { 'retry-after': '5' }), 0)
     expect(delay).toBe(5000)
   })
 
   it('uses capitalized Retry-After header', () => {
-    const delay = retryAfterDelay(
-      apiException(429, { 'Retry-After': '7' }),
-      0
-    )
+    const delay = retryAfterDelay(apiException(429, { 'Retry-After': '7' }), 0)
     expect(delay).toBe(7000)
   })
 
@@ -136,29 +130,20 @@ describe('retryAfterDelay', () => {
   })
 
   it('falls back when Retry-After is zero', () => {
-    const delay = retryAfterDelay(
-      apiException(429, { 'retry-after': '0' }),
-      2
-    )
+    const delay = retryAfterDelay(apiException(429, { 'retry-after': '0' }), 2)
     // retryDelay(2) = 4000 * (0.5..1.5) = 2000..6000
     expect(delay).toBeGreaterThanOrEqual(2000)
     expect(delay).toBeLessThanOrEqual(6000)
   })
 
   it('falls back when Retry-After is negative', () => {
-    const delay = retryAfterDelay(
-      apiException(429, { 'retry-after': '-5' }),
-      0
-    )
+    const delay = retryAfterDelay(apiException(429, { 'retry-after': '-5' }), 0)
     expect(delay).toBeGreaterThanOrEqual(500)
     expect(delay).toBeLessThanOrEqual(1500)
   })
 
   it('falls back when Retry-After is empty', () => {
-    const delay = retryAfterDelay(
-      apiException(429, { 'retry-after': '' }),
-      0
-    )
+    const delay = retryAfterDelay(apiException(429, { 'retry-after': '' }), 0)
     expect(delay).toBeGreaterThanOrEqual(500)
     expect(delay).toBeLessThanOrEqual(1500)
   })
