@@ -168,7 +168,7 @@ describe('withRetryClient', () => {
 
   it('passes non-function properties through untouched', () => {
     const target = { name: 'k8sApi', count: 42, fn: jest.fn() }
-    const wrapped = withRetryClient(target) as typeof target
+    const wrapped = withRetryClient(target)
     expect(wrapped.name).toBe('k8sApi')
     expect(wrapped.count).toBe(42)
     expect(typeof wrapped.fn).toBe('function')
