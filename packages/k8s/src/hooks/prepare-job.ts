@@ -21,6 +21,7 @@ import {
   CONTAINER_VOLUMES,
   DEFAULT_CONTAINER_ENTRY_POINT,
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
+  formatError,
   generateContainerName,
   mergeContainerWithOptions,
   readExtensionFromFile,
@@ -58,14 +59,30 @@ export async function prepareJob(
   }
 
   let services: k8s.V1Container[] = []
+  let serviceNames: string[] = []
   if (args.services?.length) {
+    const occurrences = new Map<string, number>()
+    for (const s of args.services) {
+      const base = generateContainerName(s.image)
+      occurrences.set(base, (occurrences.get(base) || 0) + 1)
+    }
+
+    const indices = new Map<string, number>()
     services = args.services.map(service => {
-      return createContainerSpec(
-        service,
-        generateContainerName(service.image),
-        false,
-        extension
-      )
+      const base = generateContainerName(service.image)
+      const total = occurrences.get(base) || 0
+      const idx = indices.get(base) || 0
+
+      let name: string
+      if (total > 1) {
+        name = `${base}-${idx}`
+      } else {
+        name = base
+      }
+
+      indices.set(base, idx + 1)
+      serviceNames.push(name)
+      return createContainerSpec(service, name, false, extension)
     })
   }
 
@@ -84,8 +101,8 @@ export async function prepareJob(
     )
   } catch (err) {
     await prunePods()
-    core.debug(`createPod failed: ${JSON.stringify(err)}`)
-    const message = (err as any)?.response?.body?.message || err
+    const message = formatError(err)
+    core.debug(`createPod failed: ${message}`)
     throw new Error(`failed to create job pod: ${message}`)
   }
 
@@ -112,7 +129,7 @@ export async function prepareJob(
     )
   } catch (err) {
     await prunePods()
-    throw new Error(`pod failed to come online with error: ${err}`)
+    throw new Error(`pod failed to come online with error: ${formatError(err)}`)
   }
 
   await execCpToPod(createdPod.metadata.name, runnerWorkspace, '/__w')
@@ -146,21 +163,20 @@ export async function prepareJob(
       JOB_CONTAINER_NAME
     )
   } catch (err) {
-    core.debug(
-      `Failed to determine if the pod is alpine: ${JSON.stringify(err)}`
-    )
-    const message = (err as any)?.response?.body?.message || err
+    const message = formatError(err)
+    core.debug(`Failed to determine if the pod is alpine: ${message}`)
     throw new Error(`failed to determine if the pod is alpine: ${message}`)
   }
   core.debug(`Setting isAlpine to ${isAlpine}`)
-  generateResponseFile(responseFile, args, createdPod, isAlpine)
+  generateResponseFile(responseFile, args, createdPod, isAlpine, serviceNames)
 }
 
 function generateResponseFile(
   responseFile: string,
   args: PrepareJobArgs,
   appPod: k8s.V1Pod,
-  isAlpine: boolean
+  isAlpine: boolean,
+  serviceNames?: string[]
 ): void {
   if (!appPod.metadata?.name) {
     throw new Error('app pod must have metadata.name specified')
@@ -193,7 +209,9 @@ function generateResponseFile(
 
   if (args.services?.length) {
     const serviceContainerNames =
-      args.services?.map(s => generateContainerName(s.image)) || []
+      serviceNames && serviceNames.length
+        ? serviceNames
+        : args.services?.map(s => generateContainerName(s.image)) || []
 
     response.context['services'] = appPod?.spec?.containers
       ?.filter(c => serviceContainerNames.includes(c.name))
