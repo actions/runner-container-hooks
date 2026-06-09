@@ -784,9 +784,43 @@ export async function waitForPodPhases(
       await backOffManager.backOff()
     }
   } catch (error) {
+    const warningEvents = await getPodWarningEvents(podName)
+    const eventsSuffix = warningEvents ? `; events: ${warningEvents}` : ''
     throw new Error(
-      `Pod ${podName} is unhealthy with phase status ${phase}: ${formatError(error)}`
+      `Pod ${podName} is unhealthy with phase status ${phase}: ${formatError(error)}${eventsSuffix}`
     )
+  }
+}
+
+// Best-effort: surface the most recent Warning events for a pod
+// (FailedScheduling, FailedMount, etc.) that explain why it never reached a
+// healthy phase. These live on the Event resource, not the pod object, and the
+// ephemeral workflow pod is usually pruned before an operator can
+// `kubectl describe` it — so without this the diagnostic is lost. Never throws:
+// it is diagnostic-only and must not shadow the original failure. Reading
+// events needs `events: list`; this is intentionally NOT added to
+// requiredPermissions (that would hard-fail prepareJob for existing
+// least-privilege deployments), so a 403 here is swallowed and simply yields no
+// extra detail.
+async function getPodWarningEvents(podName: string): Promise<string> {
+  try {
+    const { items } = await k8sApi.listNamespacedEvent({
+      namespace: namespace(),
+      fieldSelector: `involvedObject.name=${podName},type=Warning`
+    })
+    return (items ?? [])
+      .map(e => ({
+        reason: e.reason,
+        message: e.message,
+        when: new Date(e.lastTimestamp ?? e.eventTime ?? 0).getTime()
+      }))
+      .sort((a, b) => b.when - a.when)
+      .slice(0, 3)
+      .map(e => `[${e.reason}] ${e.message}`)
+      .join('; ')
+  } catch (err) {
+    core.debug(`Could not list events for pod ${podName}: ${formatError(err)}`)
+    return ''
   }
 }
 
