@@ -4,8 +4,25 @@ export interface HeartbeatWebSocket {
   readyState: number
   ping(): void
   close(): void
+  terminate(): void
   on(event: string, listener: (...args: any[]) => void): this
   once(event: string, listener: (...args: any[]) => void): this
+}
+
+// Force-close a kc WebSocket so the peer's `kubectl exec` subprocess exits.
+// `ws.close()` performs a graceful close handshake that the kubelet streaming
+// server does not forward to the child process — see kubernetes-client/javascript#2532.
+export function safeTerminateWs(
+  ws: HeartbeatWebSocket | null | undefined
+): void {
+  if (!ws) {
+    return
+  }
+  try {
+    ws.terminate()
+  } catch (err) {
+    core.debug(`[safeTerminateWs] terminate() threw, ignoring: ${err}`)
+  }
 }
 
 export function parsePositiveMsEnv(
@@ -66,11 +83,7 @@ export class WebSocketHeartbeat {
           `[Heartbeat] No pong received in ${this.pongDeadlineMs}ms, closing stale connection`
         )
         this.stop()
-        try {
-          ws.close()
-        } catch {
-          // ignore errors closing an already-closing socket
-        }
+        safeTerminateWs(ws)
         reject(
           new Error(
             `WebSocket heartbeat timeout: no pong within ${this.pongDeadlineMs}ms`
