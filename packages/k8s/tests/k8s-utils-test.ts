@@ -6,7 +6,9 @@ import {
   mergePodSpecWithOptions,
   mergeContainerWithOptions,
   readExtensionFromFile,
-  ENV_HOOK_TEMPLATE_PATH
+  tarDrainTimeoutMs,
+  ENV_HOOK_TEMPLATE_PATH,
+  ENV_TAR_DRAIN_TIMEOUT_MS
 } from '../src/k8s/utils'
 import * as k8s from '@kubernetes/client-node'
 import { TestHelper } from './test-setup'
@@ -405,5 +407,44 @@ spec:
     mergePodSpecWithOptions(base, from)
 
     expect(base).toStrictEqual(expected)
+  })
+
+  describe('tarDrainTimeoutMs', () => {
+    const original = process.env[ENV_TAR_DRAIN_TIMEOUT_MS]
+
+    afterEach(() => {
+      if (original === undefined) {
+        delete process.env[ENV_TAR_DRAIN_TIMEOUT_MS]
+      } else {
+        process.env[ENV_TAR_DRAIN_TIMEOUT_MS] = original
+      }
+    })
+
+    it('returns the 60s default when the env var is unset', () => {
+      delete process.env[ENV_TAR_DRAIN_TIMEOUT_MS]
+      expect(tarDrainTimeoutMs()).toBe(60000)
+    })
+
+    it('returns the parsed integer when the env var is a valid positive number', () => {
+      process.env[ENV_TAR_DRAIN_TIMEOUT_MS] = '12345'
+      expect(tarDrainTimeoutMs()).toBe(12345)
+    })
+
+    it('falls back to the default when the env var is not a number', () => {
+      process.env[ENV_TAR_DRAIN_TIMEOUT_MS] = 'not-a-number'
+      expect(tarDrainTimeoutMs()).toBe(60000)
+    })
+
+    it('falls back to the default when the env var is zero or negative', () => {
+      process.env[ENV_TAR_DRAIN_TIMEOUT_MS] = '0'
+      expect(tarDrainTimeoutMs()).toBe(60000)
+      process.env[ENV_TAR_DRAIN_TIMEOUT_MS] = '-100'
+      expect(tarDrainTimeoutMs()).toBe(60000)
+    })
+
+    it('falls back to the default when the env var is an empty string', () => {
+      process.env[ENV_TAR_DRAIN_TIMEOUT_MS] = ''
+      expect(tarDrainTimeoutMs()).toBe(60000)
+    })
   })
 })
