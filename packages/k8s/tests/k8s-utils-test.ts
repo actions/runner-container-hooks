@@ -1,7 +1,11 @@
 ﻿import * as fs from 'fs'
+import * as os from 'os'
+import * as path from 'path'
 import { containerPorts } from '../src/k8s'
 import {
   generateContainerName,
+  prepareJobScript,
+  writeContainerStepScript,
   writeRunScript,
   mergePodSpecWithOptions,
   mergeContainerWithOptions,
@@ -117,6 +121,55 @@ describe('k8s utils', () => {
           SOME_ENV: 'SOME_VALUE'
         }
       )
+      expect(fs.existsSync(runnerPath)).toBe(true)
+    })
+  })
+
+  describe('defensive parent-dir creation', () => {
+    let tempRoot: string
+
+    beforeEach(() => {
+      tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pr05-'))
+    })
+
+    afterEach(() => {
+      fs.rmSync(tempRoot, { recursive: true, force: true })
+    })
+
+    it('writeRunScript creates RUNNER_TEMP parent directory when missing', () => {
+      const missingDir = path.join(tempRoot, 'nested', 'runner_temp')
+      expect(fs.existsSync(missingDir)).toBe(false)
+      process.env.RUNNER_TEMP = missingDir
+
+      const { runnerPath } = writeRunScript('/test', 'sh', ['-e', 'script.sh'])
+
+      expect(fs.existsSync(missingDir)).toBe(true)
+      expect(fs.existsSync(runnerPath)).toBe(true)
+    })
+
+    it('prepareJobScript creates RUNNER_TEMP parent directory when missing', () => {
+      const missingDir = path.join(tempRoot, 'nested', 'runner_temp')
+      expect(fs.existsSync(missingDir)).toBe(false)
+      process.env.RUNNER_TEMP = missingDir
+
+      const { runnerPath } = prepareJobScript([])
+
+      expect(fs.existsSync(missingDir)).toBe(true)
+      expect(fs.existsSync(runnerPath)).toBe(true)
+    })
+
+    it('writeContainerStepScript creates dst parent directory when missing', () => {
+      const missingDst = path.join(tempRoot, 'nested', 'step_dst')
+      expect(fs.existsSync(missingDst)).toBe(false)
+
+      const { runnerPath } = writeContainerStepScript(
+        missingDst,
+        '/__w/repo/repo',
+        'sh',
+        ['-e', 'script.sh']
+      )
+
+      expect(fs.existsSync(missingDst)).toBe(true)
       expect(fs.existsSync(runnerPath)).toBe(true)
     })
   })
