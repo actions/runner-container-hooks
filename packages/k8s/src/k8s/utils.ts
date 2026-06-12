@@ -1,5 +1,6 @@
 import * as k8s from '@kubernetes/client-node'
 import * as fs from 'fs'
+import * as path from 'path'
 import * as yaml from 'js-yaml'
 import * as core from '@actions/core'
 import { v1 as uuidv4 } from 'uuid'
@@ -45,8 +46,13 @@ cp -R /__w/_temp/_github_workflow /github/workflow
 mkdir -p ${mountDirs}
 `
 
+  const runnerTemp = process.env.RUNNER_TEMP
+  if (!runnerTemp) {
+    throw new Error('RUNNER_TEMP is not set')
+  }
   const filename = `${uuidv4()}.sh`
-  const entryPointPath = `${process.env.RUNNER_TEMP}/${filename}`
+  const entryPointPath = `${runnerTemp}/${filename}`
+  fs.mkdirSync(path.dirname(entryPointPath), { recursive: true })
   fs.writeFileSync(entryPointPath, content)
   return {
     containerPath: `/__w/_temp/${filename}`,
@@ -80,8 +86,13 @@ exec ${environmentPrefix} ${entryPoint} ${
     entryPointArgs?.length ? entryPointArgs.join(' ') : ''
   }
 `
+  const runnerTemp = process.env.RUNNER_TEMP
+  if (!runnerTemp) {
+    throw new Error('RUNNER_TEMP is not set')
+  }
   const filename = `${uuidv4()}.sh`
-  const entryPointPath = `${process.env.RUNNER_TEMP}/${filename}`
+  const entryPointPath = `${runnerTemp}/${filename}`
+  fs.mkdirSync(path.dirname(entryPointPath), { recursive: true })
   fs.writeFileSync(entryPointPath, content)
   return {
     containerPath: `/__w/_temp/${filename}`,
@@ -117,6 +128,7 @@ exec ${environmentPrefix} ${entryPoint} ${
   const filename = `${uuidv4()}.sh`
   const entryPointPath = `${dst}/${filename}`
   core.debug(`Writing container step script to ${entryPointPath}`)
+  fs.mkdirSync(path.dirname(entryPointPath), { recursive: true })
   fs.writeFileSync(entryPointPath, content)
   return {
     containerPath: `/__w/_temp/${filename}`,
