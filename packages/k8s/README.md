@@ -42,3 +42,11 @@ rules:
 - Docker [create options](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idcontaineroptions) are not supported
 - Container actions will have to specify the entrypoint, since the default entrypoint will be overridden to run the commands from the workflow.
 - Container actions need to have the following binaries in their container image: `sh`, `env`, `tail`.
+
+## Configuration
+
+These environment variables are read on the runner container of the runner pod. All knobs are optional; defaults preserve the historical behavior of the hooks.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ACTIONS_RUNNER_TAR_DRAIN_TIMEOUT_MS` | `60000` | Upper bound (milliseconds) on how long `execCpFromPod` waits for the tar extraction stream to drain after the underlying `kubectl exec` channel reports success. The wait is necessary because the Kubernetes exec status callback fires when the remote tar process exits, but the WebSocket may still have tar bytes in flight that the local `tar-fs` extractor has not yet written to disk; returning early truncates the extracted workspace. Tune up (e.g. `90000`) for very large workspaces over slow links; if the timeout fires, a warning is logged and the (possibly incomplete) extract is finalized. Invalid or non-positive values fall back to the default. |
