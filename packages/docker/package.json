@@ -17,17 +17,17 @@
     "@actions/exec": "^2.0.0",
     "hooklib": "file:../hooklib",
     "shlex": "^3.0.0",
-    "uuid": "^14.0.0"
+    "uuid": "^14.0.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.29.0",
-    "@babel/preset-env": "^7.29.5",
+    "@babel/core": "^8.0.1",
+    "@babel/preset-env": "^8.0.2",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.14",
-    "@typescript-eslint/parser": "^8.59.4",
-    "@vercel/ncc": "^0.38.3",
+    "@typescript-eslint/parser": "^8.61.1",
+    "@vercel/ncc": "^0.44.0",
     "jest": "^30.4.2",
-    "ts-jest": "^29.4.9",
+    "ts-jest": "^29.4.11",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"
