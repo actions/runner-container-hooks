@@ -25,7 +25,7 @@ import {
   WORK_VOLUME
 } from './utils'
 import * as shlex from 'shlex'
-import { parsePositiveMsEnv, WebSocketHeartbeat } from './heartbeat'
+import { parsePositiveMsEnv, safeTerminateWs, WebSocketHeartbeat } from './heartbeat'
 import type { HeartbeatWebSocket } from './heartbeat'
 
 const kc = new k8s.KubeConfig()
@@ -315,7 +315,7 @@ export async function execPodStep(
                   core.debug('[execPodStep] WebSocket closed cleanly')
                   closeResolve()
                 })
-                socket.close()
+                safeTerminateWs(socket)
               })
             }
           }
@@ -361,7 +361,7 @@ export async function execPodStep(
               clearTimeout(closeTimeout)
               closeResolve()
             })
-            socket.close()
+            safeTerminateWs(socket)
           })
         }
 
