@@ -500,11 +500,28 @@ export async function execCpToPod(
             readStream,
             false,
             async status => {
-              if (errStream.size()) {
+              // Only reject on a non-Success V1Status. A non-empty errStream
+              // on Success is just stderr noise (e.g. tar writing
+              // "tar: Removing leading '/' from member names" on every copy)
+              // and must not trigger the 30-attempt retry storm. Stderr is
+              // still forwarded to debug logs so operators can inspect it.
+              if (status.status !== 'Success') {
+                // errStream.size() guard is load-bearing: getContentsAsString()
+                // on an empty buffer returns boolean false, which would
+                // interpolate as the literal string "false" in the error.
+                const errDetail = errStream.size()
+                  ? errStream.getContentsAsString()
+                  : ''
                 reject(
                   new Error(
-                    `Error from execCpToPod - status: ${status.status}, details: \n ${errStream.getContentsAsString()}`
+                    `Error from execCpToPod - status: ${status.status}, details: \n ${errDetail}`
                   )
+                )
+                return
+              }
+              if (errStream.size()) {
+                core.debug(
+                  `execCpToPod stderr (status=Success): ${errStream.getContentsAsString()}`
                 )
               }
               resolve(status)
@@ -597,11 +614,27 @@ export async function execCpFromPod(
             null,
             false,
             async status => {
-              if (errStream.size()) {
+              // Only reject on a non-Success V1Status. A non-empty errStream
+              // on Success is just stderr noise (e.g. tar warnings) and must
+              // not trigger the 30-attempt retry storm. Stderr is still
+              // forwarded to debug logs so operators can inspect it.
+              if (status.status !== 'Success') {
+                // errStream.size() guard is load-bearing: getContentsAsString()
+                // on an empty buffer returns boolean false, which would
+                // interpolate as the literal string "false" in the error.
+                const errDetail = errStream.size()
+                  ? errStream.getContentsAsString()
+                  : ''
                 reject(
                   new Error(
-                    `Error from cpFromPod - details: \n ${errStream.getContentsAsString()}`
+                    `Error from cpFromPod - status: ${status.status}, details: \n ${errDetail}`
                   )
+                )
+                return
+              }
+              if (errStream.size()) {
+                core.debug(
+                  `execCpFromPod stderr (status=Success): ${errStream.getContentsAsString()}`
                 )
               }
               resolve(status)
