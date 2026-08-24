@@ -49,7 +49,12 @@ export async function runScriptStep(
   // - Append files not already present elsewhere
   const mergeCommands = [
     'set -e',
-    'mkdir -p /__w/_temp /__w/_temp_pre',
+    // `_runner_file_commands` is included because the `cp` below reads from
+    // it under `set -e`, but the tail of this script removes `_temp_pre`
+    // after every merge. If the runner had no file commands to stage on a
+    // later step the directory is simply absent, and the `cp` fails the
+    // whole job.
+    'mkdir -p /__w/_temp /__w/_temp_pre /__w/_temp_pre/_runner_file_commands',
     'SRC=/__w/_temp_pre',
     'DST=/__w/_temp',
     // Overwrite _runner_file_commands
