@@ -27,6 +27,7 @@ import {
 import * as shlex from 'shlex'
 import { parsePositiveMsEnv, WebSocketHeartbeat } from './heartbeat'
 import type { HeartbeatWebSocket } from './heartbeat'
+import { requireExecExitCode } from './exec-response'
 
 const kc = new k8s.KubeConfig()
 
@@ -323,7 +324,11 @@ export async function execPodStep(
           if (resp.status === 'Success') {
             core.debug(`[execPodStep] Success, code: ${resp.code}`)
             await closeWebSocket()
-            resolve(resp.code || 0)
+            try {
+              resolve(requireExecExitCode(resp))
+            } catch (error) {
+              reject(error)
+            }
           } else {
             core.debug(
               `[execPodStep] Failure: ${JSON.stringify({ message: resp?.message, details: resp?.details })}`
