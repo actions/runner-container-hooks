@@ -12,6 +12,8 @@ export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
 export const ENV_USE_KUBE_SCHEDULER = 'ACTIONS_RUNNER_USE_KUBE_SCHEDULER'
+export const ENV_PRESEEDED_EXTERNALS_VERSION =
+  'ACTIONS_RUNNER_PRESEEDED_EXTERNALS_VERSION'
 
 export const EXTERNALS_VOLUME_NAME = 'externals'
 export const GITHUB_VOLUME_NAME = 'github'
@@ -267,6 +269,40 @@ export function readExtensionFromFile(): k8s.V1PodTemplateSpec | undefined {
 
 export function useKubeScheduler(): boolean {
   return process.env[ENV_USE_KUBE_SCHEDULER] === 'true'
+}
+
+// Opt-in: the platform pre-seeded the `externals` volume it supplies through
+// the hook template with this runner version's externals, and left the marker
+// `.externals-seeded-<version>` (content: the version) beside them.
+export function preseededExternalsVersion(): string | undefined {
+  return process.env[ENV_PRESEEDED_EXTERNALS_VERSION] || undefined
+}
+
+// The fs-init command that seeds /mnt/externals. Without the opt-in this is
+// the unconditional move. With it, the move is skipped only when the marker
+// for the version named in the environment is present with that version as
+// its content; the version is read from the init container's environment so
+// it never has to be quoted into the script.
+export function externalsInitCommand(preseededVersion?: string): string {
+  const move = 'mv /home/runner/externals/* /mnt/externals/'
+  if (!preseededVersion) {
+    return move
+  }
+  const version = `$${ENV_PRESEEDED_EXTERNALS_VERSION}`
+  const marker = `/mnt/externals/.externals-seeded-${version}`
+  return [
+    `if [ "$(cat "${marker}" 2>/dev/null)" = "${version}" ]`,
+    `then echo "externals pre-seeded for runner ${version}; skipping the copy"`,
+    `else ${move}`,
+    'fi'
+  ].join('; ')
+}
+
+export function extensionSuppliesVolume(
+  name: string,
+  extension?: k8s.V1PodTemplateSpec
+): boolean {
+  return extension?.spec?.volumes?.some(v => v.name === name) ?? false
 }
 
 export enum PodPhase {
