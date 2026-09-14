@@ -26,6 +26,7 @@ import {
 } from './utils'
 import * as shlex from 'shlex'
 import { parsePositiveMsEnv, WebSocketHeartbeat } from './heartbeat'
+import { BackOffManager } from './backoff'
 import type { HeartbeatWebSocket } from './heartbeat'
 
 const kc = new k8s.KubeConfig()
@@ -943,32 +944,6 @@ export function namespace(): string {
     )
   }
   return context.namespace
-}
-
-class BackOffManager {
-  private backOffSeconds = 1
-  totalTime = 0
-  constructor(private throwAfterSeconds?: number) {
-    if (!throwAfterSeconds || throwAfterSeconds < 0) {
-      this.throwAfterSeconds = undefined
-    }
-  }
-
-  async backOff(): Promise<void> {
-    await new Promise(resolve =>
-      setTimeout(resolve, this.backOffSeconds * 1000)
-    )
-    this.totalTime += this.backOffSeconds
-    if (this.throwAfterSeconds && this.throwAfterSeconds < this.totalTime) {
-      throw new Error('backoff timeout')
-    }
-    if (this.backOffSeconds < 20) {
-      this.backOffSeconds *= 2
-    }
-    if (this.backOffSeconds > 20) {
-      this.backOffSeconds = 20
-    }
-  }
 }
 
 export function containerPorts(
