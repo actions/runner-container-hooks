@@ -6,114 +6,55 @@ import { v1 as uuidv4 } from 'uuid'
 import { CONTAINER_EXTENSION_PREFIX } from '../hooks/constants'
 import * as shlex from 'shlex'
 import { Mount } from 'hooklib'
-import * as path from 'path'
-import { POD_VOLUME_NAME } from './index'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
-export const ENV_HOOK_RWO = 'ACTIONS_RUNNER_HOOK_RWO'
+export const ENV_USE_KUBE_SCHEDULER = 'ACTIONS_RUNNER_USE_KUBE_SCHEDULER'
 
-export function containerVolumes(
-  userMountVolumes: Mount[] = [],
-  jobContainer = true,
-  containerAction = false
-): k8s.V1VolumeMount[] {
-  const mounts: k8s.V1VolumeMount[] = [
-    {
-      name: POD_VOLUME_NAME,
-      mountPath: '/__w'
-    }
-  ]
+export const EXTERNALS_VOLUME_NAME = 'externals'
+export const GITHUB_VOLUME_NAME = 'github'
+export const WORK_VOLUME = 'work'
 
-  const workspacePath = process.env.GITHUB_WORKSPACE as string
-  if (containerAction) {
-    const i = workspacePath.lastIndexOf('_work/')
-    const workspaceRelativePath = workspacePath.slice(i + '_work/'.length)
-    mounts.push(
-      {
-        name: POD_VOLUME_NAME,
-        mountPath: '/github/workspace',
-        subPath: workspaceRelativePath
-      },
-      {
-        name: POD_VOLUME_NAME,
-        mountPath: '/github/file_commands',
-        subPath: '_temp/_runner_file_commands'
-      },
-      {
-        name: POD_VOLUME_NAME,
-        mountPath: '/github/home',
-        subPath: '_temp/_github_home'
-      },
-      {
-        name: POD_VOLUME_NAME,
-        mountPath: '/github/workflow',
-        subPath: '_temp/_github_workflow'
-      }
-    )
-    return mounts
+export const CONTAINER_VOLUMES: k8s.V1VolumeMount[] = [
+  {
+    name: EXTERNALS_VOLUME_NAME,
+    mountPath: '/__e'
+  },
+  {
+    name: WORK_VOLUME,
+    mountPath: '/__w'
+  },
+  {
+    name: GITHUB_VOLUME_NAME,
+    mountPath: '/github'
   }
+]
 
-  if (!jobContainer) {
-    return mounts
+export function prepareJobScript(userVolumeMounts: Mount[]): {
+  containerPath: string
+  runnerPath: string
+} {
+  let mountDirs = userVolumeMounts.map(m => m.targetVolumePath).join(' ')
+
+  const content = `#!/bin/sh -l
+set -e
+cp -R /__w/_temp/_github_home /github/home
+cp -R /__w/_temp/_github_workflow /github/workflow
+mkdir -p ${mountDirs}
+`
+
+  const filename = `${uuidv4()}.sh`
+  const entryPointPath = `${process.env.RUNNER_TEMP}/${filename}`
+  fs.writeFileSync(entryPointPath, content)
+  return {
+    containerPath: `/__w/_temp/${filename}`,
+    runnerPath: entryPointPath
   }
-
-  mounts.push(
-    {
-      name: POD_VOLUME_NAME,
-      mountPath: '/__e',
-      subPath: 'externals'
-    },
-    {
-      name: POD_VOLUME_NAME,
-      mountPath: '/github/home',
-      subPath: '_temp/_github_home'
-    },
-    {
-      name: POD_VOLUME_NAME,
-      mountPath: '/github/workflow',
-      subPath: '_temp/_github_workflow'
-    }
-  )
-
-  if (!userMountVolumes?.length) {
-    return mounts
-  }
-
-  for (const userVolume of userMountVolumes) {
-    let sourceVolumePath = ''
-    if (path.isAbsolute(userVolume.sourceVolumePath)) {
-      if (!userVolume.sourceVolumePath.startsWith(workspacePath)) {
-        throw new Error(
-          'Volume mounts outside of the work folder are not supported'
-        )
-      }
-      const i = workspacePath.lastIndexOf('_work/')
-      const workspaceRelativePath = workspacePath.slice(i + '_work/'.length)
-      const sourceRelativePath = userVolume.sourceVolumePath.slice(
-        workspacePath.length + 1
-      )
-      sourceVolumePath = sourceRelativePath
-        ? path.posix.join(workspaceRelativePath, sourceRelativePath)
-        : workspaceRelativePath
-    } else {
-      sourceVolumePath = userVolume.sourceVolumePath
-    }
-
-    mounts.push({
-      name: POD_VOLUME_NAME,
-      mountPath: userVolume.targetVolumePath,
-      subPath: sourceVolumePath,
-      readOnly: userVolume.readOnly
-    })
-  }
-
-  return mounts
 }
 
-export function writeEntryPointScript(
+export function writeRunScript(
   workingDirectory: string,
   entryPoint: string,
   entryPointArgs?: string[],
@@ -122,16 +63,19 @@ export function writeEntryPointScript(
 ): { containerPath: string; runnerPath: string } {
   let exportPath = ''
   if (prependPath?.length) {
+    // TODO: remove compatibility with typeof prependPath === 'string' as we bump to next major version, the hooks will lose PrependPath compat with runners 2.293.0 and older
     const prepend =
       typeof prependPath === 'string' ? prependPath : prependPath.join(':')
     exportPath = `export PATH=${prepend}:$PATH`
   }
 
-  const environmentPrefix = scriptEnv(environmentVariables)
+  let environmentPrefix = scriptEnv(environmentVariables)
 
   const content = `#!/bin/sh -l
+set -e
+rm "$0" # remove script after running
 ${exportPath}
-cd ${workingDirectory} && \\
+cd ${workingDirectory} && \
 exec ${environmentPrefix} ${entryPoint} ${
     entryPointArgs?.length ? entryPointArgs.join(' ') : ''
   }
@@ -321,8 +265,8 @@ export function readExtensionFromFile(): k8s.V1PodTemplateSpec | undefined {
   return doc as k8s.V1PodTemplateSpec
 }
 
-export function useRwoRequiredAffinity(): boolean {
-  return process.env[ENV_HOOK_RWO] === 'true'
+export function useKubeScheduler(): boolean {
+  return process.env[ENV_USE_KUBE_SCHEDULER] === 'true'
 }
 
 export enum PodPhase {
@@ -344,9 +288,8 @@ function mergeLists<T>(base?: T[], from?: T[]): T[] {
 }
 
 export function fixArgs(args: string[]): string[] {
-  if (args.length >= 3 && args[0] === 'sh' && args[1] === '-c') {
-    return [args[0], args[1], args.slice(2).join(' ')]
-  }
+  // Preserve shell command strings passed via `sh -c` without re-tokenizing.
+  // Retokenizing would split the script into multiple args, breaking `sh -c`.
   if (args.length >= 2 && args[0] === 'sh' && args[1] === '-c') {
     return args
   }
@@ -355,6 +298,10 @@ export function fixArgs(args: string[]): string[] {
 
 export async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+export function listDirAllCommand(dir: string): string {
+  return `cd ${shlex.quote(dir)} && find . -type f -not -path '*/_runner_hook_responses*' -exec stat -c '%s %n' {} \\;`
 }
 
 // Safely turn an unknown thrown value into a diagnostic string without

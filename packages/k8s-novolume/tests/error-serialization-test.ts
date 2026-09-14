@@ -29,6 +29,17 @@ jest.mock('@kubernetes/client-node', () => {
   }
 })
 
+jest.mock('tar-fs', () => ({
+  default: {
+    pack: jest.fn().mockReturnValue({ pipe: jest.fn() }),
+    extract: jest.fn().mockReturnValue({
+      on: jest.fn(),
+      pipe: jest.fn()
+    })
+  },
+  __esModule: true
+}))
+
 jest.mock('../src/k8s/utils', () => {
   const actual = jest.requireActual('../src/k8s/utils')
   return {
@@ -37,7 +48,12 @@ jest.mock('../src/k8s/utils', () => {
   }
 })
 
-import { waitForJobToComplete, waitForPodPhases } from '../src/k8s'
+import {
+  execCpToPod,
+  execCpFromPod,
+  waitForJobToComplete,
+  waitForPodPhases
+} from '../src/k8s'
 import { PodPhase } from '../src/k8s/utils'
 
 describe('error serialization', () => {
@@ -48,6 +64,54 @@ describe('error serialization', () => {
 
   afterEach(() => {
     delete process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE']
+  })
+
+  describe('execCpToPod', () => {
+    it('should include Error.message in thrown error after retries', async () => {
+      mockExec.mockRejectedValue(new Error('connection refused'))
+
+      await expect(
+        execCpToPod('test-pod', '/tmp/src', '/workspace')
+      ).rejects.toThrow('cpToPod failed after 30 attempts: connection refused')
+    })
+
+    it('should use String() for non-Error throwables', async () => {
+      mockExec.mockRejectedValue('raw string error')
+
+      await expect(
+        execCpToPod('test-pod', '/tmp/src', '/workspace')
+      ).rejects.toThrow('cpToPod failed after 30 attempts: raw string error')
+    })
+
+    it('should not produce empty braces in error message', async () => {
+      mockExec.mockRejectedValue(new Error('ETIMEOUT'))
+
+      await expect(
+        execCpToPod('test-pod', '/tmp/src', '/workspace')
+      ).rejects.toMatchObject({
+        message: expect.not.stringContaining('{}')
+      })
+    })
+  })
+
+  describe('execCpFromPod', () => {
+    it('should include Error.message in thrown error after retries', async () => {
+      mockExec.mockRejectedValue(new Error('container not found'))
+
+      await expect(
+        execCpFromPod('test-pod', '/workspace/output', '/tmp/dst')
+      ).rejects.toThrow(
+        'execCpFromPod failed after 30 attempts: container not found'
+      )
+    })
+
+    it('should use String() for non-Error throwables', async () => {
+      mockExec.mockRejectedValue(42)
+
+      await expect(
+        execCpFromPod('test-pod', '/workspace/output', '/tmp/dst')
+      ).rejects.toThrow('execCpFromPod failed after 30 attempts: 42')
+    })
   })
 
   describe('waitForJobToComplete', () => {

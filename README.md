@@ -23,8 +23,16 @@ You are welcome to still raise bugs in this repo.
 
 ## Background 
 
-Three projects are included in the `packages` folder
-- k8s: A kubernetes hook implementation that spins up pods dynamically to run a job. More details can be found in the [readme](./packages/k8s/README.md)
+Three hook implementations are included in the `packages` folder, alongside the shared `hooklib` library. Each implementation is released as its own archive, and only one of them is configured on a runner at a time through `ACTIONS_RUNNER_CONTAINER_HOOKS`.
+
+| Implementation | Release archive | Use it when |
+| --- | --- | --- |
+| [k8s](./packages/k8s/README.md) | `actions-runner-hooks-k8s-<version>.zip` | The runner runs in kubernetes and the runner's workspace volume can be shared with the job pods. This is the recommended kubernetes implementation. |
+| [k8s-novolume](./packages/k8s-novolume/README.md) | `actions-runner-hooks-k8s-novolume-<version>.zip` | The runner runs in kubernetes, but shared storage is not available. |
+| [docker](./packages/docker/README.md) | `actions-runner-hooks-docker-<version>.zip` | The runner runs on a machine with docker available. |
+
+- k8s: A kubernetes hook implementation that spins up pods dynamically to run a job. The runner's workspace is shared with the job pods through a persistent volume claim, so a `ReadWriteMany` volume is expected. `ReadWriteOnce` volumes are supported by setting `ACTIONS_RUNNER_HOOK_RWO=true`, which pins the job pods to the runner's node. More details can be found in the [readme](./packages/k8s/README.md)
+- k8s-novolume: A kubernetes hook implementation that spins up pods dynamically to run a job, without sharing the runner's workspace volume with them. The workspace is copied in and out of the job pod using the kubernetes `exec` API, which removes the shared storage requirement at the cost of performance. More details can be found in the [readme](./packages/k8s-novolume/README.md)
 - docker: A hook implementation of the runner's docker implementation. More details can be found in the [readme](./packages/docker/README.md)
 - hooklib: a shared library which contains typescript definitions and utilities that the other projects consume
 
