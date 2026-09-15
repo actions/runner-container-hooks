@@ -30,6 +30,7 @@ rules:
 - The `ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER` env should be set to true to prevent the runner from running any jobs outside of a container
 - The runner pod should map a persistent volume claim into the `_work` directory
     - The `ACTIONS_RUNNER_CLAIM_NAME` env should be set to the persistent volume claim that contains the runner's working directory, otherwise it defaults to `${ACTIONS_RUNNER_POD_NAME}-work`
+- The hook polls the job pod's phase (and, for container steps, the job's status) with an exponential back-off that starts at 1 s and caps at 20 s. `ACTIONS_RUNNER_BACKOFF_INITIAL_MS` and `ACTIONS_RUNNER_BACKOFF_MAX_MS` override the two bounds, in milliseconds, for clusters where a pod is Running within a few seconds of creation and the default ladder would leave it idle
 - Some actions runner env's are expected to be set. These are set automatically by the runner.
     - `RUNNER_WORKSPACE` is expected to be set to the workspace of the runner
     - `GITHUB_WORKSPACE` is expected to be set to the workspace of the job
