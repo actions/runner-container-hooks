@@ -32,11 +32,139 @@ const kc = new k8s.KubeConfig()
 
 kc.loadFromDefault()
 
-const k8sApi = kc.makeApiClient(k8s.CoreV1Api)
-const k8sBatchV1Api = kc.makeApiClient(k8s.BatchV1Api)
-const k8sAuthorizationV1Api = kc.makeApiClient(k8s.AuthorizationV1Api)
-
 const DEFAULT_WAIT_FOR_POD_TIME_SECONDS = 10 * 60 // 10 min
+
+const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504])
+const RETRYABLE_NETWORK_CODES = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'ENETUNREACH',
+  'EAI_AGAIN',
+  'ENOTFOUND'
+])
+const MAX_RETRIES = 3
+const RETRY_BASE_DELAY_MS = 1000
+
+export function isRetryableError(err: unknown): boolean {
+  if (err instanceof k8s.ApiException) {
+    return RETRYABLE_STATUS_CODES.has(err.code)
+  }
+
+  let current: unknown = err
+  while (current instanceof Error) {
+    if (
+      'code' in current &&
+      typeof current.code === 'string' &&
+      RETRYABLE_NETWORK_CODES.has(current.code)
+    ) {
+      return true
+    }
+    current = (current as { cause?: unknown }).cause
+  }
+
+  return false
+}
+
+function retryDelay(attempt: number): number {
+  return RETRY_BASE_DELAY_MS * 2 ** attempt * (0.5 + Math.random())
+}
+
+export function retryAfterDelay(
+  err: k8s.ApiException<unknown>,
+  attempt: number
+): number {
+  const headerRetrySeconds =
+    err.headers?.['retry-after'] ?? err.headers?.['Retry-After']
+  if (!headerRetrySeconds) {
+    return retryDelay(attempt)
+  }
+
+  const seconds = Number(headerRetrySeconds)
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return retryDelay(attempt)
+  }
+
+  // Cap the delay to 30 seconds
+  const maxDelaySeconds = 30
+  return Math.min(seconds * 1000, maxDelaySeconds * 1000)
+}
+
+function describeError(err: unknown): string {
+  if (err instanceof k8s.ApiException) {
+    return `status ${err.code}`
+  }
+  let current: unknown = err
+  while (current instanceof Error) {
+    if (
+      'code' in current &&
+      typeof current.code === 'string' &&
+      RETRYABLE_NETWORK_CODES.has(current.code)
+    ) {
+      return current.code
+    }
+    current = (current as { cause?: unknown }).cause
+  }
+  return String(err)
+}
+
+// WARNING: at-least-once delivery for writes.
+//
+// This proxy retries EVERY method on the wrapped client when isRetryableError
+// returns true, including non-idempotent writes (createNamespaced*,
+// patchNamespaced*, replaceNamespaced*). A 5xx from an intermediary or an
+// ECONNRESET *after* the server has already committed a POST will cause a
+// retry; on the next attempt the server returns 409 AlreadyExists, which then
+// surfaces to the caller as a hard failure even though the original write
+// succeeded.
+//
+// Every caller that POSTs/PUTs/PATCHes through this wrapped client MUST handle
+// 409 explicitly (see createJobPod, createContainerStepPod, createDockerSecret,
+// createSecretForEnvs for the existing call sites). If you add a new write
+// caller and skip the 409 fallback, you will get spurious failures under
+// transient network conditions.
+export function withRetryClient<T extends object>(client: T): T {
+  const callWithRetry = async (
+    fn: (...args: unknown[]) => unknown,
+    name: string,
+    args: unknown[]
+  ): Promise<unknown> => {
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        return await fn(...args)
+      } catch (err) {
+        if (!isRetryableError(err) || attempt === MAX_RETRIES) {
+          throw err
+        }
+        const delay =
+          err instanceof k8s.ApiException && err.code === 429
+            ? retryAfterDelay(err, attempt)
+            : retryDelay(attempt)
+        core.warning(
+          `K8s API call ${name} failed (${describeError(err)}), retrying in ${Math.round(delay)}ms (retry ${attempt + 1} of ${MAX_RETRIES})`
+        )
+        await sleep(delay)
+      }
+    }
+  }
+
+  return new Proxy(client, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver)
+      if (typeof value !== 'function') {
+        return value
+      }
+      return async (...args: unknown[]) =>
+        callWithRetry(value.bind(target), String(prop), args)
+    }
+  })
+}
+
+const k8sApi = withRetryClient(kc.makeApiClient(k8s.CoreV1Api))
+const k8sBatchV1Api = withRetryClient(kc.makeApiClient(k8s.BatchV1Api))
+const k8sAuthorizationV1Api = withRetryClient(
+  kc.makeApiClient(k8s.AuthorizationV1Api)
+)
 
 export const requiredPermissions = [
   {
@@ -179,10 +307,20 @@ export async function createJobPod(
     mergePodSpecWithOptions(appPod.spec, extension.spec)
   }
 
-  return await k8sApi.createNamespacedPod({
-    namespace: namespace(),
-    body: appPod
-  })
+  try {
+    return await k8sApi.createNamespacedPod({
+      namespace: namespace(),
+      body: appPod
+    })
+  } catch (err) {
+    if (err instanceof k8s.ApiException && err.code === 409) {
+      return await k8sApi.readNamespacedPod({
+        name,
+        namespace: namespace()
+      })
+    }
+    throw err
+  }
 }
 
 export async function createContainerStepPod(
@@ -232,18 +370,35 @@ export async function createContainerStepPod(
     mergePodSpecWithOptions(appPod.spec, extension.spec)
   }
 
-  return await k8sApi.createNamespacedPod({
-    namespace: namespace(),
-    body: appPod
-  })
+  try {
+    return await k8sApi.createNamespacedPod({
+      namespace: namespace(),
+      body: appPod
+    })
+  } catch (err) {
+    if (err instanceof k8s.ApiException && err.code === 409) {
+      return await k8sApi.readNamespacedPod({
+        name,
+        namespace: namespace()
+      })
+    }
+    throw err
+  }
 }
 
 export async function deletePod(name: string): Promise<void> {
-  await k8sApi.deleteNamespacedPod({
-    name,
-    namespace: namespace(),
-    gracePeriodSeconds: 0
-  })
+  try {
+    await k8sApi.deleteNamespacedPod({
+      name,
+      namespace: namespace(),
+      gracePeriodSeconds: 0
+    })
+  } catch (err) {
+    if (err instanceof k8s.ApiException && err.code === 404) {
+      return
+    }
+    throw err
+  }
 }
 
 export async function execPodStep(
@@ -702,11 +857,40 @@ export async function createDockerSecret(
       'base64'
     )
   }
-
-  return await k8sApi.createNamespacedSecret({
-    namespace: namespace(),
-    body: secret
-  })
+  try {
+    return await k8sApi.createNamespacedSecret({
+      namespace: namespace(),
+      body: secret
+    })
+  } catch (err) {
+    if (!(err instanceof k8s.ApiException && err.code === 409)) {
+      throw err
+    }
+    // 409 here is almost certainly the retry-induced case: our POST committed
+    // server-side, an intermediary returned 5xx / ECONNRESET, withRetryClient
+    // retried, and the second attempt saw the secret we just created. Verify
+    // the existing secret's data matches what we tried to write before
+    // returning it — otherwise the pod will pull images with stale
+    // credentials. Secrets are immutable (set above), so we cannot
+    // replace/patch on mismatch; surface the collision instead.
+    const existing = await k8sApi.readNamespacedSecret({
+      name: secretName,
+      namespace: namespace()
+    })
+    const existingData = existing.data ?? {}
+    const desiredData = secret.data ?? {}
+    const desiredKeys = Object.keys(desiredData)
+    const existingKeys = Object.keys(existingData)
+    const mismatch =
+      desiredKeys.length !== existingKeys.length ||
+      desiredKeys.some(k => existingData[k] !== desiredData[k])
+    if (mismatch) {
+      throw new Error(
+        `docker secret ${secretName} already exists with data that does not match the requested registry credentials; refusing to use stale secret`
+      )
+    }
+    return existing
+  }
 }
 
 export async function createSecretForEnvs(envs: {
@@ -730,18 +914,55 @@ export async function createSecretForEnvs(envs: {
     secret.data[key] = Buffer.from(value).toString('base64')
   }
 
-  await k8sApi.createNamespacedSecret({
-    namespace: namespace(),
-    body: secret
-  })
+  try {
+    await k8sApi.createNamespacedSecret({
+      namespace: namespace(),
+      body: secret
+    })
+  } catch (err) {
+    if (!(err instanceof k8s.ApiException && err.code === 409)) {
+      throw err
+    }
+    // 409 here is almost certainly the retry-induced case: our POST committed
+    // server-side, an intermediary returned 5xx / ECONNRESET, withRetryClient
+    // retried, and the second attempt saw the secret we just created. Verify
+    // the existing secret's data matches what we tried to write before
+    // claiming success — otherwise the caller will mount stale env values.
+    // Secrets are immutable (set above), so we cannot replace/patch on
+    // mismatch; surface the collision instead.
+    const existing = await k8sApi.readNamespacedSecret({
+      name: secretName,
+      namespace: namespace()
+    })
+    const existingData = existing.data ?? {}
+    const desiredData = secret.data ?? {}
+    const desiredKeys = Object.keys(desiredData)
+    const existingKeys = Object.keys(existingData)
+    const mismatch =
+      desiredKeys.length !== existingKeys.length ||
+      desiredKeys.some(k => existingData[k] !== desiredData[k])
+    if (mismatch) {
+      throw new Error(
+        `secret ${secretName} already exists with data that does not match the requested envs; refusing to mount stale secret`
+      )
+    }
+  }
+
   return secretName
 }
 
 export async function deleteSecret(name: string): Promise<void> {
-  await k8sApi.deleteNamespacedSecret({
-    name,
-    namespace: namespace()
-  })
+  try {
+    await k8sApi.deleteNamespacedSecret({
+      name,
+      namespace: namespace()
+    })
+  } catch (err) {
+    if (err instanceof k8s.ApiException && err.code === 404) {
+      return
+    }
+    throw err
+  }
 }
 
 export async function pruneSecrets(): Promise<void> {
