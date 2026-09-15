@@ -16,7 +16,7 @@ import * as shlex from 'shlex'
 export async function runScriptStep(
   args: RunScriptStepArgs,
   state
-): Promise<void> {
+): Promise<number> {
   // Write the entrypoint first. This will be later coppied to the workflow pod
   const { entryPoint, entryPointArgs, environmentVariables } = args
   const { containerPath, runnerPath } = writeRunScript(
@@ -79,8 +79,9 @@ export async function runScriptStep(
   // Execute the entrypoint script
   args.entryPoint = 'sh'
   args.entryPointArgs = ['-e', containerPath]
+  let exitCode = 1
   try {
-    await execPodStep(
+    exitCode = await execPodStep(
       [args.entryPoint, ...args.entryPointArgs],
       state.jobPod,
       JOB_CONTAINER_NAME
@@ -109,4 +110,6 @@ export async function runScriptStep(
   } catch (error) {
     core.warning('Failed to copy _temp from pod')
   }
+
+  return exitCode
 }
