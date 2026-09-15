@@ -277,6 +277,7 @@ export async function execPodStep(
   return new Promise<number>((resolve, reject) => {
     core.debug('[execPodStep] About to call exec.exec')
     let ws: HeartbeatWebSocket | null = null
+    let statusReceived = false
 
     exec
       .exec(
@@ -289,6 +290,7 @@ export async function execPodStep(
         stdin ?? null,
         false /* tty */,
         async resp => {
+          statusReceived = true
           core.debug(
             `[execPodStep] execPodStep response: ${JSON.stringify(resp)}`
           )
@@ -338,6 +340,14 @@ export async function execPodStep(
         ws = websocket
         if (ws) {
           heartbeat.start(ws, reject)
+          ws.once('close', () => {
+            if (!statusReceived) {
+              heartbeat.stop()
+              reject(
+                new Error('WebSocket closed without status response')
+              )
+            }
+          })
         } else {
           core.warning('[Heartbeat] WebSocket is null, heartbeat not started')
         }
