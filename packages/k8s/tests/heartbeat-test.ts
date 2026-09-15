@@ -14,6 +14,7 @@ class MockWebSocket extends EventEmitter implements HeartbeatWebSocket {
   readyState: number
   ping = jest.fn()
   close = jest.fn()
+  terminate = jest.fn()
 
   constructor(readyState = 1) {
     super()
@@ -100,7 +101,7 @@ describe('WebSocketHeartbeat', () => {
   })
 
   describe('pong timeout', () => {
-    it('closes the socket and rejects the promise when no pong is received after first ping', () => {
+    it('terminates the socket and rejects the promise when no pong is received after first ping', () => {
       const ws = new MockWebSocket(1)
       const reject = jest.fn()
       // pingPeriodMs=100, pongDeadlineMs=200
@@ -111,7 +112,11 @@ describe('WebSocketHeartbeat', () => {
 
       jest.advanceTimersByTime(350) // past first ping + deadline
 
-      expect(ws.close).toHaveBeenCalledTimes(1)
+      // Pong timeout means the connection is already declared stale —
+      // force-terminate, do not perform a graceful close that the kubelet
+      // streaming server would not forward to the child process.
+      expect(ws.terminate).toHaveBeenCalledTimes(1)
+      expect(ws.close).not.toHaveBeenCalled()
       expect(reject).toHaveBeenCalledTimes(1)
       expect(reject.mock.calls[0][0]).toBeInstanceOf(Error)
       expect(reject.mock.calls[0][0].message).toMatch(/heartbeat timeout/)
