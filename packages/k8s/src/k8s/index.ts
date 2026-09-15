@@ -22,7 +22,11 @@ import {
   sleep,
   EXTERNALS_VOLUME_NAME,
   GITHUB_VOLUME_NAME,
-  WORK_VOLUME
+  WORK_VOLUME,
+  ENV_PRESEEDED_EXTERNALS_VERSION,
+  preseededExternalsVersion,
+  externalsInitCommand,
+  extensionSuppliesVolume
 } from './utils'
 import * as shlex from 'shlex'
 import { parsePositiveMsEnv, WebSocketHeartbeat } from './heartbeat'
@@ -105,11 +109,13 @@ export async function createJobPod(
   const githubWorkspace = process.env.GITHUB_WORKSPACE
   const workingDirPath = githubWorkspace?.split('/').slice(-2).join('/') ?? ''
 
+  const preseededVersion = preseededExternalsVersion()
+
   const initCommands = [
     'mkdir -p /mnt/externals',
     'mkdir -p /mnt/work',
     'mkdir -p /mnt/github',
-    'mv /home/runner/externals/* /mnt/externals/'
+    externalsInitCommand(preseededVersion)
   ]
 
   if (workingDirPath) {
@@ -127,6 +133,13 @@ export async function createJobPod(
         runAsGroup: 1001,
         runAsUser: 1001
       },
+      ...(preseededVersion
+        ? {
+            env: [
+              { name: ENV_PRESEEDED_EXTERNALS_VERSION, value: preseededVersion }
+            ]
+          }
+        : {}),
       volumeMounts: [
         {
           name: EXTERNALS_VOLUME_NAME,
@@ -146,11 +159,20 @@ export async function createJobPod(
 
   appPod.spec.restartPolicy = 'Never'
 
-  appPod.spec.volumes = [
-    {
+  appPod.spec.volumes = []
+  // With the pre-seed opt-in the platform supplies the externals volume
+  // through the extension (the default emptyDir could never hold the seed);
+  // without one, fall back to the emptyDir and fs-init copies as usual.
+  if (
+    !preseededVersion ||
+    !extensionSuppliesVolume(EXTERNALS_VOLUME_NAME, extension)
+  ) {
+    appPod.spec.volumes.push({
       name: EXTERNALS_VOLUME_NAME,
       emptyDir: {}
-    },
+    })
+  }
+  appPod.spec.volumes.push(
     {
       name: GITHUB_VOLUME_NAME,
       emptyDir: {}
@@ -159,7 +181,7 @@ export async function createJobPod(
       name: WORK_VOLUME,
       emptyDir: {}
     }
-  ]
+  )
 
   if (registry) {
     const secret = await createDockerSecret(registry)

@@ -35,6 +35,33 @@ rules:
     - `GITHUB_WORKSPACE` is expected to be set to the workspace of the job
 
 
+## Pre-seeded externals (opt-in)
+
+On every job the `fs-init` init container moves the runner image's
+`/home/runner/externals` (the bundled Node runtimes, roughly 600 MB in ~9,000
+files) into the job pod's `externals` volume before the job container starts.
+A platform that can provision that volume already populated — for example
+from a node-local copy of the pinned runner image's externals — can skip the
+move:
+
+- Supply the `externals` volume through the hook template
+  (`ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE`, `spec.volumes`, `name: externals`),
+  pre-populated with the runner version's externals and a marker file
+  `.externals-seeded-<runner version>` whose content is that version. The
+  volume must be readable and writable by uid/gid 1001, like the emptyDir it
+  replaces.
+- Set `ACTIONS_RUNNER_PRESEEDED_EXTERNALS_VERSION` on the runner to that runner
+  version (the runner exports no version to the hook, so it is declared beside
+  the image).
+
+`fs-init` then checks the marker inside the mounted volume and skips the move
+only when it is present with the expected version as its content; a missing
+or mismatched marker (a volume seeded for another runner version, or not
+seeded at all) falls back to the move. Unset, the env changes nothing: the
+`externals` volume is the emptyDir and the move runs as before. With the env
+set but no `externals` volume in the template, the emptyDir is used and the
+move runs.
+
 ## Limitations
 - A [job containers](https://docs.github.com/en/actions/using-jobs/running-jobs-in-a-container) will be required for all jobs
 - Building container actions from a dockerfile is not supported at this time

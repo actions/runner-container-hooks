@@ -1,4 +1,7 @@
 ﻿import * as fs from 'fs'
+import * as os from 'os'
+import * as path from 'path'
+import { execFileSync } from 'child_process'
 import { containerPorts } from '../src/k8s'
 import {
   generateContainerName,
@@ -6,7 +9,12 @@ import {
   mergePodSpecWithOptions,
   mergeContainerWithOptions,
   readExtensionFromFile,
-  ENV_HOOK_TEMPLATE_PATH
+  ENV_HOOK_TEMPLATE_PATH,
+  ENV_PRESEEDED_EXTERNALS_VERSION,
+  EXTERNALS_VOLUME_NAME,
+  preseededExternalsVersion,
+  externalsInitCommand,
+  extensionSuppliesVolume
 } from '../src/k8s/utils'
 import * as k8s from '@kubernetes/client-node'
 import { TestHelper } from './test-setup'
@@ -225,6 +233,93 @@ describe('k8s utils', () => {
         generateContainerName('localstack/localstack/:latest')
       ).toThrow()
       expect(() => generateContainerName(':latest')).toThrow()
+    })
+  })
+
+  describe('pre-seeded externals', () => {
+    const unconditionalMove = 'mv /home/runner/externals/* /mnt/externals/'
+
+    afterEach(() => {
+      delete process.env[ENV_PRESEEDED_EXTERNALS_VERSION]
+    })
+
+    it('should not opt in when the env is unset or empty', () => {
+      delete process.env[ENV_PRESEEDED_EXTERNALS_VERSION]
+      expect(preseededExternalsVersion()).toBeUndefined()
+      process.env[ENV_PRESEEDED_EXTERNALS_VERSION] = ''
+      expect(preseededExternalsVersion()).toBeUndefined()
+    })
+
+    it('should read the version from the env', () => {
+      process.env[ENV_PRESEEDED_EXTERNALS_VERSION] = '2.336.0'
+      expect(preseededExternalsVersion()).toBe('2.336.0')
+    })
+
+    it('should keep the unconditional move without the opt-in', () => {
+      expect(externalsInitCommand(undefined)).toBe(unconditionalMove)
+    })
+
+    it('should gate the move on the marker with the opt-in', () => {
+      const command = externalsInitCommand('2.336.0')
+      expect(command).toContain(unconditionalMove)
+      expect(command).toContain(
+        `/mnt/externals/.externals-seeded-$${ENV_PRESEEDED_EXTERNALS_VERSION}`
+      )
+      // the version is read from the init container's env, never inlined
+      expect(command).not.toContain('2.336.0')
+    })
+
+    it('should skip the move only when the marker matches', () => {
+      const command = externalsInitCommand('2.336.0')
+      const externals = fs.mkdtempSync(path.join(os.tmpdir(), 'externals-'))
+      const marker = path.join(externals, '.externals-seeded-2.336.0')
+      const run = (version: string): string =>
+        execFileSync(
+          'sh',
+          ['-c', command.split('/mnt/externals').join(externals)],
+          {
+            env: {
+              PATH: process.env.PATH,
+              [ENV_PRESEEDED_EXTERNALS_VERSION]: version
+            },
+            stdio: ['ignore', 'pipe', 'ignore']
+          }
+        ).toString()
+      try {
+        // no marker: the move runs (and fails here, since there is no source)
+        expect(() => run('2.336.0')).toThrow()
+        // marker for another version: the move runs
+        fs.writeFileSync(marker, '2.336.0')
+        expect(() => run('2.337.0')).toThrow()
+        // marker with the wrong content: the move runs
+        fs.writeFileSync(marker, 'something else')
+        expect(() => run('2.336.0')).toThrow()
+        // marker present with the version as its content: skipped
+        fs.writeFileSync(marker, '2.336.0\n')
+        expect(run('2.336.0')).toContain('externals pre-seeded')
+      } finally {
+        fs.rmSync(externals, { recursive: true })
+      }
+    })
+
+    it('should tell whether the extension supplies a volume', () => {
+      expect(extensionSuppliesVolume(EXTERNALS_VOLUME_NAME, undefined)).toBe(
+        false
+      )
+      expect(extensionSuppliesVolume(EXTERNALS_VOLUME_NAME, {})).toBe(false)
+      expect(
+        extensionSuppliesVolume(EXTERNALS_VOLUME_NAME, {
+          spec: { containers: [], volumes: [{ name: 'other' }] }
+        })
+      ).toBe(false)
+      expect(
+        extensionSuppliesVolume(EXTERNALS_VOLUME_NAME, {
+          spec: {
+            containers: [],
+            volumes: [{ name: EXTERNALS_VOLUME_NAME, hostPath: { path: '/x' } }]
+          }
+        })
+      ).toBe(true)
     })
   })
 
