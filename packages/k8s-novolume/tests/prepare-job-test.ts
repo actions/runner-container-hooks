@@ -50,7 +50,7 @@ describe('Prepare job', () => {
     prepareJobData.args.container.userMountVolumes = [
       {
         sourceVolumePath: userVolumeMount,
-        targetVolumePath: '/myvolume',
+        targetVolumePath: '/__w/myvolume',
         readOnly: false
       }
     ]
@@ -63,7 +63,7 @@ describe('Prepare job', () => {
     )
 
     await execPodStep(
-      ['sh', '-c', '[ "$(cat /myvolume/file.txt)" = "hello" ] || exit 5'],
+      ['sh', '-c', '[ "$(cat /__w/myvolume/file.txt)" = "hello" ] || exit 5'],
       content!.state!.jobPod,
       JOB_CONTAINER_NAME
     ).then(output => {
