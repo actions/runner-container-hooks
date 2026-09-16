@@ -1,7 +1,7 @@
 # K8s Hooks
 
 ## Description
-This implementation provides a way to dynamically spin up jobs to run container workflows, rather then relying on the default docker implementation. It is meant to be used when the runner itself is running in k8s, for example when using the [Actions Runner Controller](https://github.com/actions-runner-controller/actions-runner-controller)
+This implementation provides a way to dynamically spin up jobs to run container workflows, rather than relying on the default docker implementation. It is meant to be used when the runner itself is running in k8s, for example when using the [Actions Runner Controller](https://github.com/actions-runner-controller/actions-runner-controller)
 
 ## Pre-requisites 
 Some things are expected to be set when using these hooks
@@ -24,6 +24,9 @@ rules:
   verbs: ["get", "list", "watch",]
 - apiGroups: [""]
   resources: ["secrets"]
+  verbs: ["get", "list", "create", "delete"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
   verbs: ["get", "list", "create", "delete"]
 ```
 - The `ACTIONS_RUNNER_POD_NAME` env should be set to the name of the pod
@@ -57,6 +60,8 @@ To enable this safely:
 2. The hooks will add a required `nodeAffinity` to job pods, ensuring they are scheduled on the same node as the runner pod (`kubernetes.io/hostname` match).
 
 > **Note:** We do not recommend manually setting `nodeName` in the pod template, as the hooks handle node placement automatically via affinity.
+
+> **Note:** The pod template extension (`ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE`) is applied last and replaces `spec.affinity` wholesale. If you set `affinity` in your template while running with `ACTIONS_RUNNER_HOOK_RWO=true`, you are responsible for including the required `kubernetes.io/hostname` node affinity yourself, otherwise job pods may be scheduled away from the node holding the RWO volume.
 
 
 ## Limitations

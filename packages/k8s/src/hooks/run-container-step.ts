@@ -38,8 +38,8 @@ export async function runContainerStep(
     }
     secretName = await createSecretForEnvs(envs)
   } catch (err) {
-    core.debug(`createSecretForEnvs failed: ${JSON.stringify(err)}`)
-    const message = (err as any)?.response?.body?.message || err
+    const message = formatError(err)
+    core.debug(`createSecretForEnvs failed: ${message}`)
     throw new Error(`failed to create script environment: ${message}`)
   }
 
@@ -70,8 +70,8 @@ export async function runContainerStep(
   try {
     podName = await getContainerJobPodName(job.metadata.name)
   } catch (err) {
-    core.debug(`getContainerJobPodName failed: ${JSON.stringify(err)}`)
-    const message = (err as any)?.response?.body?.message || err
+    const message = formatError(err)
+    core.debug(`getContainerJobPodName failed: ${message}`)
     throw new Error(`failed to get container job pod name: ${message}`)
   }
 

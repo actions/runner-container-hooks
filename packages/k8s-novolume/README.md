@@ -1,7 +1,7 @@
 # K8s Novolume Hooks
 
 ## Description
-This implementation provides a way to dynamically spin up pods to run container workflows, rather then relying on the default docker implementation. It is meant to be used when the runner itself is running in k8s, for example when using the [Actions Runner Controller](https://github.com/actions-runner-controller/actions-runner-controller)
+This implementation provides a way to dynamically spin up pods to run container workflows, rather than relying on the default docker implementation. It is meant to be used when the runner itself is running in k8s, for example when using the [Actions Runner Controller](https://github.com/actions-runner-controller/actions-runner-controller)
 
 Unlike the [k8s hooks](../k8s/README.md), the job pods do not mount the runner's workspace volume. Instead, the workspace and the internal directories are copied into the job pod using the Kubernetes `exec` API, and copied back once the step completes. This removes the need for a `ReadWriteMany` volume (or for pinning every job pod to the runner's node), at the cost of the time it takes to copy the assets for every step.
 
