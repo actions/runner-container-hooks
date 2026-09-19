@@ -106,6 +106,8 @@ export async function createJobPod(
   const workingDirPath = githubWorkspace?.split('/').slice(-2).join('/') ?? ''
 
   const initCommands = [
+    // group-writable dirs so non-1001 job images can write the workspace (fsGroup)
+    'umask 002',
     'mkdir -p /mnt/externals',
     'mkdir -p /mnt/work',
     'mkdir -p /mnt/github',
