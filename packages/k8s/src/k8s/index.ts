@@ -761,6 +761,31 @@ export async function pruneSecrets(): Promise<void> {
   )
 }
 
+const UNRECOVERABLE_WAITING_REASONS = new Set([
+  'ImagePullBackOff',
+  'ErrImagePull',
+  'InvalidImageName',
+  'CreateContainerConfigError',
+  'CreateContainerError'
+])
+
+function getContainerErrors(pod: k8s.V1Pod): string[] {
+  const errors: string[] = []
+  const allStatuses = [
+    ...(pod.status?.initContainerStatuses ?? []),
+    ...(pod.status?.containerStatuses ?? [])
+  ]
+  for (const cs of allStatuses) {
+    const waiting = cs.state?.waiting
+    if (waiting?.reason && UNRECOVERABLE_WAITING_REASONS.has(waiting.reason)) {
+      errors.push(
+        `container "${cs.name}": ${waiting.reason}${waiting.message ? ` - ${waiting.message}` : ''}`
+      )
+    }
+  }
+  return errors
+}
+
 export async function waitForPodPhases(
   podName: string,
   awaitingPhases: Set<PodPhase>,
@@ -771,7 +796,8 @@ export async function waitForPodPhases(
   let phase: PodPhase = PodPhase.UNKNOWN
   try {
     while (true) {
-      phase = await getPodPhase(podName)
+      const pod = await readPod(podName)
+      phase = parsePodPhase(pod)
       if (awaitingPhases.has(phase)) {
         return
       }
@@ -781,6 +807,14 @@ export async function waitForPodPhases(
           `Pod ${podName} is unhealthy with phase status ${phase}`
         )
       }
+
+      const containerErrors = getContainerErrors(pod)
+      if (containerErrors.length > 0) {
+        throw new Error(
+          `Pod ${podName} has unrecoverable container errors: ${containerErrors.join('; ')}`
+        )
+      }
+
       await backOffManager.backOff()
     }
   } catch (error) {
@@ -809,23 +843,26 @@ export function getPrepareJobTimeoutSeconds(): number {
   return timeoutSeconds
 }
 
-async function getPodPhase(name: string): Promise<PodPhase> {
-  const podPhaseLookup = new Set<string>([
-    PodPhase.PENDING,
-    PodPhase.RUNNING,
-    PodPhase.SUCCEEDED,
-    PodPhase.FAILED,
-    PodPhase.UNKNOWN
-  ])
-  const pod = await k8sApi.readNamespacedPod({
+async function readPod(name: string): Promise<k8s.V1Pod> {
+  return k8sApi.readNamespacedPod({
     name,
     namespace: namespace()
   })
+}
 
+const podPhaseLookup = new Set<string>([
+  PodPhase.PENDING,
+  PodPhase.RUNNING,
+  PodPhase.SUCCEEDED,
+  PodPhase.FAILED,
+  PodPhase.UNKNOWN
+])
+
+function parsePodPhase(pod: k8s.V1Pod): PodPhase {
   if (!pod.status?.phase || !podPhaseLookup.has(pod.status.phase)) {
     return PodPhase.UNKNOWN
   }
-  return pod.status?.phase as PodPhase
+  return pod.status.phase as PodPhase
 }
 
 async function isJobSucceeded(name: string): Promise<boolean> {
