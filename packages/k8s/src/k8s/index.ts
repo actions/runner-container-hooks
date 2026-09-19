@@ -22,7 +22,10 @@ import {
   sleep,
   EXTERNALS_VOLUME_NAME,
   GITHUB_VOLUME_NAME,
-  WORK_VOLUME
+  WORK_VOLUME,
+  externalsFromImage,
+  externalsVolume,
+  runnerImage
 } from './utils'
 import * as shlex from 'shlex'
 import { parsePositiveMsEnv, WebSocketHeartbeat } from './heartbeat'
@@ -105,12 +108,14 @@ export async function createJobPod(
   const githubWorkspace = process.env.GITHUB_WORKSPACE
   const workingDirPath = githubWorkspace?.split('/').slice(-2).join('/') ?? ''
 
-  const initCommands = [
-    'mkdir -p /mnt/externals',
-    'mkdir -p /mnt/work',
-    'mkdir -p /mnt/github',
-    'mv /home/runner/externals/* /mnt/externals/'
-  ]
+  const initCommands = ['mkdir -p /mnt/work', 'mkdir -p /mnt/github']
+
+  if (!externalsFromImage()) {
+    initCommands.push(
+      'mkdir -p /mnt/externals',
+      'mv /home/runner/externals/* /mnt/externals/'
+    )
+  }
 
   if (workingDirPath) {
     initCommands.push(`mkdir -p /mnt/work/${workingDirPath}`)
@@ -119,19 +124,21 @@ export async function createJobPod(
   appPod.spec.initContainers = [
     {
       name: 'fs-init',
-      image:
-        process.env.ACTIONS_RUNNER_IMAGE ||
-        'ghcr.io/actions/actions-runner:latest',
+      image: runnerImage(),
       command: ['sh', '-c', initCommands.join(' && ')],
       securityContext: {
         runAsGroup: 1001,
         runAsUser: 1001
       },
       volumeMounts: [
-        {
-          name: EXTERNALS_VOLUME_NAME,
-          mountPath: '/mnt/externals'
-        },
+        ...(externalsFromImage()
+          ? []
+          : [
+              {
+                name: EXTERNALS_VOLUME_NAME,
+                mountPath: '/mnt/externals'
+              }
+            ]),
         {
           name: WORK_VOLUME,
           mountPath: '/mnt/work'
@@ -147,10 +154,7 @@ export async function createJobPod(
   appPod.spec.restartPolicy = 'Never'
 
   appPod.spec.volumes = [
-    {
-      name: EXTERNALS_VOLUME_NAME,
-      emptyDir: {}
-    },
+    externalsVolume(),
     {
       name: GITHUB_VOLUME_NAME,
       emptyDir: {}
@@ -210,10 +214,7 @@ export async function createContainerStepPod(
   appPod.spec.restartPolicy = 'Never'
 
   appPod.spec.volumes = [
-    {
-      name: EXTERNALS_VOLUME_NAME,
-      emptyDir: {}
-    },
+    externalsVolume(),
     {
       name: GITHUB_VOLUME_NAME,
       emptyDir: {}

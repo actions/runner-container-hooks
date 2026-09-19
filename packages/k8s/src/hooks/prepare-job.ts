@@ -18,7 +18,7 @@ import {
   execPodStep
 } from '../k8s'
 import {
-  CONTAINER_VOLUMES,
+  containerVolumes,
   DEFAULT_CONTAINER_ENTRY_POINT,
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
   formatError,
@@ -284,7 +284,7 @@ export function createContainerSpec(
     })
   }
 
-  podContainer.volumeMounts = CONTAINER_VOLUMES
+  podContainer.volumeMounts = containerVolumes()
 
   if (!extension) {
     return podContainer

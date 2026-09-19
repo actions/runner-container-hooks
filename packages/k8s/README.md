@@ -33,6 +33,7 @@ rules:
 - Some actions runner env's are expected to be set. These are set automatically by the runner.
     - `RUNNER_WORKSPACE` is expected to be set to the workspace of the runner
     - `GITHUB_WORKSPACE` is expected to be set to the workspace of the job
+- (Optional) The `ACTIONS_RUNNER_K8S_EXTERNALS_FROM_IMAGE` env can be set to `true` to mount the runner's externals directly from an [image volume](https://kubernetes.io/docs/tasks/configure-pod-container/image-volumes/) (the runner image, taken from `ACTIONS_RUNNER_IMAGE`) instead of copying them into an `emptyDir` in the `fs-init` init container on every job. This removes the per-job copy of the externals and reduces job pod startup time. It requires the `ImageVolume` feature gate, which is enabled by default in Kubernetes 1.35+; on clusters where it is unavailable the API server drops the volume and jobs fail, so leave it unset (the default) unless your cluster supports it.
 
 
 ## Limitations

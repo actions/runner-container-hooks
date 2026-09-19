@@ -12,25 +12,40 @@ export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
 export const ENV_USE_KUBE_SCHEDULER = 'ACTIONS_RUNNER_USE_KUBE_SCHEDULER'
+export const ENV_EXTERNALS_FROM_IMAGE =
+  'ACTIONS_RUNNER_K8S_EXTERNALS_FROM_IMAGE'
+export const ENV_RUNNER_IMAGE = 'ACTIONS_RUNNER_IMAGE'
+export const DEFAULT_RUNNER_IMAGE = 'ghcr.io/actions/actions-runner:latest'
 
 export const EXTERNALS_VOLUME_NAME = 'externals'
 export const GITHUB_VOLUME_NAME = 'github'
 export const WORK_VOLUME = 'work'
 
-export const CONTAINER_VOLUMES: k8s.V1VolumeMount[] = [
-  {
-    name: EXTERNALS_VOLUME_NAME,
-    mountPath: '/__e'
-  },
-  {
-    name: WORK_VOLUME,
-    mountPath: '/__w'
-  },
-  {
-    name: GITHUB_VOLUME_NAME,
-    mountPath: '/github'
-  }
-]
+export function containerVolumes(): k8s.V1VolumeMount[] {
+  const externals: k8s.V1VolumeMount = externalsFromImage()
+    ? {
+        name: EXTERNALS_VOLUME_NAME,
+        mountPath: '/__e',
+        subPath: 'home/runner/externals',
+        readOnly: true
+      }
+    : {
+        name: EXTERNALS_VOLUME_NAME,
+        mountPath: '/__e'
+      }
+
+  return [
+    externals,
+    {
+      name: WORK_VOLUME,
+      mountPath: '/__w'
+    },
+    {
+      name: GITHUB_VOLUME_NAME,
+      mountPath: '/github'
+    }
+  ]
+}
 
 export function prepareJobScript(userVolumeMounts: Mount[]): {
   containerPath: string
@@ -267,6 +282,30 @@ export function readExtensionFromFile(): k8s.V1PodTemplateSpec | undefined {
 
 export function useKubeScheduler(): boolean {
   return process.env[ENV_USE_KUBE_SCHEDULER] === 'true'
+}
+
+export function externalsFromImage(): boolean {
+  return process.env[ENV_EXTERNALS_FROM_IMAGE] === 'true'
+}
+
+export function runnerImage(): string {
+  return process.env[ENV_RUNNER_IMAGE] || DEFAULT_RUNNER_IMAGE
+}
+
+export function externalsVolume(): k8s.V1Volume {
+  if (externalsFromImage()) {
+    return {
+      name: EXTERNALS_VOLUME_NAME,
+      image: {
+        reference: runnerImage(),
+        pullPolicy: 'IfNotPresent'
+      }
+    }
+  }
+  return {
+    name: EXTERNALS_VOLUME_NAME,
+    emptyDir: {}
+  }
 }
 
 export enum PodPhase {
