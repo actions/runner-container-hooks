@@ -12,6 +12,9 @@ export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
 export const ENV_USE_KUBE_SCHEDULER = 'ACTIONS_RUNNER_USE_KUBE_SCHEDULER'
+export const ENV_TAR_DRAIN_TIMEOUT_MS = 'ACTIONS_RUNNER_TAR_DRAIN_TIMEOUT_MS'
+
+export const DEFAULT_TAR_DRAIN_TIMEOUT_MS = 60000
 
 export const EXTERNALS_VOLUME_NAME = 'externals'
 export const GITHUB_VOLUME_NAME = 'github'
@@ -267,6 +270,18 @@ export function readExtensionFromFile(): k8s.V1PodTemplateSpec | undefined {
 
 export function useKubeScheduler(): boolean {
   return process.env[ENV_USE_KUBE_SCHEDULER] === 'true'
+}
+
+export function tarDrainTimeoutMs(): number {
+  const raw = process.env[ENV_TAR_DRAIN_TIMEOUT_MS]
+  if (raw === undefined || raw === '') {
+    return DEFAULT_TAR_DRAIN_TIMEOUT_MS
+  }
+  const parsed = parseInt(raw, 10)
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return DEFAULT_TAR_DRAIN_TIMEOUT_MS
+  }
+  return parsed
 }
 
 export enum PodPhase {

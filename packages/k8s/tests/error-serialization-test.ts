@@ -34,7 +34,8 @@ jest.mock('tar-fs', () => ({
     pack: jest.fn().mockReturnValue({ pipe: jest.fn() }),
     extract: jest.fn().mockReturnValue({
       on: jest.fn(),
-      pipe: jest.fn()
+      pipe: jest.fn(),
+      destroy: jest.fn()
     })
   },
   __esModule: true

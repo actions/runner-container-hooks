@@ -20,6 +20,7 @@ import {
   fixArgs,
   listDirAllCommand,
   sleep,
+  tarDrainTimeoutMs,
   EXTERNALS_VOLUME_NAME,
   GITHUB_VOLUME_NAME,
   WORK_VOLUME
@@ -585,30 +586,56 @@ export async function execCpFromPod(
       const writerStream = tar.extract(parentRunnerPath)
       const errStream = new WritableStreamBuffer()
 
-      await new Promise((resolve, reject) => {
-        exec
-          .exec(
-            namespace(),
-            podName,
-            JOB_CONTAINER_NAME,
-            command,
-            writerStream,
-            errStream,
-            null,
-            false,
-            async status => {
-              if (errStream.size()) {
-                reject(
-                  new Error(
-                    `Error from cpFromPod - details: \n ${errStream.getContentsAsString()}`
+      try {
+        await new Promise((resolve, reject) => {
+          exec
+            .exec(
+              namespace(),
+              podName,
+              JOB_CONTAINER_NAME,
+              command,
+              writerStream,
+              errStream,
+              null,
+              false,
+              async status => {
+                if (errStream.size()) {
+                  reject(
+                    new Error(
+                      `Error from cpFromPod - details: \n ${errStream.getContentsAsString()}`
+                    )
                   )
-                )
+                }
+                resolve(status)
               }
-              resolve(status)
-            }
-          )
-          .catch(e => reject(e))
-      })
+            )
+            .catch(e => reject(e))
+        })
+      } catch (error) {
+        // Failure path: destroy immediately. Awaiting drain on a stream that
+        // kc reported Failure on could hang against a half-open WebSocket.
+        writerStream.destroy()
+        throw error
+      }
+
+      // Success path: kc reported the exec channel closed cleanly, but the
+      // tar bytes from the WebSocket may still be in flight to tar-fs's
+      // extractor. Returning before the extractor finishes truncates the
+      // workspace silently. Bound the wait so a malformed stream cannot
+      // hang the hook indefinitely.
+      const timeoutMs = tarDrainTimeoutMs()
+      try {
+        await stream.promises.finished(writerStream, {
+          signal: AbortSignal.timeout(timeoutMs)
+        })
+      } catch (err) {
+        core.warning(
+          `[execCpFromPod] tar drain did not complete within ${timeoutMs}ms; ` +
+            `the extracted workspace may be incomplete: ${formatError(err)}`
+        )
+      } finally {
+        writerStream.destroy()
+      }
       break
     } catch (error) {
       core.debug(`Attempt ${attempt + 1} failed: ${error}`)
