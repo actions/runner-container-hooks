@@ -4,7 +4,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { spawn } from 'child_process'
-import { execCpToPod } from '../src/k8s'
+import { execCpToPod, localCalculateOutputHashSorted } from '../src/k8s'
 import * as utils from '../src/k8s/utils'
 
 // Exercise real tar/find/chmod over the exec transport boundary without a cluster.
@@ -104,18 +104,27 @@ describe('copy timing diagnostics', () => {
           'directory_permissions',
           'copy_transfer'
         ])
-        // The baseline hash includes directory sizes, which can differ even
-        // after a correct copy. Timing must preserve that bounded retry path.
+        // Use the actual listing contract, including on source-pinned releases
+        // that hash directory sizes and can retry even after a correct copy.
         const mismatch =
-          fs.statSync(source).size !== fs.statSync(destination).size
+          (await localCalculateOutputHashSorted([
+            'sh',
+            '-c',
+            utils.listDirAllCommand(source)
+          ])) !==
+          (await localCalculateOutputHashSorted([
+            'sh',
+            '-c',
+            utils.listDirAllCommand(destination)
+          ]))
         const comparisons = records.filter(
           record => record.phase === 'verification'
         )
         expect(comparisons).toHaveLength(mismatch ? 15 : 1)
-        for (const [i, record] of comparisons.entries()) {
+        comparisons.forEach((record, i) => {
           expect(record.attempt).toBe(i + 1)
           expect(record.result).toBe(Number(mismatch))
-        }
+        })
         for (const record of records) {
           expect(record.durationMs).toBeGreaterThanOrEqual(0)
           if (record.phase !== 'verification') expect(record.result).toBe(0)
