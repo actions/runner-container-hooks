@@ -15,7 +15,8 @@ import {
   waitForPodPhases,
   getPrepareJobTimeoutSeconds,
   execCpToPod,
-  execPodStep
+  execPodStep,
+  timeHookPhase
 } from '../k8s'
 import {
   CONTAINER_VOLUMES,
@@ -37,6 +38,15 @@ import {
 import { dirname } from 'path'
 
 export async function prepareJob(
+  args: PrepareJobArgs,
+  responseFile
+): Promise<void> {
+  return timeHookPhase('prepare_job', async () =>
+    prepareJobImpl(args, responseFile)
+  )
+}
+
+async function prepareJobImpl(
   args: PrepareJobArgs,
   responseFile
 ): Promise<void> {
@@ -121,18 +131,24 @@ export async function prepareJob(
   }
 
   try {
-    await waitForPodPhases(
-      createdPod.metadata.name,
-      new Set([PodPhase.RUNNING]),
-      new Set([PodPhase.PENDING]),
-      getPrepareJobTimeoutSeconds()
+    const podName = createdPod.metadata.name
+    await timeHookPhase('wait_for_running', async () =>
+      waitForPodPhases(
+        podName,
+        new Set([PodPhase.RUNNING]),
+        new Set([PodPhase.PENDING]),
+        getPrepareJobTimeoutSeconds()
+      )
     )
   } catch (err) {
     await prunePods()
     throw new Error(`pod failed to come online with error: ${formatError(err)}`)
   }
 
-  await execCpToPod(createdPod.metadata.name, runnerWorkspace, '/__w')
+  const podName = createdPod.metadata.name
+  await timeHookPhase('workspace_copy', async () =>
+    execCpToPod(podName, runnerWorkspace, '/__w')
+  )
 
   if (prepareScript) {
     await execPodStep(

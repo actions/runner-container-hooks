@@ -466,6 +466,42 @@ export async function localCalculateOutputHashSorted(
   })
 }
 
+// Opt-in numeric diagnostics: never include paths, contents, or remote output.
+function hookTiming(
+  phase: string,
+  durationMs: number,
+  attempt = 0,
+  result = 0
+): void {
+  if (process.env.ACTIONS_RUNNER_HOOK_TIMINGS === 'true') {
+    core.info(
+      JSON.stringify({
+        event: 'runner_hook_timing',
+        phase,
+        durationMs,
+        attempt,
+        result
+      })
+    )
+  }
+}
+
+export async function timeHookPhase<T>(
+  phase: string,
+  action: () => Promise<T>,
+  attempt = 0
+): Promise<T> {
+  const start = performance.now()
+  let result = 1
+  try {
+    const value = await action()
+    result = 0
+    return value
+  } finally {
+    hookTiming(phase, performance.now() - start, attempt, result)
+  }
+}
+
 export async function execCpToPod(
   podName: string,
   runnerPath: string,
@@ -479,39 +515,83 @@ export async function execCpToPod(
       const exec = new k8s.Exec(kc)
       // Use tar to extract with --no-same-owner to avoid ownership issues.
       // Then use find to fix permissions. The -m flag helps but we also need to fix permissions after.
+      const phases = ['extract', 'file_permissions', 'directory_permissions']
+      const scripts = [
+        `tar xf - --no-same-owner -C ${shlex.quote(containerPath)} 2>/dev/null`,
+        `find ${shlex.quote(containerPath)} -type f -exec chmod u+rw {} \\; 2>/dev/null`,
+        `find ${shlex.quote(containerPath)} -type d -exec chmod u+rwx {} \\; 2>/dev/null`
+      ]
+      const timing = process.env.ACTIONS_RUNNER_HOOK_TIMINGS === 'true'
+      // /proc/uptime is monotonic on Linux, including BusyBox-based images.
+      // Keep command exit status and stderr unchanged; parse only numeric stdout.
+      const prefix = `hook_phase() {
+        phase="$1"; shift
+        read started rest < /proc/uptime 2>/dev/null || started=0
+        "$@"; result=$?
+        read ended rest < /proc/uptime 2>/dev/null || ended=0
+        printf 'HOOK_TIMING %s %s %s %s\\n' "$phase" "$started" "$ended" "$result"
+        return "$result"
+      }; `
       const command = [
         'sh',
         '-c',
-        `tar xf - --no-same-owner -C ${shlex.quote(containerPath)} 2>/dev/null; ` +
-          `find ${shlex.quote(containerPath)} -type f -exec chmod u+rw {} \\; 2>/dev/null; ` +
-          `find ${shlex.quote(containerPath)} -type d -exec chmod u+rwx {} \\; 2>/dev/null`
+        timing
+          ? prefix +
+            scripts
+              .map(
+                (script, i) =>
+                  `hook_phase ${phases[i]} sh -c ${shlex.quote(script)}`
+              )
+              .join('; ')
+          : scripts.join('; ')
       ]
+      const diagnostics = new WritableStreamBuffer()
       const readStream = tar.pack(runnerPath)
       const errStream = new WritableStreamBuffer()
-      await new Promise((resolve, reject) => {
-        exec
-          .exec(
-            namespace(),
-            podName,
-            JOB_CONTAINER_NAME,
-            command,
-            null,
-            errStream,
-            readStream,
-            false,
-            async status => {
-              if (errStream.size()) {
-                reject(
-                  new Error(
-                    `Error from execCpToPod - status: ${status.status}, details: \n ${errStream.getContentsAsString()}`
-                  )
-                )
-              }
-              resolve(status)
-            }
-          )
-          .catch(e => reject(e))
-      })
+      await timeHookPhase(
+        'copy_transfer',
+        async () =>
+          new Promise((resolve, reject) => {
+            exec
+              .exec(
+                namespace(),
+                podName,
+                JOB_CONTAINER_NAME,
+                command,
+                timing ? diagnostics : null,
+                errStream,
+                readStream,
+                false,
+                async status => {
+                  const output = diagnostics.getContentsAsString() || ''
+                  for (const line of output.split('\n')) {
+                    const match =
+                      /^HOOK_TIMING (extract|file_permissions|directory_permissions) (\d+\.\d+) (\d+\.\d+) (\d+)$/.exec(
+                        line
+                      )
+                    if (match) {
+                      hookTiming(
+                        match[1],
+                        (Number(match[3]) - Number(match[2])) * 1000,
+                        attempt + 1,
+                        Number(match[4])
+                      )
+                    }
+                  }
+                  if (errStream.size()) {
+                    reject(
+                      new Error(
+                        `Error from execCpToPod - status: ${status.status}, details: \n ${errStream.getContentsAsString()}`
+                      )
+                    )
+                  }
+                  resolve(status)
+                }
+              )
+              .catch(e => reject(e))
+          }),
+        attempt + 1
+      )
       break
     } catch (error) {
       core.debug(`cpToPod: Attempt ${attempt + 1} failed: ${error}`)
@@ -529,18 +609,29 @@ export async function execCpToPod(
   const delay = 1000
   for (let i = 0; i < attempts; i++) {
     try {
-      const want = await localCalculateOutputHashSorted([
-        'sh',
-        '-c',
-        listDirAllCommand(runnerPath)
-      ])
-
-      const got = await execCalculateOutputHashSorted(
-        podName,
-        JOB_CONTAINER_NAME,
-        ['sh', '-c', listDirAllCommand(containerPath)]
+      const want = await timeHookPhase(
+        'local_metadata',
+        async () =>
+          localCalculateOutputHashSorted([
+            'sh',
+            '-c',
+            listDirAllCommand(runnerPath)
+          ]),
+        i + 1
       )
 
+      const got = await timeHookPhase(
+        'remote_metadata',
+        async () =>
+          execCalculateOutputHashSorted(podName, JOB_CONTAINER_NAME, [
+            'sh',
+            '-c',
+            listDirAllCommand(containerPath)
+          ]),
+        i + 1
+      )
+
+      hookTiming('verification', 0, i + 1, Number(got !== want))
       if (got !== want) {
         core.debug(
           `The hash of the directory does not match the expected value; want='${want}' got='${got}'`
