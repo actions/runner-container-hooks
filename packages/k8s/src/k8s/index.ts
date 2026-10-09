@@ -525,7 +525,7 @@ export async function execCpToPod(
     }
   }
 
-  let attempts = 15
+  const attempts = 15
   const delay = 1000
   for (let i = 0; i < attempts; i++) {
     try {
@@ -549,12 +549,13 @@ export async function execCpToPod(
         continue
       }
 
-      break
+      return
     } catch (error) {
       core.debug(`Attempt ${i + 1} failed: ${error}`)
       await sleep(delay)
     }
   }
+  throw new Error(`cpToPod verification failed after ${attempts} attempts`)
 }
 
 export async function execCpFromPod(
