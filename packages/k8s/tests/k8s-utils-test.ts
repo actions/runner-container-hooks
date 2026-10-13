@@ -2,6 +2,7 @@
 import { containerPorts } from '../src/k8s'
 import {
   containerVolumes,
+  ensureRequiredNodeAffinity,
   generateContainerName,
   mergePodSpecWithOptions,
   mergeContainerWithOptions,
@@ -362,5 +363,133 @@ describe('container volumes path containment', () => {
 
   it('should keep relative source paths untouched', () => {
     expect(subPathOf('some/relative/path')).toBe('some/relative/path')
+  })
+})
+
+describe('ensureRequiredNodeAffinity', () => {
+  const nodeName = 'runner-node-1'
+  const hostnameKey = 'kubernetes.io/hostname'
+
+  const requiredTerms = (
+    spec: k8s.V1PodSpec
+  ): k8s.V1NodeSelectorTerm[] | undefined =>
+    spec.affinity?.nodeAffinity?.requiredDuringSchedulingIgnoredDuringExecution
+      ?.nodeSelectorTerms
+
+  it('should add a required hostname term to an empty spec', () => {
+    const spec = {} as k8s.V1PodSpec
+    ensureRequiredNodeAffinity(spec, nodeName)
+
+    const terms = requiredTerms(spec)
+    expect(terms).toHaveLength(1)
+    expect(terms?.[0].matchExpressions).toEqual([
+      { key: hostnameKey, operator: 'In', values: [nodeName] }
+    ])
+  })
+
+  it('should re-assert the hostname term when an extension replaced affinity', () => {
+    // mergePodSpecWithOptions assigns spec.affinity wholesale, so this is the
+    // state the hook sees after a pod template sets its own affinity
+    const spec = {
+      affinity: {
+        nodeAffinity: {
+          requiredDuringSchedulingIgnoredDuringExecution: {
+            nodeSelectorTerms: [
+              {
+                matchExpressions: [
+                  { key: 'disktype', operator: 'In', values: ['ssd'] }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    } as k8s.V1PodSpec
+
+    ensureRequiredNodeAffinity(spec, nodeName)
+
+    const terms = requiredTerms(spec)
+    expect(terms).toHaveLength(1)
+    expect(terms?.[0].matchExpressions).toEqual([
+      { key: 'disktype', operator: 'In', values: ['ssd'] },
+      { key: hostnameKey, operator: 'In', values: [nodeName] }
+    ])
+  })
+
+  it('should constrain every term because terms are OR-ed', () => {
+    const spec = {
+      affinity: {
+        nodeAffinity: {
+          requiredDuringSchedulingIgnoredDuringExecution: {
+            nodeSelectorTerms: [
+              {
+                matchExpressions: [
+                  { key: 'disktype', operator: 'In', values: ['ssd'] }
+                ]
+              },
+              {
+                matchExpressions: [
+                  { key: 'zone', operator: 'In', values: ['us-east-1a'] }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    } as k8s.V1PodSpec
+
+    ensureRequiredNodeAffinity(spec, nodeName)
+
+    const terms = requiredTerms(spec)
+    expect(terms).toHaveLength(2)
+    for (const term of terms ?? []) {
+      expect(term.matchExpressions).toContainEqual({
+        key: hostnameKey,
+        operator: 'In',
+        values: [nodeName]
+      })
+    }
+  })
+
+  it('should override a conflicting hostname requirement', () => {
+    const spec = {
+      affinity: {
+        nodeAffinity: {
+          requiredDuringSchedulingIgnoredDuringExecution: {
+            nodeSelectorTerms: [
+              {
+                matchExpressions: [
+                  { key: hostnameKey, operator: 'In', values: ['other-node'] }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    } as k8s.V1PodSpec
+
+    ensureRequiredNodeAffinity(spec, nodeName)
+
+    const expressions = requiredTerms(spec)?.[0].matchExpressions
+    expect(expressions).toEqual([
+      { key: hostnameKey, operator: 'In', values: [nodeName] }
+    ])
+  })
+
+  it('should preserve unrelated affinity settings', () => {
+    const spec = {
+      affinity: {
+        podAntiAffinity: {
+          preferredDuringSchedulingIgnoredDuringExecution: [
+            { weight: 50, podAffinityTerm: { topologyKey: hostnameKey } }
+          ]
+        }
+      }
+    } as k8s.V1PodSpec
+
+    ensureRequiredNodeAffinity(spec, nodeName)
+
+    expect(spec.affinity?.podAntiAffinity).toBeDefined()
+    expect(requiredTerms(spec)).toHaveLength(1)
   })
 })

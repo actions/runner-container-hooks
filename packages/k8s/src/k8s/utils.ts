@@ -334,6 +334,47 @@ export function useRwoRequiredAffinity(): boolean {
   return process.env[ENV_HOOK_RWO] === 'true'
 }
 
+// The pod template extension is merged last and replaces whole pod spec
+// fields, so a template that sets `affinity` would silently drop the node
+// affinity that pins job pods to the runner's node. That is only a
+// preference in RWX mode, but with a ReadWriteOnce volume it is the
+// guarantee that keeps the pod schedulable at all, so re-assert it after
+// the merge instead of letting the extension win.
+export function ensureRequiredNodeAffinity(
+  spec: k8s.V1PodSpec,
+  nodeName: string
+): void {
+  const requirement: k8s.V1NodeSelectorRequirement = {
+    key: 'kubernetes.io/hostname',
+    operator: 'In',
+    values: [nodeName]
+  }
+
+  spec.affinity = spec.affinity ?? {}
+  spec.affinity.nodeAffinity = spec.affinity.nodeAffinity ?? {}
+  const nodeAffinity = spec.affinity.nodeAffinity
+
+  const terms =
+    nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution
+      ?.nodeSelectorTerms
+  if (!terms?.length) {
+    nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution = {
+      nodeSelectorTerms: [{ matchExpressions: [requirement] }]
+    }
+    return
+  }
+
+  // nodeSelectorTerms are OR'ed while matchExpressions inside a term are
+  // AND'ed, so the hostname requirement has to be added to every term for
+  // the constraint to hold no matter which term the scheduler matches.
+  for (const term of terms) {
+    term.matchExpressions = [
+      ...(term.matchExpressions ?? []).filter(e => e.key !== requirement.key),
+      requirement
+    ]
+  }
+}
+
 export enum PodPhase {
   PENDING = 'Pending',
   RUNNING = 'Running',

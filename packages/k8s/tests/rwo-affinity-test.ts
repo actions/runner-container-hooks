@@ -3,7 +3,7 @@ import { cleanupJob } from '../src/hooks'
 import { prepareJob } from '../src/hooks/prepare-job'
 import { TestHelper } from './test-setup'
 import { getPodByName } from '../src/k8s'
-import { ENV_HOOK_RWO } from '../src/k8s/utils'
+import { ENV_HOOK_RWO, ENV_HOOK_TEMPLATE_PATH } from '../src/k8s/utils'
 
 jest.useRealTimers()
 
@@ -147,6 +147,53 @@ describe('RWO Affinity Behavior', () => {
 
     if (runnerPod.spec?.nodeName) {
       expect(affinityValues).toContain(runnerPod.spec.nodeName)
+    }
+  })
+
+  it('should keep the required affinity when an extension sets its own', async () => {
+    // A pod template that sets spec.affinity used to replace the hook's
+    // required hostname affinity outright, which silently un-pinned the pod
+    // from the node holding the ReadWriteOnce volume.
+    process.env[ENV_HOOK_RWO] = 'true'
+
+    const templatePath = testHelper.createFile('affinity-extension.yaml')
+    fs.writeFileSync(
+      templatePath,
+      `spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                  - linux
+`
+    )
+    process.env[ENV_HOOK_TEMPLATE_PATH] = templatePath
+
+    try {
+      await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
+    } finally {
+      delete process.env[ENV_HOOK_TEMPLATE_PATH]
+    }
+
+    const content = JSON.parse(
+      fs.readFileSync(prepareJobOutputFilePath).toString()
+    )
+    const pod = await getPodByName(content.state.jobPod)
+
+    const terms =
+      pod.spec?.affinity?.nodeAffinity
+        ?.requiredDuringSchedulingIgnoredDuringExecution?.nodeSelectorTerms
+
+    expect(terms?.length).toBeGreaterThan(0)
+    for (const term of terms ?? []) {
+      const keys = term.matchExpressions?.map(e => e.key)
+      // the extension's own constraint survives alongside the hook's
+      expect(keys).toContain('kubernetes.io/os')
+      expect(keys).toContain('kubernetes.io/hostname')
     }
   })
 })

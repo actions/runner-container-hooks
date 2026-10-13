@@ -6,8 +6,7 @@ import {
   createSecretForEnvs,
   getContainerJobPodName,
   getPodLogs,
-  getPodStatus,
-  waitForJobToComplete,
+  waitForContainerToTerminate,
   waitForPodPhases
 } from '../k8s'
 import {
@@ -89,25 +88,16 @@ export async function runContainerStep(
 
   await getPodLogs(podName, JOB_CONTAINER_NAME)
 
-  core.debug('Waiting for container job to complete')
-  await waitForJobToComplete(job.metadata.name)
+  core.debug('Waiting for the job container to terminate')
+  const terminated = await waitForContainerToTerminate(
+    podName,
+    JOB_CONTAINER_NAME
+  )
 
-  const status = await getPodStatus(podName)
-  if (status?.phase === 'Succeeded') {
-    return 0
-  }
-  if (!status?.containerStatuses?.length) {
-    core.error(
-      `Can't determine container status from response:  ${JSON.stringify(
-        status
-      )}`
-    )
-    return 1
-  }
-  const exitCode =
-    status.containerStatuses[status.containerStatuses.length - 1].state
-      ?.terminated?.exitCode
-  return Number(exitCode) || 1
+  // Read the exit code from the job container by name. Indexing into
+  // containerStatuses picked up a sidecar's exit code whenever a pod
+  // template extension contributed extra containers.
+  return typeof terminated.exitCode === 'number' ? terminated.exitCode : 1
 }
 
 function createContainerSpec(

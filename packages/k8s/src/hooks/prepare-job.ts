@@ -13,6 +13,7 @@ import {
   containerPorts,
   createPod,
   isPodContainerAlpine,
+  pruneJobs,
   prunePods,
   waitForPodPhases,
   getPrepareJobTimeoutSeconds
@@ -38,6 +39,9 @@ export async function prepareJob(
     throw new Error('Job Container is required.')
   }
 
+  // Remove anything left behind by a previous run on this runner, including
+  // Jobs that never finished and so were never reclaimed by their TTL.
+  await pruneJobs()
   await prunePods()
 
   const extension = readExtensionFromFile()

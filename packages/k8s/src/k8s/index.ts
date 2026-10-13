@@ -16,6 +16,7 @@ import {
   mergePodSpecWithOptions,
   mergeObjectMeta,
   useRwoRequiredAffinity,
+  ensureRequiredNodeAffinity,
   fixArgs
 } from './utils'
 import { parsePositiveMsEnv, WebSocketHeartbeat } from './heartbeat'
@@ -99,10 +100,8 @@ export async function createPod(
   appPod.spec.restartPolicy = 'Never'
 
   const nodeName = await getCurrentNodeName()
-  appPod.spec.affinity = await getPodAffinity(
-    nodeName,
-    useRwoRequiredAffinity()
-  )
+  const requireRwoAffinity = useRwoRequiredAffinity()
+  appPod.spec.affinity = await getPodAffinity(nodeName, requireRwoAffinity)
   const claimName = getVolumeClaimName()
   appPod.spec.volumes = [
     {
@@ -127,6 +126,10 @@ export async function createPod(
 
   if (extension?.spec) {
     mergePodSpecWithOptions(appPod.spec, extension.spec)
+  }
+
+  if (requireRwoAffinity) {
+    ensureRequiredNodeAffinity(appPod.spec, nodeName)
   }
 
   return await k8sApi.createNamespacedPod({
@@ -156,15 +159,20 @@ export async function createJob(
 
   job.spec.template.spec = new k8s.V1PodSpec()
   job.spec.template.metadata = new k8s.V1ObjectMeta()
-  job.spec.template.metadata.labels = {}
+  // Label the pod template too, otherwise the step pod the Job creates
+  // carries no runner label and prunePods() cannot see it.
+  job.spec.template.metadata.labels = {
+    [runnerInstanceLabel.key]: runnerInstanceLabel.value
+  }
   job.spec.template.metadata.annotations = {}
   job.spec.template.spec.containers = [container]
   job.spec.template.spec.restartPolicy = 'Never'
 
   const nodeName = await getCurrentNodeName()
+  const requireRwoAffinity = useRwoRequiredAffinity()
   job.spec.template.spec.affinity = await getPodAffinity(
     nodeName,
-    useRwoRequiredAffinity()
+    requireRwoAffinity
   )
 
   const claimName = getVolumeClaimName()
@@ -183,6 +191,10 @@ export async function createJob(
     if (extension.spec) {
       mergePodSpecWithOptions(job.spec.template.spec, extension.spec)
     }
+  }
+
+  if (requireRwoAffinity) {
+    ensureRequiredNodeAffinity(job.spec.template.spec, nodeName)
   }
 
   return await k8sBatchV1Api.createNamespacedJob({
@@ -357,6 +369,48 @@ export async function waitForJobToComplete(jobName: string): Promise<void> {
     } catch (error) {
       throw new Error(`job ${jobName} has failed: ${formatError(error)}`)
     }
+    await backOffManager.backOff()
+  }
+}
+
+// Waits for a single container in the pod to terminate, rather than for the
+// whole Job to complete. A Job only reports success once *every* container
+// has exited, so waiting on the Job hangs forever when a pod template
+// extension contributes a sidecar that is meant to run for the lifetime of
+// the step. The step's result is defined by the job container alone.
+export async function waitForContainerToTerminate(
+  podName: string,
+  containerName: string
+): Promise<k8s.V1ContainerStateTerminated> {
+  const backOffManager = new BackOffManager()
+  while (true) {
+    let status: k8s.V1PodStatus | undefined
+    try {
+      status = await getPodStatus(podName)
+    } catch (error) {
+      throw new Error(
+        `failed to read status of pod ${podName}: ${formatError(error)}`
+      )
+    }
+
+    const terminated = status?.containerStatuses?.find(
+      c => c.name === containerName
+    )?.state?.terminated
+    if (terminated) {
+      return terminated
+    }
+
+    if (status?.phase === PodPhase.SUCCEEDED) {
+      throw new Error(
+        `pod ${podName} succeeded without reporting a terminated state for container ${containerName}`
+      )
+    }
+    if (status?.phase === PodPhase.FAILED) {
+      throw new Error(
+        `pod ${podName} failed: ${status.reason || 'no reason provided'}`
+      )
+    }
+
     await backOffManager.backOff()
   }
 }
@@ -565,9 +619,57 @@ export async function prunePods(): Promise<void> {
   }
 
   await Promise.all(
-    podList.items.map(
-      async pod => pod.metadata?.name && deletePod(pod.metadata.name)
-    )
+    podList.items.map(async pod => {
+      if (!pod.metadata?.name) {
+        return
+      }
+      try {
+        await deletePod(pod.metadata.name)
+      } catch (err) {
+        // a pod owned by a Job we just deleted may already be gone
+        core.debug(
+          `failed to delete pod ${pod.metadata.name}: ${formatError(err)}`
+        )
+      }
+    })
+  )
+}
+
+export async function deleteJob(name: string): Promise<void> {
+  await k8sBatchV1Api.deleteNamespacedJob({
+    name,
+    namespace: namespace(),
+    // without this the Job is removed but its pod is orphaned
+    propagationPolicy: 'Background'
+  })
+}
+
+// Jobs are only garbage collected by ttlSecondsAfterFinished once they
+// finish, so a Job whose pod never completes (a long-lived sidecar, or a
+// cancelled workflow) is leaked indefinitely. Delete them explicitly.
+export async function pruneJobs(): Promise<void> {
+  const jobList = await k8sBatchV1Api.listNamespacedJob({
+    namespace: namespace(),
+    labelSelector: new RunnerInstanceLabel().toString()
+  })
+  if (!jobList.items.length) {
+    return
+  }
+
+  await Promise.all(
+    jobList.items.map(async job => {
+      if (!job.metadata?.name) {
+        return
+      }
+      try {
+        await deleteJob(job.metadata.name)
+      } catch (err) {
+        // cleanup is best effort; a job that is already gone is not a failure
+        core.debug(
+          `failed to delete job ${job.metadata.name}: ${formatError(err)}`
+        )
+      }
+    })
   )
 }
 
