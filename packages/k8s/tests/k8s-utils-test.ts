@@ -1,6 +1,7 @@
 ﻿import * as fs from 'fs'
 import { containerPorts } from '../src/k8s'
 import {
+  containerVolumes,
   generateContainerName,
   mergePodSpecWithOptions,
   mergeContainerWithOptions,
@@ -297,5 +298,69 @@ spec:
     mergePodSpecWithOptions(base, from)
 
     expect(base).toStrictEqual(expected)
+  })
+})
+
+describe('container volumes path containment', () => {
+  const workspacePath = '/home/runner/_work/repo/repo'
+  let originalWorkspace: string | undefined
+
+  beforeEach(() => {
+    originalWorkspace = process.env.GITHUB_WORKSPACE
+    process.env.GITHUB_WORKSPACE = workspacePath
+  })
+
+  afterEach(() => {
+    if (originalWorkspace === undefined) {
+      delete process.env.GITHUB_WORKSPACE
+    } else {
+      process.env.GITHUB_WORKSPACE = originalWorkspace
+    }
+  })
+
+  const subPathOf = (sourceVolumePath: string): string | undefined => {
+    const mounts = containerVolumes([
+      { sourceVolumePath, targetVolumePath: '/mnt/target', readOnly: false }
+    ])
+    return mounts[mounts.length - 1].subPath
+  }
+
+  it('should map the workspace root onto the work volume', () => {
+    expect(subPathOf(workspacePath)).toBe('repo/repo')
+  })
+
+  it('should map a directory inside the workspace', () => {
+    expect(subPathOf(`${workspacePath}/src`)).toBe('repo/repo/src')
+  })
+
+  it('should reject paths outside the work folder', () => {
+    expect(() => subPathOf('/etc/passwd')).toThrow(
+      'Volume mounts outside of the work folder are not supported'
+    )
+  })
+
+  it('should reject parent directory traversal out of the workspace', () => {
+    expect(() => subPathOf(`${workspacePath}/../../../../etc`)).toThrow(
+      'Volume mounts outside of the work folder are not supported'
+    )
+  })
+
+  it('should reject sibling directories that share the workspace prefix', () => {
+    // `startsWith` would accept these and silently mount the wrong directory:
+    // repo-evil/secrets previously mapped to subPath repo/repo/evil/secrets
+    expect(() => subPathOf(`${workspacePath}-evil/secrets`)).toThrow(
+      'Volume mounts outside of the work folder are not supported'
+    )
+    expect(() => subPathOf(`${workspacePath}XYZ`)).toThrow(
+      'Volume mounts outside of the work folder are not supported'
+    )
+  })
+
+  it('should allow a directory whose name begins with dots', () => {
+    expect(subPathOf(`${workspacePath}/..foo`)).toBe('repo/repo/..foo')
+  })
+
+  it('should keep relative source paths untouched', () => {
+    expect(subPathOf('some/relative/path')).toBe('some/relative/path')
   })
 })

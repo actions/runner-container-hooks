@@ -85,16 +85,25 @@ export function containerVolumes(
   for (const userVolume of userMountVolumes) {
     let sourceVolumePath = ''
     if (path.isAbsolute(userVolume.sourceVolumePath)) {
-      if (!userVolume.sourceVolumePath.startsWith(workspacePath)) {
+      // Resolve the path relative to the workspace to decide containment.
+      // A plain startsWith() is not path containment: it accepts sibling
+      // directories that merely share a prefix (repo-evil vs repo) and then
+      // silently mounts the wrong directory.
+      const sourceRelativePath = path.posix.relative(
+        workspacePath,
+        userVolume.sourceVolumePath
+      )
+      if (
+        sourceRelativePath === '..' ||
+        sourceRelativePath.startsWith('../') ||
+        path.posix.isAbsolute(sourceRelativePath)
+      ) {
         throw new Error(
           'Volume mounts outside of the work folder are not supported'
         )
       }
       const i = workspacePath.lastIndexOf('_work/')
       const workspaceRelativePath = workspacePath.slice(i + '_work/'.length)
-      const sourceRelativePath = userVolume.sourceVolumePath.slice(
-        workspacePath.length + 1
-      )
       sourceVolumePath = sourceRelativePath
         ? path.posix.join(workspaceRelativePath, sourceRelativePath)
         : workspaceRelativePath
