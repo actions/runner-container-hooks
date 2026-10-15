@@ -15,6 +15,27 @@ export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
 export const ENV_HOOK_RWO = 'ACTIONS_RUNNER_HOOK_RWO'
 
+// Path of the runner's work directory, which is what the shared volume is
+// mounted from. RUNNER_WORKSPACE is `<work>/<repo>`, so its parent is the
+// work root. Searching GITHUB_WORKSPACE for the last `_work/` instead is
+// wrong for repositories whose name contains `_work`: with
+// GITHUB_WORKSPACE=/home/runner/_work/my_work/my_work the last occurrence
+// is inside the repository name and the lookup yields `my_work` rather
+// than `my_work/my_work`, mounting the checkout's parent.
+function workRoot(): string {
+  const runnerWorkspace = process.env.RUNNER_WORKSPACE
+  if (!runnerWorkspace) {
+    throw new Error('RUNNER_WORKSPACE is not set')
+  }
+  return path.dirname(runnerWorkspace)
+}
+
+// GITHUB_WORKSPACE expressed relative to the work root, which is the subPath
+// of the checkout inside the shared volume.
+export function workspaceRelativePath(workspacePath: string): string {
+  return path.posix.relative(workRoot(), workspacePath)
+}
+
 export function containerVolumes(
   userMountVolumes: Mount[] = [],
   jobContainer = true,
@@ -29,13 +50,11 @@ export function containerVolumes(
 
   const workspacePath = process.env.GITHUB_WORKSPACE as string
   if (containerAction) {
-    const i = workspacePath.lastIndexOf('_work/')
-    const workspaceRelativePath = workspacePath.slice(i + '_work/'.length)
     mounts.push(
       {
         name: POD_VOLUME_NAME,
         mountPath: '/github/workspace',
-        subPath: workspaceRelativePath
+        subPath: workspaceRelativePath(workspacePath)
       },
       {
         name: POD_VOLUME_NAME,
@@ -102,11 +121,10 @@ export function containerVolumes(
           'Volume mounts outside of the work folder are not supported'
         )
       }
-      const i = workspacePath.lastIndexOf('_work/')
-      const workspaceRelativePath = workspacePath.slice(i + '_work/'.length)
+      const relativeWorkspace = workspaceRelativePath(workspacePath)
       sourceVolumePath = sourceRelativePath
-        ? path.posix.join(workspaceRelativePath, sourceRelativePath)
-        : workspaceRelativePath
+        ? path.posix.join(relativeWorkspace, sourceRelativePath)
+        : relativeWorkspace
     } else {
       sourceVolumePath = userVolume.sourceVolumePath
     }
@@ -334,6 +352,22 @@ export function useRwoRequiredAffinity(): boolean {
   return process.env[ENV_HOOK_RWO] === 'true'
 }
 
+// `nodeName` is a Node's `metadata.name`. Matching it against the
+// `kubernetes.io/hostname` label is an indirection that is not guaranteed to
+// hold: kubelet seeds that label from the machine's hostname while the node
+// name can come from `--hostname-override` or a cloud provider, and the label
+// is mutable afterwards. Where the two differ the required affinity never
+// matches and the pod stays Pending forever, so select on the field instead.
+export function nodeNameRequirement(
+  nodeName: string
+): k8s.V1NodeSelectorRequirement {
+  return {
+    key: 'metadata.name',
+    operator: 'In',
+    values: [nodeName]
+  }
+}
+
 // The pod template extension is merged last and replaces whole pod spec
 // fields, so a template that sets `affinity` would silently drop the node
 // affinity that pins job pods to the runner's node. That is only a
@@ -344,11 +378,7 @@ export function ensureRequiredNodeAffinity(
   spec: k8s.V1PodSpec,
   nodeName: string
 ): void {
-  const requirement: k8s.V1NodeSelectorRequirement = {
-    key: 'kubernetes.io/hostname',
-    operator: 'In',
-    values: [nodeName]
-  }
+  const requirement = nodeNameRequirement(nodeName)
 
   spec.affinity = spec.affinity ?? {}
   spec.affinity.nodeAffinity = spec.affinity.nodeAffinity ?? {}
@@ -359,19 +389,31 @@ export function ensureRequiredNodeAffinity(
       ?.nodeSelectorTerms
   if (!terms?.length) {
     nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution = {
-      nodeSelectorTerms: [{ matchExpressions: [requirement] }]
+      nodeSelectorTerms: [{ matchFields: [requirement] }]
     }
     return
   }
 
-  // nodeSelectorTerms are OR'ed while matchExpressions inside a term are
-  // AND'ed, so the hostname requirement has to be added to every term for
-  // the constraint to hold no matter which term the scheduler matches.
+  // nodeSelectorTerms are OR'ed while matchFields/matchExpressions inside a
+  // term are AND'ed, so the node requirement has to be added to every term
+  // for the constraint to hold no matter which term the scheduler matches.
   for (const term of terms) {
-    term.matchExpressions = [
-      ...(term.matchExpressions ?? []).filter(e => e.key !== requirement.key),
+    term.matchFields = [
+      ...(term.matchFields ?? []).filter(e => e.key !== requirement.key),
       requirement
     ]
+
+    // An extension pinning the node by hostname label would be AND'ed with
+    // the requirement above and could make the pod unschedulable, so the
+    // runner's node wins in RWO mode.
+    const expressions = (term.matchExpressions ?? []).filter(
+      e => e.key !== 'kubernetes.io/hostname'
+    )
+    if (expressions.length) {
+      term.matchExpressions = expressions
+    } else {
+      delete term.matchExpressions
+    }
   }
 }
 
@@ -394,9 +436,10 @@ function mergeLists<T>(base?: T[], from?: T[]): T[] {
 }
 
 export function fixArgs(args: string[]): string[] {
-  if (args.length >= 3 && args[0] === 'sh' && args[1] === '-c') {
-    return [args[0], args[1], args.slice(2).join(' ')]
-  }
+  // Preserve shell command strings passed via `sh -c` without re-tokenizing.
+  // Retokenizing would split the script into multiple args, breaking `sh -c`.
+  // Everything after the script is $0 and the positional parameters, so it
+  // must stay in its own argv slot rather than being folded into the script.
   if (args.length >= 2 && args[0] === 'sh' && args[1] === '-c') {
     return args
   }

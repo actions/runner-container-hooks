@@ -25,7 +25,7 @@ describe('RWO Affinity Behavior', () => {
     delete process.env[ENV_HOOK_RWO]
   })
 
-  it('should add preferred nodeAffinity with hostname selector by default', async () => {
+  it('should add preferred nodeAffinity selecting the node by name by default', async () => {
     await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
 
     const content = JSON.parse(
@@ -49,17 +49,19 @@ describe('RWO Affinity Behavior', () => {
     expect(preferred?.length).toBeGreaterThan(0)
     expect(preferred?.[0]?.weight).toBe(100)
 
-    const matchExpressions = preferred?.[0]?.preference?.matchExpressions
-    expect(matchExpressions).toBeDefined()
-    expect(matchExpressions?.length).toBeGreaterThan(0)
+    const matchFields = preferred?.[0]?.preference?.matchFields
+    expect(matchFields).toBeDefined()
+    expect(matchFields?.length).toBeGreaterThan(0)
 
-    const hostnameExpression = matchExpressions?.[0]
-    expect(hostnameExpression?.key).toBe('kubernetes.io/hostname')
-    expect(hostnameExpression?.operator).toBe('In')
+    // the node is selected by metadata.name, not by the kubernetes.io/hostname
+    // label, which is not guaranteed to equal the node name
+    const nodeField = matchFields?.[0]
+    expect(nodeField?.key).toBe('metadata.name')
+    expect(nodeField?.operator).toBe('In')
 
-    expect(hostnameExpression?.values).toBeDefined()
-    expect(hostnameExpression?.values?.length).toBeGreaterThan(0)
-    expect(hostnameExpression?.values?.[0]).toBeTruthy()
+    expect(nodeField?.values).toBeDefined()
+    expect(nodeField?.values?.length).toBeGreaterThan(0)
+    expect(nodeField?.values?.[0]).toBeTruthy()
   })
 
   it('should add required nodeAffinity when ACTIONS_RUNNER_HOOK_RWO=true', async () => {
@@ -84,13 +86,14 @@ describe('RWO Affinity Behavior', () => {
         ?.preferredDuringSchedulingIgnoredDuringExecution
     ).toBeUndefined()
 
-    const requiredValues =
+    const requiredField =
       pod.spec?.affinity?.nodeAffinity
         ?.requiredDuringSchedulingIgnoredDuringExecution?.nodeSelectorTerms?.[0]
-        ?.matchExpressions?.[0]?.values
+        ?.matchFields?.[0]
 
-    expect(requiredValues).toBeDefined()
-    expect(requiredValues?.length).toBeGreaterThan(0)
+    expect(requiredField?.key).toBe('metadata.name')
+    expect(requiredField?.values).toBeDefined()
+    expect(requiredField?.values?.length).toBeGreaterThan(0)
   })
 
   it('should not require node affinity by default', async () => {
@@ -113,14 +116,12 @@ describe('RWO Affinity Behavior', () => {
       pod.spec?.affinity?.nodeAffinity
         ?.preferredDuringSchedulingIgnoredDuringExecution
 
-    expect(preferred?.[0]?.preference?.matchExpressions?.[0]?.key).toBe(
-      'kubernetes.io/hostname'
+    expect(preferred?.[0]?.preference?.matchFields?.[0]?.key).toBe(
+      'metadata.name'
     )
-    expect(preferred?.[0]?.preference?.matchExpressions?.[0]?.operator).toBe(
-      'In'
-    )
+    expect(preferred?.[0]?.preference?.matchFields?.[0]?.operator).toBe('In')
     expect(
-      preferred?.[0]?.preference?.matchExpressions?.[0]?.values?.length
+      preferred?.[0]?.preference?.matchFields?.[0]?.values?.length
     ).toBeGreaterThan(0)
   })
 
@@ -140,7 +141,7 @@ describe('RWO Affinity Behavior', () => {
     const affinityValues =
       jobPod.spec?.affinity?.nodeAffinity
         ?.preferredDuringSchedulingIgnoredDuringExecution?.[0]?.preference
-        ?.matchExpressions?.[0]?.values
+        ?.matchFields?.[0]?.values
 
     expect(affinityValues).toBeDefined()
     expect(affinityValues?.length).toBeGreaterThan(0)
@@ -152,7 +153,7 @@ describe('RWO Affinity Behavior', () => {
 
   it('should keep the required affinity when an extension sets its own', async () => {
     // A pod template that sets spec.affinity used to replace the hook's
-    // required hostname affinity outright, which silently un-pinned the pod
+    // required node affinity outright, which silently un-pinned the pod
     // from the node holding the ReadWriteOnce volume.
     process.env[ENV_HOOK_RWO] = 'true'
 
@@ -190,10 +191,14 @@ describe('RWO Affinity Behavior', () => {
 
     expect(terms?.length).toBeGreaterThan(0)
     for (const term of terms ?? []) {
-      const keys = term.matchExpressions?.map(e => e.key)
       // the extension's own constraint survives alongside the hook's
-      expect(keys).toContain('kubernetes.io/os')
-      expect(keys).toContain('kubernetes.io/hostname')
+      expect(term.matchExpressions?.map(e => e.key)).toContain(
+        'kubernetes.io/os'
+      )
+      expect(term.matchFields?.map(e => e.key)).toContain('metadata.name')
     }
+
+    // the pod must actually be schedulable with both constraints applied
+    expect(pod.spec?.nodeName).toBeTruthy()
   })
 })

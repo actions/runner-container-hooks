@@ -3,6 +3,8 @@ import { containerPorts } from '../src/k8s'
 import {
   containerVolumes,
   ensureRequiredNodeAffinity,
+  fixArgs,
+  workspaceRelativePath,
   generateContainerName,
   mergePodSpecWithOptions,
   mergeContainerWithOptions,
@@ -305,10 +307,13 @@ spec:
 describe('container volumes path containment', () => {
   const workspacePath = '/home/runner/_work/repo/repo'
   let originalWorkspace: string | undefined
+  let originalRunnerWorkspace: string | undefined
 
   beforeEach(() => {
     originalWorkspace = process.env.GITHUB_WORKSPACE
+    originalRunnerWorkspace = process.env.RUNNER_WORKSPACE
     process.env.GITHUB_WORKSPACE = workspacePath
+    process.env.RUNNER_WORKSPACE = '/home/runner/_work/repo'
   })
 
   afterEach(() => {
@@ -316,6 +321,11 @@ describe('container volumes path containment', () => {
       delete process.env.GITHUB_WORKSPACE
     } else {
       process.env.GITHUB_WORKSPACE = originalWorkspace
+    }
+    if (originalRunnerWorkspace === undefined) {
+      delete process.env.RUNNER_WORKSPACE
+    } else {
+      process.env.RUNNER_WORKSPACE = originalRunnerWorkspace
     }
   })
 
@@ -366,9 +376,83 @@ describe('container volumes path containment', () => {
   })
 })
 
+describe('work directory resolution', () => {
+  // a repository named so that its name contains the work directory name:
+  // lastIndexOf('_work/') lands inside the repository name and resolves the
+  // checkout's parent instead of the checkout itself
+  const workspacePath = '/home/runner/_work/my_work/my_work'
+  let originalWorkspace: string | undefined
+  let originalRunnerWorkspace: string | undefined
+
+  beforeEach(() => {
+    originalWorkspace = process.env.GITHUB_WORKSPACE
+    originalRunnerWorkspace = process.env.RUNNER_WORKSPACE
+    process.env.GITHUB_WORKSPACE = workspacePath
+    process.env.RUNNER_WORKSPACE = '/home/runner/_work/my_work'
+  })
+
+  afterEach(() => {
+    if (originalWorkspace === undefined) {
+      delete process.env.GITHUB_WORKSPACE
+    } else {
+      process.env.GITHUB_WORKSPACE = originalWorkspace
+    }
+    if (originalRunnerWorkspace === undefined) {
+      delete process.env.RUNNER_WORKSPACE
+    } else {
+      process.env.RUNNER_WORKSPACE = originalRunnerWorkspace
+    }
+  })
+
+  it('should resolve the workspace relative to the work root', () => {
+    expect(workspaceRelativePath(workspacePath)).toBe('my_work/my_work')
+  })
+
+  it('should mount the checkout for a container action', () => {
+    const mounts = containerVolumes([], true, true)
+    const workspaceMount = mounts.find(m => m.mountPath === '/github/workspace')
+    expect(workspaceMount?.subPath).toBe('my_work/my_work')
+  })
+
+  it('should map a user mount inside a repository named like the work dir', () => {
+    const mounts = containerVolumes([
+      {
+        sourceVolumePath: `${workspacePath}/src`,
+        targetVolumePath: '/mnt/target',
+        readOnly: false
+      }
+    ])
+    expect(mounts[mounts.length - 1].subPath).toBe('my_work/my_work/src')
+  })
+})
+
+describe('fixArgs', () => {
+  it('should keep a sh -c script in a single argument', () => {
+    expect(fixArgs(['sh', '-c', 'echo hello world'])).toEqual([
+      'sh',
+      '-c',
+      'echo hello world'
+    ])
+  })
+
+  it('should preserve positional parameters after a sh -c script', () => {
+    // everything after the script is $0 and the positional parameters;
+    // folding them into the script makes `printf "%s" "$1"` print
+    // `labelpayload` rather than `payload`
+    expect(
+      fixArgs(['sh', '-c', 'printf "%s" "$1"', 'label', 'payload'])
+    ).toEqual(['sh', '-c', 'printf "%s" "$1"', 'label', 'payload'])
+  })
+
+  it('should tokenize anything that is not a sh -c invocation', () => {
+    expect(fixArgs(['echo', 'hello world'])).toEqual(['echo', 'hello', 'world'])
+  })
+})
+
 describe('ensureRequiredNodeAffinity', () => {
   const nodeName = 'runner-node-1'
   const hostnameKey = 'kubernetes.io/hostname'
+  const nodeField = { key: 'metadata.name', operator: 'In', values: [nodeName] }
 
   const requiredTerms = (
     spec: k8s.V1PodSpec
@@ -376,18 +460,28 @@ describe('ensureRequiredNodeAffinity', () => {
     spec.affinity?.nodeAffinity?.requiredDuringSchedulingIgnoredDuringExecution
       ?.nodeSelectorTerms
 
-  it('should add a required hostname term to an empty spec', () => {
+  it('should add a required node term to an empty spec', () => {
     const spec = {} as k8s.V1PodSpec
     ensureRequiredNodeAffinity(spec, nodeName)
 
     const terms = requiredTerms(spec)
     expect(terms).toHaveLength(1)
-    expect(terms?.[0].matchExpressions).toEqual([
-      { key: hostnameKey, operator: 'In', values: [nodeName] }
-    ])
+    expect(terms?.[0].matchFields).toEqual([nodeField])
   })
 
-  it('should re-assert the hostname term when an extension replaced affinity', () => {
+  it('should select the node by name rather than by hostname label', () => {
+    // the kubernetes.io/hostname label is seeded from the machine hostname
+    // and is not guaranteed to equal the node name, so matching on it can
+    // leave the pod Pending forever
+    const spec = {} as k8s.V1PodSpec
+    ensureRequiredNodeAffinity(spec, nodeName)
+
+    const term = requiredTerms(spec)?.[0]
+    expect(term?.matchFields).toEqual([nodeField])
+    expect(term?.matchExpressions).toBeUndefined()
+  })
+
+  it('should re-assert the node term when an extension replaced affinity', () => {
     // mergePodSpecWithOptions assigns spec.affinity wholesale, so this is the
     // state the hook sees after a pod template sets its own affinity
     const spec = {
@@ -410,9 +504,9 @@ describe('ensureRequiredNodeAffinity', () => {
 
     const terms = requiredTerms(spec)
     expect(terms).toHaveLength(1)
+    expect(terms?.[0].matchFields).toEqual([nodeField])
     expect(terms?.[0].matchExpressions).toEqual([
-      { key: 'disktype', operator: 'In', values: ['ssd'] },
-      { key: hostnameKey, operator: 'In', values: [nodeName] }
+      { key: 'disktype', operator: 'In', values: ['ssd'] }
     ])
   })
 
@@ -443,15 +537,39 @@ describe('ensureRequiredNodeAffinity', () => {
     const terms = requiredTerms(spec)
     expect(terms).toHaveLength(2)
     for (const term of terms ?? []) {
-      expect(term.matchExpressions).toContainEqual({
-        key: hostnameKey,
-        operator: 'In',
-        values: [nodeName]
-      })
+      expect(term.matchFields).toContainEqual(nodeField)
     }
   })
 
-  it('should override a conflicting hostname requirement', () => {
+  it('should override a conflicting node name requirement', () => {
+    const spec = {
+      affinity: {
+        nodeAffinity: {
+          requiredDuringSchedulingIgnoredDuringExecution: {
+            nodeSelectorTerms: [
+              {
+                matchFields: [
+                  {
+                    key: 'metadata.name',
+                    operator: 'In',
+                    values: ['other-node']
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    } as k8s.V1PodSpec
+
+    ensureRequiredNodeAffinity(spec, nodeName)
+
+    expect(requiredTerms(spec)?.[0].matchFields).toEqual([nodeField])
+  })
+
+  it('should drop a conflicting hostname expression set by an extension', () => {
+    // a hostname expression would be AND-ed with the node requirement and
+    // could make the pod unschedulable
     const spec = {
       affinity: {
         nodeAffinity: {
@@ -470,10 +588,9 @@ describe('ensureRequiredNodeAffinity', () => {
 
     ensureRequiredNodeAffinity(spec, nodeName)
 
-    const expressions = requiredTerms(spec)?.[0].matchExpressions
-    expect(expressions).toEqual([
-      { key: hostnameKey, operator: 'In', values: [nodeName] }
-    ])
+    const term = requiredTerms(spec)?.[0]
+    expect(term?.matchFields).toEqual([nodeField])
+    expect(term?.matchExpressions).toBeUndefined()
   })
 
   it('should preserve unrelated affinity settings', () => {
