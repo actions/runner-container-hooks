@@ -37,6 +37,7 @@ jobs:
         run: |
           zip -r -j actions-runner-hooks-docker-${{ steps.releaseVersion.outputs.result }}.zip packages/docker/dist
           zip -r -j actions-runner-hooks-k8s-${{ steps.releaseVersion.outputs.result }}.zip packages/k8s/dist
+          zip -r -j actions-runner-hooks-k8s-novolume-${{ steps.releaseVersion.outputs.result }}.zip packages/k8s-novolume/dist
 
       - name: Calculate SHA
         id: sha
@@ -48,6 +49,9 @@ jobs:
           sha_k8s=$(sha256sum actions-runner-hooks-k8s-${{ steps.releaseVersion.outputs.result }}.zip | awk '{print $1}')
           echo "K8s SHA: $sha_k8s"
           echo "k8s-sha=$sha_k8s" >> $GITHUB_OUTPUT
+          sha_k8s_novolume=$(sha256sum actions-runner-hooks-k8s-novolume-${{ steps.releaseVersion.outputs.result }}.zip | awk '{print $1}')
+          echo "K8s novolume SHA: $sha_k8s_novolume"
+          echo "k8s-novolume-sha=$sha_k8s_novolume" >> $GITHUB_OUTPUT
 
       - name: Create release notes
         id: releaseNotes
@@ -57,6 +61,7 @@ jobs:
             const fs = require('fs');
             var releaseNotes = fs.readFileSync('${{ github.workspace }}/releaseNotes.md', 'utf8').replace(/<HOOK_VERSION>/g, '${{ steps.releaseVersion.outputs.result }}')
             releaseNotes = releaseNotes.replace(/<DOCKER_SHA>/g, '${{ steps.sha.outputs.docker-sha }}')
+            releaseNotes = releaseNotes.replace(/<K8S_NOVOLUME_SHA>/g, '${{ steps.sha.outputs.k8s-novolume-sha }}')
             releaseNotes = releaseNotes.replace(/<K8S_SHA>/g, '${{ steps.sha.outputs.k8s-sha }}')
             console.log(releaseNotes)
             fs.writeFileSync('${{ github.workspace }}/finalReleaseNotes.md', releaseNotes);
@@ -71,4 +76,5 @@ jobs:
             --notes-file ${{ github.workspace }}/finalReleaseNotes.md \
             --latest \
             ${{ github.workspace }}/actions-runner-hooks-k8s-${{ steps.releaseVersion.outputs.result }}.zip \
+            ${{ github.workspace }}/actions-runner-hooks-k8s-novolume-${{ steps.releaseVersion.outputs.result }}.zip \
             ${{ github.workspace }}/actions-runner-hooks-docker-${{ steps.releaseVersion.outputs.result }}.zip
