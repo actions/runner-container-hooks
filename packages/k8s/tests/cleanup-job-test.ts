@@ -1,7 +1,7 @@
 import * as k8s from '@kubernetes/client-node'
-import { cleanupJob, prepareJob, runContainerStep } from '../src/hooks'
-import { RunnerInstanceLabel } from '../src/hooks/constants'
-import { namespace } from '../src/k8s'
+import { cleanupJob, prepareJob } from '../src/hooks'
+import { JOB_CONTAINER_NAME, RunnerInstanceLabel } from '../src/hooks/constants'
+import { createJob, getContainerJobPodName, namespace } from '../src/k8s'
 import { TestHelper } from './test-setup'
 import { PrepareJobArgs } from 'hooklib'
 
@@ -62,7 +62,6 @@ describe('Cleanup Job', () => {
 
 describe('cleanup job removes step jobs', () => {
   let helper: TestHelper
-  let stepData: any
 
   const clients = (): {
     core: k8s.CoreV1Api
@@ -82,7 +81,16 @@ describe('cleanup job removes step jobs', () => {
     const prepareJobData = helper.getPrepareJobDefinition()
     const outputPath = helper.createFile('prepare-job-output.json')
     await prepareJob(prepareJobData.args as PrepareJobArgs, outputPath)
-    stepData = helper.getRunContainerStepDefinition()
+    // Simulate an interrupted hook that could not run its per-step cleanup.
+    const job = await createJob({
+      name: JOB_CONTAINER_NAME,
+      image: 'ubuntu:latest',
+      command: ['sh', '-c', 'sleep 600']
+    })
+    if (!job.metadata?.name) {
+      throw new Error('created job should have metadata.name')
+    }
+    await getContainerJobPodName(job.metadata.name)
   })
 
   afterEach(async () => {
@@ -91,8 +99,6 @@ describe('cleanup job removes step jobs', () => {
   })
 
   it('should label the pod created by the step job', async () => {
-    await runContainerStep(stepData.args)
-
     const { core } = clients()
     const pods = await core.listNamespacedPod({
       namespace: namespace(),
@@ -108,8 +114,6 @@ describe('cleanup job removes step jobs', () => {
   })
 
   it('should delete the step job on cleanup', async () => {
-    await runContainerStep(stepData.args)
-
     const { batch } = clients()
     const labelSelector = new RunnerInstanceLabel().toString()
 

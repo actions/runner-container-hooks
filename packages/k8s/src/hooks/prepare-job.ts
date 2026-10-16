@@ -45,7 +45,15 @@ export async function prepareJob(
   await prunePods()
 
   const extension = readExtensionFromFile()
-  await copyExternalsToRoot()
+  const externalsPath = args.container.systemMountVolumes.find(
+    volume => volume.targetVolumePath === '/__e'
+  )?.sourceVolumePath
+  if (!externalsPath) {
+    throw new Error(
+      'Job container systemMountVolumes must include a sourceVolumePath for /__e'
+    )
+  }
+  await copyExternalsToRoot(externalsPath)
 
   let container: k8s.V1Container | undefined = undefined
   if (args.container?.image) {
@@ -206,15 +214,15 @@ function generateResponseFile(
   writeToResponseFile(responseFile, JSON.stringify(response))
 }
 
-async function copyExternalsToRoot(): Promise<void> {
+async function copyExternalsToRoot(sourcePath: string): Promise<void> {
   const workspace = process.env['RUNNER_WORKSPACE']
-  if (workspace) {
-    await fs.promises.cp(
-      path.join(workspace, '../../externals'),
-      path.join(workspace, '../externals'),
-      { force: true, recursive: true }
-    )
+  if (!workspace) {
+    throw new Error('RUNNER_WORKSPACE is not set')
   }
+  await fs.promises.cp(sourcePath, path.join(workspace, '../externals'), {
+    force: true,
+    recursive: true
+  })
 }
 
 export function createContainerSpec(

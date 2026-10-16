@@ -4,8 +4,11 @@ import { RunContainerStepArgs } from 'hooklib'
 import {
   createJob,
   createSecretForEnvs,
+  deleteJob,
+  deletePod,
   getContainerJobPodName,
   getPodLogs,
+  getPrepareJobTimeoutSeconds,
   waitForContainerToTerminate,
   waitForPodPhases
 } from '../k8s'
@@ -65,39 +68,58 @@ export async function runContainerStep(
   }
   core.debug(`Job created, waiting for pod to start: ${job.metadata?.name}`)
 
-  let podName: string
+  let podName: string | undefined
   try {
-    podName = await getContainerJobPodName(job.metadata.name)
-  } catch (err) {
-    const message = formatError(err)
-    core.debug(`getContainerJobPodName failed: ${message}`)
-    throw new Error(`failed to get container job pod name: ${message}`)
+    try {
+      podName = await getContainerJobPodName(job.metadata.name)
+    } catch (err) {
+      const message = formatError(err)
+      core.debug(`getContainerJobPodName failed: ${message}`)
+      throw new Error(`failed to get container job pod name: ${message}`)
+    }
+
+    await waitForPodPhases(
+      podName,
+      new Set([
+        PodPhase.COMPLETED,
+        PodPhase.RUNNING,
+        PodPhase.SUCCEEDED,
+        PodPhase.FAILED
+      ]),
+      new Set([PodPhase.PENDING, PodPhase.UNKNOWN]),
+      getPrepareJobTimeoutSeconds()
+    )
+    core.debug('Container step is running or complete, pulling logs')
+
+    await getPodLogs(podName, JOB_CONTAINER_NAME)
+
+    core.debug('Waiting for the job container to terminate')
+    const terminated = await waitForContainerToTerminate(
+      podName,
+      JOB_CONTAINER_NAME
+    )
+
+    // Read the exit code from the job container by name. Indexing into
+    // containerStatuses picked up a sidecar's exit code whenever a pod
+    // template extension contributed extra containers.
+    return typeof terminated.exitCode === 'number' ? terminated.exitCode : 1
+  } finally {
+    // Delete the owner first so it cannot replace the pod during cleanup.
+    await deleteJob(job.metadata.name).catch(err => {
+      core.error(
+        `Failed to delete step job ${job.metadata?.name}: ${formatError(err)}`
+      )
+    })
+    if (podName) {
+      await deletePod(podName).catch(err => {
+        // The Job's garbage collector may have already removed the pod.
+        if (err instanceof k8s.ApiException && err.code === 404) {
+          return
+        }
+        core.error(`Failed to delete step pod ${podName}: ${formatError(err)}`)
+      })
+    }
   }
-
-  await waitForPodPhases(
-    podName,
-    new Set([
-      PodPhase.COMPLETED,
-      PodPhase.RUNNING,
-      PodPhase.SUCCEEDED,
-      PodPhase.FAILED
-    ]),
-    new Set([PodPhase.PENDING, PodPhase.UNKNOWN])
-  )
-  core.debug('Container step is running or complete, pulling logs')
-
-  await getPodLogs(podName, JOB_CONTAINER_NAME)
-
-  core.debug('Waiting for the job container to terminate')
-  const terminated = await waitForContainerToTerminate(
-    podName,
-    JOB_CONTAINER_NAME
-  )
-
-  // Read the exit code from the job container by name. Indexing into
-  // containerStatuses picked up a sidecar's exit code whenever a pod
-  // template extension contributed extra containers.
-  return typeof terminated.exitCode === 'number' ? terminated.exitCode : 1
 }
 
 function createContainerSpec(

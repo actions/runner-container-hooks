@@ -38,9 +38,12 @@ rules:
 - Some actions runner env's are expected to be set. These are set automatically by the runner.
     - `RUNNER_WORKSPACE` is expected to be set to the workspace of the runner
     - `GITHUB_WORKSPACE` is expected to be set to the workspace of the job
+- `ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS` optionally sets the startup timeout for both job pods and container-step pods (default: 600 seconds).
 
 ## Storage Guidance
 The K8s hooks require a shared volume between the runner pod and the job pods to share the workspace and other internal directories.
+
+The hook copies runner externals from the `/__e` system mount's `sourceVolumePath` into `externals` under the shared work root. The runner installation does not need to be adjacent to the workspace.
 
 If shared storage is not an option for your cluster, use the [k8s-novolume hooks](../k8s-novolume/README.md) instead, which copy the workspace into the job pod rather than mounting it.
 
@@ -63,6 +66,9 @@ To enable this safely:
 
 > **Note:** The pod template extension (`ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE`) is applied last and replaces `spec.affinity` wholesale. If you set `affinity` in your template while running with `ACTIONS_RUNNER_HOOK_RWO=true`, you are responsible for including the required `kubernetes.io/hostname` node affinity yourself, otherwise job pods may be scheduled away from the node holding the RWO volume.
 
+
+## Container-step cleanup
+Each container step deletes its Kubernetes Job and pod after the job container exits, including any sidecars added by a pod template extension. Cleanup also runs if the step fails. Workflow cleanup and the next job's preparation prune leftover Jobs and pods as a fallback for interrupted hooks.
 
 ## Limitations
 - A [job containers](https://docs.github.com/en/actions/using-jobs/running-jobs-in-a-container) will be required for all jobs

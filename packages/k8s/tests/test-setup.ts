@@ -232,6 +232,10 @@ export class TestHelper {
 
     prepareJob.args.container.userMountVolumes = undefined
     prepareJob.args.container.registry = null
+    const externals = prepareJob.args.container.systemMountVolumes.find(
+      volume => volume.targetVolumePath === '/__e'
+    )
+    externals.sourceVolumePath = `${this.tempDirPath}/externals`
     prepareJob.args.services.forEach(s => {
       s.registry = null
     })
