@@ -221,7 +221,8 @@ async function copyExternalsToRoot(sourcePath: string): Promise<void> {
   }
   await fs.promises.cp(sourcePath, path.join(workspace, '../externals'), {
     force: true,
-    recursive: true
+    recursive: true,
+    dereference: true
   })
 }
 

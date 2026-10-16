@@ -33,17 +33,17 @@ rules:
 - The `ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER` env should be set to true to prevent the runner from running any jobs outside of a container
 - The runner pod should map a persistent volume claim into the `_work` directory
     - The `ACTIONS_RUNNER_CLAIM_NAME` env should be set to the persistent volume claim that contains the runner's working directory, otherwise it defaults to `${ACTIONS_RUNNER_POD_NAME}-work`
-- By default, the hook uses the Kubernetes scheduler and sets a *preferred* `nodeAffinity` to the runner node (`kubernetes.io/hostname`) without requiring it.
+- By default, the hook uses the Kubernetes scheduler and sets a *preferred* `nodeAffinity` to the runner node (`metadata.name`) without requiring it.
 - Setting `ACTIONS_RUNNER_HOOK_RWO=true` switches this to a *required* node affinity, ensuring scheduling on the same node as the runner pod (recommended for `ReadWriteOnce` volumes).
 - Some actions runner env's are expected to be set. These are set automatically by the runner.
     - `RUNNER_WORKSPACE` is expected to be set to the workspace of the runner
     - `GITHUB_WORKSPACE` is expected to be set to the workspace of the job
-- `ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS` optionally sets the startup timeout for both job pods and container-step pods (default: 600 seconds).
+- `ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS` optionally sets the startup timeout for both job pods and container-step pods (default: 600 seconds). Container-step pod discovery and the subsequent phase wait each use this timeout.
 
 ## Storage Guidance
 The K8s hooks require a shared volume between the runner pod and the job pods to share the workspace and other internal directories.
 
-The hook copies runner externals from the `/__e` system mount's `sourceVolumePath` into `externals` under the shared work root. The runner installation does not need to be adjacent to the workspace.
+The hook copies runner externals from the `/__e` system mount's `sourceVolumePath` into `externals` under the shared work root, dereferencing symlinks so the copy is self-contained. The runner installation does not need to be adjacent to the workspace.
 
 If shared storage is not an option for your cluster, use the [k8s-novolume hooks](../k8s-novolume/README.md) instead, which copy the workspace into the job pod rather than mounting it.
 
@@ -60,11 +60,11 @@ If `ReadWriteMany` storage is not available, you can use `ReadWriteOnce` (RWO) s
 
 To enable this safely:
 1. Set `ACTIONS_RUNNER_HOOK_RWO=true`.
-2. The hooks will add a required `nodeAffinity` to job pods, ensuring they are scheduled on the same node as the runner pod (`kubernetes.io/hostname` match).
+2. The hooks will add a required `nodeAffinity` to job pods, ensuring they are scheduled on the same node as the runner pod (`metadata.name` field match).
 
 > **Note:** We do not recommend manually setting `nodeName` in the pod template, as the hooks handle node placement automatically via affinity.
 
-> **Note:** The pod template extension (`ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE`) is applied last and replaces `spec.affinity` wholesale. If you set `affinity` in your template while running with `ACTIONS_RUNNER_HOOK_RWO=true`, you are responsible for including the required `kubernetes.io/hostname` node affinity yourself, otherwise job pods may be scheduled away from the node holding the RWO volume.
+> **Note:** The pod template extension (`ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE`) replaces `spec.affinity` when it supplies that field. In RWO mode, the hooks then enforce the runner node's `metadata.name` in every required node-selector term for both job pods and container-step Jobs, replacing any existing `metadata.name` constraints and removing `kubernetes.io/hostname` expressions. Other affinity constraints are preserved and must also be satisfied; extensions cannot relax the required runner-node placement.
 
 
 ## Container-step cleanup

@@ -1,6 +1,7 @@
 const mockExec = jest.fn()
 const mockReadNamespacedPod = jest.fn()
 const mockReadNamespacedJob = jest.fn()
+const mockListNamespacedPod = jest.fn()
 
 jest.mock('@kubernetes/client-node', () => {
   return {
@@ -14,7 +15,10 @@ jest.mock('@kubernetes/client-node', () => {
         if (name.includes('Authorization')) {
           return { createSelfSubjectAccessReview: jest.fn() }
         }
-        return { readNamespacedPod: mockReadNamespacedPod }
+        return {
+          readNamespacedPod: mockReadNamespacedPod,
+          listNamespacedPod: mockListNamespacedPod
+        }
       }),
       getContexts: jest.fn().mockReturnValue([{ namespace: 'test-namespace' }])
     })),
@@ -37,7 +41,11 @@ jest.mock('../src/k8s/utils', () => {
   }
 })
 
-import { waitForJobToComplete, waitForPodPhases } from '../src/k8s'
+import {
+  getContainerJobPodName,
+  waitForJobToComplete,
+  waitForPodPhases
+} from '../src/k8s'
 import { PodPhase } from '../src/k8s/utils'
 
 describe('error serialization', () => {
@@ -48,6 +56,79 @@ describe('error serialization', () => {
 
   afterEach(() => {
     delete process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE']
+  })
+
+  describe('getContainerJobPodName', () => {
+    const originalTimeout =
+      process.env.ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS
+
+    beforeEach(() => {
+      jest.useFakeTimers({ now: 0 })
+      delete process.env.ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS
+    })
+
+    afterEach(() => {
+      jest.useRealTimers()
+      if (originalTimeout === undefined) {
+        delete process.env.ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS
+      } else {
+        process.env.ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS = originalTimeout
+      }
+    })
+
+    it.each([
+      [undefined, 120],
+      ['1800', 1200]
+    ])(
+      'allows pod discovery after %p timeout configuration and %p seconds of delay',
+      async (configured, delaySeconds) => {
+        if (configured !== undefined) {
+          process.env.ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS = configured
+        }
+        mockListNamespacedPod.mockImplementation(async () => ({
+          items:
+            Date.now() >= delaySeconds * 1000
+              ? [{ metadata: { name: 'step-pod' } }]
+              : []
+        }))
+
+        const result = expect(getContainerJobPodName('step-job')).resolves.toBe(
+          'step-pod'
+        )
+        await jest.runAllTimersAsync()
+        await result
+
+        expect(Date.now()).toBeGreaterThanOrEqual(delaySeconds * 1000)
+        expect(mockListNamespacedPod).toHaveBeenCalledWith({
+          namespace: 'test-namespace',
+          labelSelector: 'job-name=step-job',
+          limit: 1
+        })
+      }
+    )
+
+    it.each([
+      [undefined, 600],
+      ['1800', 1800],
+      ['1', 1]
+    ])(
+      'times out pod discovery with configuration %p after %p seconds',
+      async (configured, timeoutSeconds) => {
+        if (configured !== undefined) {
+          process.env.ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS = configured
+        }
+        mockListNamespacedPod.mockResolvedValue({ items: [] })
+
+        const result = expect(
+          getContainerJobPodName('step-job')
+        ).rejects.toThrow('backoff timeout')
+        await jest.runAllTimersAsync()
+        await result
+
+        expect(Date.now()).toBeGreaterThan(timeoutSeconds * 1000)
+        expect(Date.now()).toBeLessThanOrEqual((timeoutSeconds + 20) * 1000)
+      }
+    )
   })
 
   describe('waitForJobToComplete', () => {

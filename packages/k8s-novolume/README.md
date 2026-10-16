@@ -32,8 +32,7 @@ rules:
 ```
 - The `ACTIONS_RUNNER_POD_NAME` env should be set to the name of the pod
 - The `ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER` env should be set to true to prevent the runner from running any jobs outside of a container
-- The runner pod should map a persistent volume claim into the `_work` directory
-    - The `ACTIONS_RUNNER_CLAIM_NAME` env should be set to the persistent volume claim that contains the runner's working directory, otherwise it defaults to `${ACTIONS_RUNNER_POD_NAME}-work`
+- The runner must have a writable `_work` directory. Job pods use `emptyDir` volumes, and workspace files are copied through the Kubernetes `exec` API. No persistent volume claim or `ACTIONS_RUNNER_CLAIM_NAME` setting is required.
 - Some actions runner env's are expected to be set. These are set automatically by the runner.
     - `RUNNER_WORKSPACE` is expected to be set to the workspace of the runner
     - `GITHUB_WORKSPACE` is expected to be set to the workspace of the job

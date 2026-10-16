@@ -125,6 +125,43 @@ describe('prepare job externals', () => {
     ).toBe('runtime')
   })
 
+  it.each(['relative', 'absolute'])(
+    'copies a runtime with a %s symlink without depending on the source',
+    async linkType => {
+      const runtimePath = path.join(sourcePath, 'node24', 'bin', 'node')
+      const targetPath = `${runtimePath}.real`
+      fs.renameSync(runtimePath, targetPath)
+      fs.symlinkSync(
+        linkType === 'relative' ? 'node.real' : targetPath,
+        runtimePath
+      )
+
+      await prepareJob(args, responsePath)
+      fs.rmSync(sourcePath, { recursive: true })
+
+      const copiedRuntime = path.join(destinationPath, 'node24', 'bin', 'node')
+      expect(fs.lstatSync(copiedRuntime).isSymbolicLink()).toBe(false)
+      expect(fs.readFileSync(copiedRuntime, 'utf8')).toBe('runtime')
+    }
+  )
+
+  it('copies a symlinked externals directory without depending on its target', async () => {
+    const targetPath = path.join(tempDir, 'external-runtimes')
+    fs.renameSync(sourcePath, targetPath)
+    fs.symlinkSync(targetPath, sourcePath, 'dir')
+
+    await prepareJob(args, responsePath)
+    fs.rmSync(targetPath, { recursive: true })
+
+    expect(fs.lstatSync(destinationPath).isSymbolicLink()).toBe(false)
+    expect(
+      fs.readFileSync(
+        path.join(destinationPath, 'node24', 'bin', 'node'),
+        'utf8'
+      )
+    ).toBe('runtime')
+  })
+
   it('rejects a missing externals system mount', async () => {
     args.container!.systemMountVolumes = []
 

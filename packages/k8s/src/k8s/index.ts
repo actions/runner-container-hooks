@@ -206,7 +206,7 @@ export async function createJob(
 
 export async function getContainerJobPodName(jobName: string): Promise<string> {
   const selector = `job-name=${jobName}`
-  const backOffManager = new BackOffManager(60)
+  const backOffManager = new BackOffManager(getPrepareJobTimeoutSeconds())
   while (true) {
     const podList = await k8sApi.listNamespacedPod({
       namespace: namespace(),
