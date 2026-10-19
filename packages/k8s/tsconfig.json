@@ -3,9 +3,9 @@
     "compilerOptions": {
       "baseUrl": "./",
       "outDir": "./lib",
-      "rootDir": "./src"
+      "rootDir": "./src",
+      "esModuleInterop": true /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
     },
-    "esModuleInterop": true, /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
     "include": [
       "src/**/*",
     ]

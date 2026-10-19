@@ -7,18 +7,19 @@ import {
   writeToResponseFile,
   ServiceContainerInfo
 } from 'hooklib'
+import path from 'path'
+import * as fs from 'fs'
 import {
   containerPorts,
-  createJobPod,
+  createPod,
   isPodContainerAlpine,
+  pruneJobs,
   prunePods,
   waitForPodPhases,
-  getPrepareJobTimeoutSeconds,
-  execCpToPod,
-  execPodStep
+  getPrepareJobTimeoutSeconds
 } from '../k8s'
 import {
-  CONTAINER_VOLUMES,
+  containerVolumes,
   DEFAULT_CONTAINER_ENTRY_POINT,
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
   formatError,
@@ -26,15 +27,9 @@ import {
   mergeContainerWithOptions,
   readExtensionFromFile,
   PodPhase,
-  fixArgs,
-  prepareJobScript
+  fixArgs
 } from '../k8s/utils'
-import {
-  CONTAINER_EXTENSION_PREFIX,
-  getJobPodName,
-  JOB_CONTAINER_NAME
-} from './constants'
-import { dirname } from 'path'
+import { CONTAINER_EXTENSION_PREFIX, JOB_CONTAINER_NAME } from './constants'
 
 export async function prepareJob(
   args: PrepareJobArgs,
@@ -44,9 +39,20 @@ export async function prepareJob(
     throw new Error('Job Container is required.')
   }
 
+  // Wait for previous workloads to stop before touching the shared filesystem.
+  await pruneJobs()
   await prunePods()
 
   const extension = readExtensionFromFile()
+  const externalsPath = args.container.systemMountVolumes.find(
+    volume => volume.targetVolumePath === '/__e'
+  )?.sourceVolumePath
+  if (!externalsPath) {
+    throw new Error(
+      'Job container systemMountVolumes must include a sourceVolumePath for /__e'
+    )
+  }
+  await copyExternalsToRoot(externalsPath)
 
   let container: k8s.V1Container | undefined = undefined
   if (args.container?.image) {
@@ -92,8 +98,7 @@ export async function prepareJob(
 
   let createdPod: k8s.V1Pod | undefined = undefined
   try {
-    createdPod = await createJobPod(
-      getJobPodName(),
+    createdPod = await createPod(
       container,
       services,
       args.container.registry,
@@ -113,13 +118,6 @@ export async function prepareJob(
     `Job pod created, waiting for it to come online ${createdPod?.metadata?.name}`
   )
 
-  const runnerWorkspace = dirname(process.env.RUNNER_WORKSPACE as string)
-
-  let prepareScript: { containerPath: string; runnerPath: string } | undefined
-  if (args.container?.userMountVolumes?.length) {
-    prepareScript = prepareJobScript(args.container.userMountVolumes || [])
-  }
-
   try {
     await waitForPodPhases(
       createdPod.metadata.name,
@@ -130,28 +128,6 @@ export async function prepareJob(
   } catch (err) {
     await prunePods()
     throw new Error(`pod failed to come online with error: ${formatError(err)}`)
-  }
-
-  await execCpToPod(createdPod.metadata.name, runnerWorkspace, '/__w')
-
-  if (prepareScript) {
-    await execPodStep(
-      ['sh', '-e', prepareScript.containerPath],
-      createdPod.metadata.name,
-      JOB_CONTAINER_NAME
-    )
-
-    const promises: Promise<void>[] = []
-    for (const vol of args?.container?.userMountVolumes || []) {
-      promises.push(
-        execCpToPod(
-          createdPod.metadata.name,
-          vol.sourceVolumePath,
-          vol.targetVolumePath
-        )
-      )
-    }
-    await Promise.all(promises)
   }
 
   core.debug('Job pod is ready for traffic')
@@ -196,8 +172,10 @@ function generateResponseFile(
     const mainContainerContextPorts: ContextPorts = {}
     if (mainContainer?.ports) {
       for (const port of mainContainer.ports) {
-        mainContainerContextPorts[port.containerPort] =
-          mainContainerContextPorts.hostPort
+        if (port.containerPort && port.hostPort) {
+          mainContainerContextPorts[port.containerPort.toString()] =
+            port.hostPort.toString()
+        }
       }
     }
 
@@ -235,6 +213,35 @@ function generateResponseFile(
   writeToResponseFile(responseFile, JSON.stringify(response))
 }
 
+async function copyExternalsToRoot(sourcePath: string): Promise<void> {
+  const workspace = process.env['RUNNER_WORKSPACE']
+  if (!workspace) {
+    throw new Error('RUNNER_WORKSPACE is not set')
+  }
+  const workRoot = path.dirname(workspace)
+  // No workflow pods may be running while this same-filesystem staging tree
+  // exists. mkdtemp creates a new, private directory, not a workflow-owned one.
+  const stagingRoot = await fs.promises.mkdtemp(
+    path.join(workRoot, '.externals-')
+  )
+  try {
+    const stagedExternals = path.join(stagingRoot, 'externals')
+    await fs.promises.cp(sourcePath, stagedExternals, {
+      recursive: true,
+      dereference: true,
+      force: false,
+      errorOnExist: true
+    })
+
+    const destination = path.join(workRoot, 'externals')
+    // rm unlinks symlinks rather than following them; never copy into the old tree.
+    await fs.promises.rm(destination, { recursive: true, force: true })
+    await fs.promises.rename(stagedExternals, destination)
+  } finally {
+    await fs.promises.rm(stagingRoot, { recursive: true, force: true })
+  }
+}
+
 export function createContainerSpec(
   container: JobContainerInfo | ServiceContainerInfo,
   name: string,
@@ -268,7 +275,7 @@ export function createContainerSpec(
     container['environmentVariables'] || {}
   )) {
     if (value && key !== 'HOME') {
-      podContainer.env.push({ name: key, value })
+      podContainer.env.push({ name: key, value: value })
     }
   }
 
@@ -284,7 +291,10 @@ export function createContainerSpec(
     })
   }
 
-  podContainer.volumeMounts = CONTAINER_VOLUMES
+  podContainer.volumeMounts = containerVolumes(
+    container['userMountVolumes'],
+    jobContainer
+  )
 
   if (!extension) {
     return podContainer

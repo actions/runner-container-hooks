@@ -1,8 +1,11 @@
 ﻿import * as fs from 'fs'
 import { containerPorts } from '../src/k8s'
 import {
+  containerVolumes,
+  ensureRequiredNodeAffinity,
+  fixArgs,
+  workspaceRelativePath,
   generateContainerName,
-  writeRunScript,
   mergePodSpecWithOptions,
   mergeContainerWithOptions,
   readExtensionFromFile,
@@ -14,113 +17,6 @@ import { TestHelper } from './test-setup'
 let testHelper: TestHelper
 
 describe('k8s utils', () => {
-  describe('write entrypoint', () => {
-    beforeEach(async () => {
-      testHelper = new TestHelper()
-      await testHelper.initialize()
-    })
-
-    afterEach(async () => {
-      await testHelper.cleanup()
-    })
-
-    it('should not throw', () => {
-      expect(() =>
-        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
-          SOME_ENV: 'SOME_VALUE'
-        })
-      ).not.toThrow()
-    })
-
-    it('should throw if RUNNER_TEMP is not set', () => {
-      delete process.env.RUNNER_TEMP
-      expect(() =>
-        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
-          SOME_ENV: 'SOME_VALUE'
-        })
-      ).toThrow()
-    })
-
-    it('should throw if environment variable name contains double quote', () => {
-      expect(() =>
-        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
-          'SOME"_ENV': 'SOME_VALUE'
-        })
-      ).toThrow()
-    })
-
-    it('should throw if environment variable name contains =', () => {
-      expect(() =>
-        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
-          'SOME=ENV': 'SOME_VALUE'
-        })
-      ).toThrow()
-    })
-
-    it('should throw if environment variable name contains single quote', () => {
-      expect(() =>
-        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
-          "SOME'_ENV": 'SOME_VALUE'
-        })
-      ).toThrow()
-    })
-
-    it('should throw if environment variable name contains dollar', () => {
-      expect(() =>
-        writeRunScript('/test', 'sh', ['-e', 'script.sh'], ['/prepend/path'], {
-          SOME_$_ENV: 'SOME_VALUE'
-        })
-      ).toThrow()
-    })
-
-    it('should escape double quote, dollar and backslash in environment variable values', () => {
-      const { runnerPath } = writeRunScript(
-        '/test',
-        'sh',
-        ['-e', 'script.sh'],
-        ['/prepend/path'],
-        {
-          DQUOTE: '"',
-          BACK_SLASH: '\\',
-          DOLLAR: '$'
-        }
-      )
-      expect(fs.existsSync(runnerPath)).toBe(true)
-      const script = fs.readFileSync(runnerPath, 'utf8')
-      expect(script).toContain('"DQUOTE=\\"')
-      expect(script).toContain('"BACK_SLASH=\\\\"')
-      expect(script).toContain('"DOLLAR=\\$"')
-    })
-
-    it('should return object with containerPath and runnerPath', () => {
-      const { containerPath, runnerPath } = writeRunScript(
-        '/test',
-        'sh',
-        ['-e', 'script.sh'],
-        ['/prepend/path'],
-        {
-          SOME_ENV: 'SOME_VALUE'
-        }
-      )
-      expect(containerPath).toMatch(/\/__w\/_temp\/.*\.sh/)
-      const re = new RegExp(`${process.env.RUNNER_TEMP}/.*\\.sh`)
-      expect(runnerPath).toMatch(re)
-    })
-
-    it('should write entrypoint path and the file should exist', () => {
-      const { runnerPath } = writeRunScript(
-        '/test',
-        'sh',
-        ['-e', 'script.sh'],
-        ['/prepend/path'],
-        {
-          SOME_ENV: 'SOME_VALUE'
-        }
-      )
-      expect(fs.existsSync(runnerPath)).toBe(true)
-    })
-  })
-
   describe('container volumes', () => {
     beforeEach(async () => {
       testHelper = new TestHelper()
@@ -405,5 +301,312 @@ spec:
     mergePodSpecWithOptions(base, from)
 
     expect(base).toStrictEqual(expected)
+  })
+})
+
+describe('container volumes path containment', () => {
+  const workspacePath = '/home/runner/_work/repo/repo'
+  let originalWorkspace: string | undefined
+  let originalRunnerWorkspace: string | undefined
+
+  beforeEach(() => {
+    originalWorkspace = process.env.GITHUB_WORKSPACE
+    originalRunnerWorkspace = process.env.RUNNER_WORKSPACE
+    process.env.GITHUB_WORKSPACE = workspacePath
+    process.env.RUNNER_WORKSPACE = '/home/runner/_work/repo'
+  })
+
+  afterEach(() => {
+    if (originalWorkspace === undefined) {
+      delete process.env.GITHUB_WORKSPACE
+    } else {
+      process.env.GITHUB_WORKSPACE = originalWorkspace
+    }
+    if (originalRunnerWorkspace === undefined) {
+      delete process.env.RUNNER_WORKSPACE
+    } else {
+      process.env.RUNNER_WORKSPACE = originalRunnerWorkspace
+    }
+  })
+
+  const subPathOf = (sourceVolumePath: string): string | undefined => {
+    const mounts = containerVolumes([
+      { sourceVolumePath, targetVolumePath: '/mnt/target', readOnly: false }
+    ])
+    return mounts[mounts.length - 1].subPath
+  }
+
+  it('should map the workspace root onto the work volume', () => {
+    expect(subPathOf(workspacePath)).toBe('repo/repo')
+  })
+
+  it('should map a directory inside the workspace', () => {
+    expect(subPathOf(`${workspacePath}/src`)).toBe('repo/repo/src')
+  })
+
+  it('should reject paths outside the work folder', () => {
+    expect(() => subPathOf('/etc/passwd')).toThrow(
+      'Volume mounts outside of the work folder are not supported'
+    )
+  })
+
+  it('should reject parent directory traversal out of the workspace', () => {
+    expect(() => subPathOf(`${workspacePath}/../../../../etc`)).toThrow(
+      'Volume mounts outside of the work folder are not supported'
+    )
+  })
+
+  it('should reject sibling directories that share the workspace prefix', () => {
+    // `startsWith` would accept these and silently mount the wrong directory:
+    // repo-evil/secrets previously mapped to subPath repo/repo/evil/secrets
+    expect(() => subPathOf(`${workspacePath}-evil/secrets`)).toThrow(
+      'Volume mounts outside of the work folder are not supported'
+    )
+    expect(() => subPathOf(`${workspacePath}XYZ`)).toThrow(
+      'Volume mounts outside of the work folder are not supported'
+    )
+  })
+
+  it('should allow a directory whose name begins with dots', () => {
+    expect(subPathOf(`${workspacePath}/..foo`)).toBe('repo/repo/..foo')
+  })
+
+  it('should keep relative source paths untouched', () => {
+    expect(subPathOf('some/relative/path')).toBe('some/relative/path')
+  })
+})
+
+describe('work directory resolution', () => {
+  // a repository named so that its name contains the work directory name:
+  // lastIndexOf('_work/') lands inside the repository name and resolves the
+  // checkout's parent instead of the checkout itself
+  const workspacePath = '/home/runner/_work/my_work/my_work'
+  let originalWorkspace: string | undefined
+  let originalRunnerWorkspace: string | undefined
+
+  beforeEach(() => {
+    originalWorkspace = process.env.GITHUB_WORKSPACE
+    originalRunnerWorkspace = process.env.RUNNER_WORKSPACE
+    process.env.GITHUB_WORKSPACE = workspacePath
+    process.env.RUNNER_WORKSPACE = '/home/runner/_work/my_work'
+  })
+
+  afterEach(() => {
+    if (originalWorkspace === undefined) {
+      delete process.env.GITHUB_WORKSPACE
+    } else {
+      process.env.GITHUB_WORKSPACE = originalWorkspace
+    }
+    if (originalRunnerWorkspace === undefined) {
+      delete process.env.RUNNER_WORKSPACE
+    } else {
+      process.env.RUNNER_WORKSPACE = originalRunnerWorkspace
+    }
+  })
+
+  it('should resolve the workspace relative to the work root', () => {
+    expect(workspaceRelativePath(workspacePath)).toBe('my_work/my_work')
+  })
+
+  it('should mount the checkout for a container action', () => {
+    const mounts = containerVolumes([], true, true)
+    const workspaceMount = mounts.find(m => m.mountPath === '/github/workspace')
+    expect(workspaceMount?.subPath).toBe('my_work/my_work')
+  })
+
+  it('should map a user mount inside a repository named like the work dir', () => {
+    const mounts = containerVolumes([
+      {
+        sourceVolumePath: `${workspacePath}/src`,
+        targetVolumePath: '/mnt/target',
+        readOnly: false
+      }
+    ])
+    expect(mounts[mounts.length - 1].subPath).toBe('my_work/my_work/src')
+  })
+})
+
+describe('fixArgs', () => {
+  it('should keep a sh -c script in a single argument', () => {
+    expect(fixArgs(['sh', '-c', 'echo hello world'])).toEqual([
+      'sh',
+      '-c',
+      'echo hello world'
+    ])
+  })
+
+  it('should preserve positional parameters after a sh -c script', () => {
+    // everything after the script is $0 and the positional parameters;
+    // folding them into the script makes `printf "%s" "$1"` print
+    // `labelpayload` rather than `payload`
+    expect(
+      fixArgs(['sh', '-c', 'printf "%s" "$1"', 'label', 'payload'])
+    ).toEqual(['sh', '-c', 'printf "%s" "$1"', 'label', 'payload'])
+  })
+
+  it('should tokenize anything that is not a sh -c invocation', () => {
+    expect(fixArgs(['echo', 'hello world'])).toEqual(['echo', 'hello', 'world'])
+  })
+})
+
+describe('ensureRequiredNodeAffinity', () => {
+  const nodeName = 'runner-node-1'
+  const hostnameKey = 'kubernetes.io/hostname'
+  const nodeField = { key: 'metadata.name', operator: 'In', values: [nodeName] }
+
+  const requiredTerms = (
+    spec: k8s.V1PodSpec
+  ): k8s.V1NodeSelectorTerm[] | undefined =>
+    spec.affinity?.nodeAffinity?.requiredDuringSchedulingIgnoredDuringExecution
+      ?.nodeSelectorTerms
+
+  it('should add a required node term to an empty spec', () => {
+    const spec = {} as k8s.V1PodSpec
+    ensureRequiredNodeAffinity(spec, nodeName)
+
+    const terms = requiredTerms(spec)
+    expect(terms).toHaveLength(1)
+    expect(terms?.[0].matchFields).toEqual([nodeField])
+  })
+
+  it('should select the node by name rather than by hostname label', () => {
+    // the kubernetes.io/hostname label is seeded from the machine hostname
+    // and is not guaranteed to equal the node name, so matching on it can
+    // leave the pod Pending forever
+    const spec = {} as k8s.V1PodSpec
+    ensureRequiredNodeAffinity(spec, nodeName)
+
+    const term = requiredTerms(spec)?.[0]
+    expect(term?.matchFields).toEqual([nodeField])
+    expect(term?.matchExpressions).toBeUndefined()
+  })
+
+  it('should re-assert the node term when an extension replaced affinity', () => {
+    // mergePodSpecWithOptions assigns spec.affinity wholesale, so this is the
+    // state the hook sees after a pod template sets its own affinity
+    const spec = {
+      affinity: {
+        nodeAffinity: {
+          requiredDuringSchedulingIgnoredDuringExecution: {
+            nodeSelectorTerms: [
+              {
+                matchExpressions: [
+                  { key: 'disktype', operator: 'In', values: ['ssd'] }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    } as k8s.V1PodSpec
+
+    ensureRequiredNodeAffinity(spec, nodeName)
+
+    const terms = requiredTerms(spec)
+    expect(terms).toHaveLength(1)
+    expect(terms?.[0].matchFields).toEqual([nodeField])
+    expect(terms?.[0].matchExpressions).toEqual([
+      { key: 'disktype', operator: 'In', values: ['ssd'] }
+    ])
+  })
+
+  it('should constrain every term because terms are OR-ed', () => {
+    const spec = {
+      affinity: {
+        nodeAffinity: {
+          requiredDuringSchedulingIgnoredDuringExecution: {
+            nodeSelectorTerms: [
+              {
+                matchExpressions: [
+                  { key: 'disktype', operator: 'In', values: ['ssd'] }
+                ]
+              },
+              {
+                matchExpressions: [
+                  { key: 'zone', operator: 'In', values: ['us-east-1a'] }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    } as k8s.V1PodSpec
+
+    ensureRequiredNodeAffinity(spec, nodeName)
+
+    const terms = requiredTerms(spec)
+    expect(terms).toHaveLength(2)
+    for (const term of terms ?? []) {
+      expect(term.matchFields).toContainEqual(nodeField)
+    }
+  })
+
+  it('should override a conflicting node name requirement', () => {
+    const spec = {
+      affinity: {
+        nodeAffinity: {
+          requiredDuringSchedulingIgnoredDuringExecution: {
+            nodeSelectorTerms: [
+              {
+                matchFields: [
+                  {
+                    key: 'metadata.name',
+                    operator: 'In',
+                    values: ['other-node']
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    } as k8s.V1PodSpec
+
+    ensureRequiredNodeAffinity(spec, nodeName)
+
+    expect(requiredTerms(spec)?.[0].matchFields).toEqual([nodeField])
+  })
+
+  it('should drop a conflicting hostname expression set by an extension', () => {
+    // a hostname expression would be AND-ed with the node requirement and
+    // could make the pod unschedulable
+    const spec = {
+      affinity: {
+        nodeAffinity: {
+          requiredDuringSchedulingIgnoredDuringExecution: {
+            nodeSelectorTerms: [
+              {
+                matchExpressions: [
+                  { key: hostnameKey, operator: 'In', values: ['other-node'] }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    } as k8s.V1PodSpec
+
+    ensureRequiredNodeAffinity(spec, nodeName)
+
+    const term = requiredTerms(spec)?.[0]
+    expect(term?.matchFields).toEqual([nodeField])
+    expect(term?.matchExpressions).toBeUndefined()
+  })
+
+  it('should preserve unrelated affinity settings', () => {
+    const spec = {
+      affinity: {
+        podAntiAffinity: {
+          preferredDuringSchedulingIgnoredDuringExecution: [
+            { weight: 50, podAffinityTerm: { topologyKey: hostnameKey } }
+          ]
+        }
+      }
+    } as k8s.V1PodSpec
+
+    ensureRequiredNodeAffinity(spec, nodeName)
+
+    expect(spec.affinity?.podAntiAffinity).toBeDefined()
+    expect(requiredTerms(spec)).toHaveLength(1)
   })
 })

@@ -1,19 +1,22 @@
 {
   "name": "hooks",
   "version": "0.8.1",
-  "description": "Three projects are included - k8s: a kubernetes hook implementation that spins up pods dynamically to run a job - docker: A hook implementation of the runner's docker implementation  - A hook lib, which contains shared typescript definitions and utilities that the other packages consume",
+  "description": "Four projects are included - k8s: a kubernetes hook implementation that spins up pods dynamically to run a job, sharing the runner's workspace through a volume - k8s-novolume: a kubernetes hook implementation that spins up pods dynamically to run a job, copying the runner's workspace into the job pod instead of relying on a shared volume - docker: A hook implementation of the runner's docker implementation  - A hook lib, which contains shared typescript definitions and utilities that the other packages consume",
   "main": "",
   "directories": {
     "doc": "docs"
   },
   "scripts": {
-    "test": "npm run test --prefix packages/docker && npm run test --prefix packages/k8s",
-    "bootstrap": "npm ci --prefix packages/hooklib && npm ci --prefix packages/k8s && npm ci --prefix packages/docker",
+    "test": "npm run test --prefix packages/docker && npm run test --prefix packages/k8s && npm run test --prefix packages/k8s-novolume",
+    "test:docker": "npm run test --prefix packages/docker",
+    "test:k8s": "npm run test --prefix packages/k8s",
+    "test:k8s-novolume": "npm run test --prefix packages/k8s-novolume",
+    "bootstrap": "npm ci --prefix packages/hooklib && npm ci --prefix packages/k8s && npm ci --prefix packages/k8s-novolume && npm ci --prefix packages/docker",
     "format": "prettier --write '**/*.ts'",
     "format-check": "prettier --check '**/*.ts'",
     "lint": "eslint packages/**/*.ts",
     "lint:fix": "eslint packages/**/*.ts --fix",
-    "build-all": "npm run build --prefix packages/hooklib && npm run build --prefix packages/k8s && npm run build --prefix packages/docker"
+    "build-all": "npm run build --prefix packages/hooklib && npm run build --prefix packages/k8s && npm run build --prefix packages/k8s-novolume && npm run build --prefix packages/docker"
   },
   "repository": {
     "type": "git",
