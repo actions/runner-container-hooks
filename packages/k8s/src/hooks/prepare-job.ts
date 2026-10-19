@@ -39,8 +39,7 @@ export async function prepareJob(
     throw new Error('Job Container is required.')
   }
 
-  // Remove anything left behind by a previous run on this runner, including
-  // Jobs that never finished and so were never reclaimed by their TTL.
+  // Wait for previous workloads to stop before touching the shared filesystem.
   await pruneJobs()
   await prunePods()
 
@@ -219,11 +218,28 @@ async function copyExternalsToRoot(sourcePath: string): Promise<void> {
   if (!workspace) {
     throw new Error('RUNNER_WORKSPACE is not set')
   }
-  await fs.promises.cp(sourcePath, path.join(workspace, '../externals'), {
-    force: true,
-    recursive: true,
-    dereference: true
-  })
+  const workRoot = path.dirname(workspace)
+  // No workflow pods may be running while this same-filesystem staging tree
+  // exists. mkdtemp creates a new, private directory, not a workflow-owned one.
+  const stagingRoot = await fs.promises.mkdtemp(
+    path.join(workRoot, '.externals-')
+  )
+  try {
+    const stagedExternals = path.join(stagingRoot, 'externals')
+    await fs.promises.cp(sourcePath, stagedExternals, {
+      recursive: true,
+      dereference: true,
+      force: false,
+      errorOnExist: true
+    })
+
+    const destination = path.join(workRoot, 'externals')
+    // rm unlinks symlinks rather than following them; never copy into the old tree.
+    await fs.promises.rm(destination, { recursive: true, force: true })
+    await fs.promises.rename(stagedExternals, destination)
+  } finally {
+    await fs.promises.rm(stagingRoot, { recursive: true, force: true })
+  }
 }
 
 export function createContainerSpec(

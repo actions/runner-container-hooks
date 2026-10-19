@@ -229,11 +229,47 @@ export async function getContainerJobPodName(jobName: string): Promise<string> {
 }
 
 export async function deletePod(podName: string): Promise<void> {
-  await k8sApi.deleteNamespacedPod({
-    name: podName,
-    namespace: namespace(),
-    gracePeriodSeconds: 0
-  })
+  const request = { name: podName, namespace: namespace() }
+  try {
+    await k8sApi.deleteNamespacedPod({
+      ...request,
+      // Zero force-deletes the API object without waiting for the kubelet.
+      gracePeriodSeconds: 1
+    })
+  } catch (err) {
+    if (!(err instanceof k8s.ApiException && err.code === 404)) {
+      throw err
+    }
+  }
+  await waitForDeletion(`pod ${podName}`, async () =>
+    k8sApi.readNamespacedPod(request)
+  )
+}
+
+async function waitForDeletion(
+  resource: string,
+  readResource: () => Promise<unknown>
+): Promise<void> {
+  const backOffManager = new BackOffManager(getPrepareJobTimeoutSeconds())
+  while (true) {
+    try {
+      await readResource()
+    } catch (err) {
+      if (err instanceof k8s.ApiException && err.code === 404) {
+        return
+      }
+      throw new Error(
+        `Failed to wait for deletion of ${resource}: ${formatError(err)}`
+      )
+    }
+    try {
+      await backOffManager.backOff()
+    } catch (err) {
+      throw new Error(
+        `Failed to wait for deletion of ${resource}: ${formatError(err)}`
+      )
+    }
+  }
 }
 
 export async function execPodStep(
@@ -622,14 +658,13 @@ export async function prunePods(): Promise<void> {
   await Promise.all(
     podList.items.map(async pod => {
       if (!pod.metadata?.name) {
-        return
+        throw new Error('Cannot delete a pod without metadata.name')
       }
       try {
         await deletePod(pod.metadata.name)
       } catch (err) {
-        // a pod owned by a Job we just deleted may already be gone
-        core.debug(
-          `failed to delete pod ${pod.metadata.name}: ${formatError(err)}`
+        throw new Error(
+          `Failed to delete pod ${pod.metadata.name}: ${formatError(err)}`
         )
       }
     })
@@ -637,12 +672,34 @@ export async function prunePods(): Promise<void> {
 }
 
 export async function deleteJob(name: string): Promise<void> {
-  await k8sBatchV1Api.deleteNamespacedJob({
-    name,
-    namespace: namespace(),
-    // without this the Job is removed but its pod is orphaned
-    propagationPolicy: 'Background'
+  const request = { name, namespace: namespace() }
+  try {
+    await k8sBatchV1Api.deleteNamespacedJob({
+      ...request,
+      // Stop the controller first, then delete its pods ourselves with a
+      // nonzero grace period, even if the pod template specified zero.
+      propagationPolicy: 'Orphan'
+    })
+  } catch (err) {
+    if (!(err instanceof k8s.ApiException && err.code === 404)) {
+      throw err
+    }
+  }
+  await waitForDeletion(`job ${name}`, async () =>
+    k8sBatchV1Api.readNamespacedJob(request)
+  )
+  const podList = await k8sApi.listNamespacedPod({
+    namespace: request.namespace,
+    labelSelector: `job-name=${name}`
   })
+  await Promise.all(
+    podList.items.map(async pod => {
+      if (!pod.metadata?.name) {
+        throw new Error(`Job ${name} has a pod without metadata.name`)
+      }
+      await deletePod(pod.metadata.name)
+    })
+  )
 }
 
 // Jobs are only garbage collected by ttlSecondsAfterFinished once they
@@ -660,14 +717,13 @@ export async function pruneJobs(): Promise<void> {
   await Promise.all(
     jobList.items.map(async job => {
       if (!job.metadata?.name) {
-        return
+        throw new Error('Cannot delete a job without metadata.name')
       }
       try {
         await deleteJob(job.metadata.name)
       } catch (err) {
-        // cleanup is best effort; a job that is already gone is not a failure
-        core.debug(
-          `failed to delete job ${job.metadata.name}: ${formatError(err)}`
+        throw new Error(
+          `Failed to delete job ${job.metadata.name}: ${formatError(err)}`
         )
       }
     })

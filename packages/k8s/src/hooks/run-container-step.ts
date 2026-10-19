@@ -112,10 +112,6 @@ export async function runContainerStep(
     })
     if (podName) {
       await deletePod(podName).catch(err => {
-        // The Job's garbage collector may have already removed the pod.
-        if (err instanceof k8s.ApiException && err.code === 404) {
-          return
-        }
         core.error(`Failed to delete step pod ${podName}: ${formatError(err)}`)
       })
     }

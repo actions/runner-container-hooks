@@ -1,5 +1,4 @@
 import * as core from '@actions/core'
-import { ApiException } from '@kubernetes/client-node'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
@@ -57,6 +56,7 @@ describe('prepare job externals', () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hook-externals-'))
     sourcePath = path.join(tempDir, 'runner', 'externals')
     destinationPath = path.join(tempDir, 'mounted-work', 'externals')
+    fs.mkdirSync(path.dirname(destinationPath))
     responsePath = path.join(tempDir, 'response.json')
     fs.writeFileSync(responsePath, '')
     process.env.RUNNER_WORKSPACE = path.join(tempDir, 'mounted-work', 'repo')
@@ -125,6 +125,100 @@ describe('prepare job externals', () => {
     ).toBe('runtime')
   })
 
+  it('stages a complete copy in a fresh private directory before replacing the old tree', async () => {
+    fs.mkdirSync(destinationPath)
+    fs.writeFileSync(path.join(destinationPath, 'stale-runtime'), 'old')
+    const copy = fs.promises.cp
+    jest
+      .spyOn(fs.promises, 'cp')
+      .mockImplementation(async (source, target, options) => {
+        const stagingRoot = path.dirname(target.toString())
+        expect(path.dirname(stagingRoot)).toBe(path.dirname(destinationPath))
+        expect(path.basename(stagingRoot)).toMatch(/^\.externals-/)
+        expect(fs.statSync(stagingRoot).mode & 0o777).toBe(0o700)
+        expect(
+          fs.readFileSync(path.join(destinationPath, 'stale-runtime'), 'utf8')
+        ).toBe('old')
+        await copy(source, target, options)
+      })
+
+    await prepareJob(args, responsePath)
+
+    expect(fs.existsSync(path.join(destinationPath, 'stale-runtime'))).toBe(
+      false
+    )
+    expect(fs.readdirSync(path.dirname(destinationPath))).toEqual(['externals'])
+  })
+
+  it('waits for previous pods to stop before staging externals', async () => {
+    let finishCleanup: () => void = () => {
+      throw new Error('Cleanup has not started')
+    }
+    let cleanupStarted: () => void = () => undefined
+    const started = new Promise<void>(resolve => {
+      cleanupStarted = resolve
+    })
+    jest.mocked(k8s.prunePods).mockImplementation(async () => {
+      await new Promise<void>(resolve => {
+        finishCleanup = resolve
+        cleanupStarted()
+      })
+    })
+
+    const preparation = prepareJob(args, responsePath)
+    await started
+    expect(k8s.pruneJobs).toHaveBeenCalledTimes(1)
+    expect(fs.readdirSync(path.dirname(destinationPath))).toEqual([])
+    expect(k8s.createPod).not.toHaveBeenCalled()
+    finishCleanup()
+    await preparation
+    expect(fs.existsSync(destinationPath)).toBe(true)
+  })
+
+  it.each(['pruneJobs', 'prunePods'] as const)(
+    'does not copy externals or create a pod if %s fails',
+    async operation => {
+      const error = new Error('Previous workloads could not be stopped')
+      jest.mocked(k8s[operation]).mockRejectedValue(error)
+
+      await expect(prepareJob(args, responsePath)).rejects.toBe(error)
+
+      expect(fs.readdirSync(path.dirname(destinationPath))).toEqual([])
+      expect(k8s.createPod).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each(['externals', 'node24', 'bin', 'node'])(
+    'replaces a destination symlink at %s without modifying runner files',
+    async component => {
+      const outsidePath = path.join(tempDir, 'outside-work')
+      const relativePaths = {
+        externals: '',
+        node24: 'node24',
+        bin: 'node24/bin',
+        node: 'node24/bin/node'
+      }
+      const linkPath = path.join(destinationPath, relativePaths[component])
+      const targetPath = path.join(outsidePath, relativePaths[component])
+      const sentinelPath = path.join(outsidePath, 'node24', 'bin', 'node')
+      fs.mkdirSync(path.dirname(sentinelPath), { recursive: true })
+      fs.writeFileSync(sentinelPath, 'runner-file')
+      fs.mkdirSync(path.dirname(linkPath), { recursive: true })
+      fs.symlinkSync(targetPath, linkPath)
+
+      await prepareJob(args, responsePath)
+
+      expect(fs.readFileSync(sentinelPath, 'utf8')).toBe('runner-file')
+      expect(fs.lstatSync(linkPath).isSymbolicLink()).toBe(false)
+      expect(
+        fs.readFileSync(
+          path.join(destinationPath, 'node24', 'bin', 'node'),
+          'utf8'
+        )
+      ).toBe('runtime')
+    }
+  )
+
   it.each(['relative', 'absolute'])(
     'copies a runtime with a %s symlink without depending on the source',
     async linkType => {
@@ -181,9 +275,28 @@ describe('prepare job externals', () => {
   })
 
   it('propagates copy failures without creating a pod', async () => {
+    fs.mkdirSync(destinationPath)
+    fs.writeFileSync(path.join(destinationPath, 'old-runtime'), 'old')
     fs.rmSync(sourcePath, { recursive: true })
 
     await expect(prepareJob(args, responsePath)).rejects.toThrow(/ENOENT/)
+    expect(k8s.createPod).not.toHaveBeenCalled()
+    expect(
+      fs.readFileSync(path.join(destinationPath, 'old-runtime'), 'utf8')
+    ).toBe('old')
+    expect(fs.readdirSync(path.dirname(destinationPath))).toEqual(['externals'])
+  })
+
+  it('removes the staging directory if publishing the copy fails', async () => {
+    jest
+      .spyOn(fs.promises, 'rename')
+      .mockRejectedValue(new Error('rename failed'))
+
+    await expect(prepareJob(args, responsePath)).rejects.toThrow(
+      'rename failed'
+    )
+
+    expect(fs.readdirSync(path.dirname(destinationPath))).toEqual([])
     expect(k8s.createPod).not.toHaveBeenCalled()
   })
 })
@@ -334,17 +447,5 @@ describe('container step lifecycle', () => {
     expect(core.error).toHaveBeenCalledWith(
       'Failed to delete step pod step-pod: delete failed'
     )
-  })
-
-  it('tolerates a pod already removed by Job garbage collection', async () => {
-    jest
-      .mocked(k8s.deletePod)
-      .mockRejectedValue(new ApiException(404, 'Not Found', undefined, {}))
-
-    await expect(runContainerStep(args)).resolves.toBe(0)
-
-    expect(k8s.deletePod).toHaveBeenCalledTimes(1)
-    expect(k8s.deletePod).toHaveBeenCalledWith('step-pod')
-    expect(core.error).not.toHaveBeenCalled()
   })
 })

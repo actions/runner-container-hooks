@@ -45,6 +45,10 @@ The K8s hooks require a shared volume between the runner pod and the job pods to
 
 The hook copies runner externals from the `/__e` system mount's `sourceVolumePath` into `externals` under the shared work root, dereferencing symlinks so the copy is self-contained. The runner installation does not need to be adjacent to the workspace.
 
+Before copying, preparation waits for previous Jobs and pods to be deleted. It then copies into a fresh private staging directory on the shared filesystem, removes the old externals tree without following destination symlinks, and renames the completed copy into place before starting any new workflow pods. Staging failures leave the old tree untouched.
+
+The work root must be dedicated to this runner and its hook-managed pods; unrelated workloads must not have write access. Do not force-delete workload pods and immediately reuse the work root: force deletion can remove the API object while its containers are still running. If workloads were force-deleted, ensure their containers have stopped before reusing the volume.
+
 If shared storage is not an option for your cluster, use the [k8s-novolume hooks](../k8s-novolume/README.md) instead, which copy the workspace into the job pod rather than mounting it.
 
 ### RWX (Recommended)
@@ -69,6 +73,8 @@ To enable this safely:
 
 ## Container-step cleanup
 Each container step deletes its Kubernetes Job and pod after the job container exits, including any sidecars added by a pod template extension. Cleanup also runs if the step fails. Workflow cleanup and the next job's preparation prune leftover Jobs and pods as a fallback for interrupted hooks.
+
+The hooks remove Job controllers with orphan propagation, then explicitly delete their pods with a nonzero grace period and wait for deletion. This avoids force-deleting the API objects while containers may still be running. Deletion waits use `ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS`; preparation fails on cleanup errors or timeouts rather than copying externals while previous workloads may still be writing.
 
 ## Limitations
 - A [job containers](https://docs.github.com/en/actions/using-jobs/running-jobs-in-a-container) will be required for all jobs

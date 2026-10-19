@@ -114,7 +114,7 @@ describe('cleanup job removes step jobs', () => {
   })
 
   it('should delete the step job on cleanup', async () => {
-    const { batch } = clients()
+    const { core, batch } = clients()
     const labelSelector = new RunnerInstanceLabel().toString()
 
     const before = await batch.listNamespacedJob({
@@ -131,7 +131,11 @@ describe('cleanup job removes step jobs', () => {
       namespace: namespace(),
       labelSelector
     })
-    const remaining = after.items.filter(j => !j.metadata?.deletionTimestamp)
-    expect(remaining).toHaveLength(0)
+    expect(after.items).toHaveLength(0)
+    const pods = await core.listNamespacedPod({
+      namespace: namespace(),
+      labelSelector
+    })
+    expect(pods.items).toHaveLength(0)
   })
 })
