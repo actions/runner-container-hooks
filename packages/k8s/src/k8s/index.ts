@@ -2,7 +2,6 @@ import * as core from '@actions/core'
 import * as k8s from '@kubernetes/client-node'
 import { ContainerInfo, Registry } from 'hooklib'
 import * as stream from 'stream'
-import WebSocket from 'isomorphic-ws'
 import {
   getJobPodName,
   getRunnerPodName,
@@ -18,6 +17,7 @@ import {
   useKubeScheduler,
   fixArgs
 } from './utils'
+import { parsePositiveMsEnv, WebSocketHeartbeat } from './heartbeat'
 
 const kc = new k8s.KubeConfig()
 
@@ -235,85 +235,21 @@ export async function execPodStep(
   const exec = new k8s.Exec(kc)
   command = fixArgs(command)
 
-  // Heartbeat constants matching kubectl's Go implementation
-  const PING_PERIOD_MS = 5 * 1000 // 5 seconds
-  const PING_READ_DEADLINE_MS = PING_PERIOD_MS * 12 + 1000 // ~61 seconds
-
-  let pingInterval: NodeJS.Timeout | null = null
-  let pongTimeout: NodeJS.Timeout | null = null
-
-  const stopHeartbeat = (): void => {
-    if (pingInterval) {
-      clearInterval(pingInterval)
-      pingInterval = null
-    }
-    if (pongTimeout) {
-      clearTimeout(pongTimeout)
-      pongTimeout = null
-    }
-  }
-
-  const resetPongTimeout = (ws: WebSocket): void => {
-    if (pongTimeout) {
-      clearTimeout(pongTimeout)
-    }
-    pongTimeout = setTimeout(() => {
-      core.warning(
-        `[Heartbeat] No pong received in ${PING_READ_DEADLINE_MS}ms, connection may be stale`
-      )
-    }, PING_READ_DEADLINE_MS)
-  }
-
-  const startHeartbeat = (ws: WebSocket): void => {
-    core.debug(
-      `[Heartbeat] Starting with period=${PING_PERIOD_MS}ms, deadline=${PING_READ_DEADLINE_MS}ms`
-    )
-
-    // Handle pong responses
-    ws.on('pong', () => {
-      core.debug('[Heartbeat] Pong received')
-      resetPongTimeout(ws)
-    })
-
-    // Handle WebSocket errors
-    ws.on('error', (err) => {
-      core.warning(`[Heartbeat] WebSocket error: ${err}`)
-    })
-
-    // Cleanup on close
-    ws.on('close', (code, reason) => {
-      const reasonStr = reason ? reason.toString() : 'no reason provided'
-      core.warning(
-        `[Heartbeat] WebSocket closed (code=${code}, reason="${reasonStr}"), stopping heartbeat`
-      )
-      stopHeartbeat()
-    })
-
-    // Set initial pong timeout
-    resetPongTimeout(ws)
-
-    // Start ping loop
-    pingInterval = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        try {
-          ws.ping()
-          core.debug('[Heartbeat] Ping sent')
-        } catch (err) {
-          core.warning(`[Heartbeat] Ping failed: ${err}`)
-        }
-      } else {
-        const readyStateNames = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED']
-        const stateName = readyStateNames[ws.readyState] || 'UNKNOWN'
-        core.warning(
-          `[Heartbeat] WebSocket not in OPEN state (readyState=${ws.readyState}/${stateName}), stopping heartbeat`
-        )
-        stopHeartbeat()
-      }
-    }, PING_PERIOD_MS)
-  }
+  const DEFAULT_PING_PERIOD_MS = 5000
+  const pingPeriodMs = parsePositiveMsEnv(
+    process.env.ACTIONS_RUNNER_HEARTBEAT_PERIOD_MS,
+    DEFAULT_PING_PERIOD_MS
+  )
+  const pongDeadlineMs = parsePositiveMsEnv(
+    process.env.ACTIONS_RUNNER_HEARTBEAT_DEADLINE_MS,
+    pingPeriodMs * 12 + 1000
+  )
+  const heartbeat = new WebSocketHeartbeat(pingPeriodMs, pongDeadlineMs)
 
   // Exec returns a websocket. If websocket fails, we should reject the promise. Otherwise, websocket will call a callback. Since at that point, websocket is not failing, we can safely resolve or reject the promise.
   await new Promise(function (resolve, reject) {
+    let statusReceived = false
+
     exec
       .exec(
         namespace(),
@@ -325,7 +261,8 @@ export async function execPodStep(
         stdin ?? null,
         false /* tty */,
         resp => {
-          stopHeartbeat()
+          statusReceived = true
+          heartbeat.stop()
           // kube.exec returns an error if exit code is not 0, but we can't actually get the exit code
           if (resp.status === 'Success') {
             resolve(resp.code)
@@ -340,14 +277,26 @@ export async function execPodStep(
           }
         }
       )
+      // eslint-disable-next-line github/no-then
       .then(ws => {
-        // Start heartbeat once WebSocket is connected
-        startHeartbeat(ws)
+        // Without a status frame the promise would never settle, and the
+        // hook would exit 0 once the event loop drains.
+        ws.once('close', () => {
+          if (!statusReceived) {
+            heartbeat.stop()
+            reject(
+              new Error(
+                'exec stream closed before the command reported an exit status'
+              )
+            )
+          }
+        })
+        heartbeat.start(ws, reject)
       })
       // If exec.exec fails, explicitly reject the outer promise
       // eslint-disable-next-line github/no-then
       .catch(e => {
-        stopHeartbeat()
+        heartbeat.stop()
         reject(e)
       })
   })
