@@ -27,6 +27,9 @@ import {
 import * as shlex from 'shlex'
 import { parsePositiveMsEnv, WebSocketHeartbeat } from './heartbeat'
 import type { HeartbeatWebSocket } from './heartbeat'
+import { hasRequiredPermissions } from './permissions'
+
+export { requiredPermissions } from './permissions'
 
 const kc = new k8s.KubeConfig()
 
@@ -37,33 +40,6 @@ const k8sBatchV1Api = kc.makeApiClient(k8s.BatchV1Api)
 const k8sAuthorizationV1Api = kc.makeApiClient(k8s.AuthorizationV1Api)
 
 const DEFAULT_WAIT_FOR_POD_TIME_SECONDS = 10 * 60 // 10 min
-
-export const requiredPermissions = [
-  {
-    group: '',
-    verbs: ['get', 'list', 'create', 'delete'],
-    resource: 'pods',
-    subresource: ''
-  },
-  {
-    group: '',
-    verbs: ['get', 'create'],
-    resource: 'pods',
-    subresource: 'exec'
-  },
-  {
-    group: '',
-    verbs: ['get', 'list', 'watch'],
-    resource: 'pods',
-    subresource: 'log'
-  },
-  {
-    group: '',
-    verbs: ['create', 'delete', 'get', 'list'],
-    resource: 'secrets',
-    subresource: ''
-  }
-]
 
 export async function createJobPod(
   name: string,
@@ -889,24 +865,22 @@ export async function getPodStatus(
 }
 
 export async function isAuthPermissionsOK(): Promise<boolean> {
-  const sar = new k8s.V1SelfSubjectAccessReview()
-  const asyncs: Promise<k8s.V1SelfSubjectAccessReview>[] = []
-  for (const resource of requiredPermissions) {
-    for (const verb of resource.verbs) {
+  return hasRequiredPermissions({
+    namespace: namespace(),
+    review: async attrs => {
+      // Build a fresh review per probe: the previous implementation mutated a
+      // shared V1SelfSubjectAccessReview instance across concurrent requests.
+      const sar = new k8s.V1SelfSubjectAccessReview()
       sar.spec = new k8s.V1SelfSubjectAccessReviewSpec()
       sar.spec.resourceAttributes = new k8s.V1ResourceAttributes()
-      sar.spec.resourceAttributes.verb = verb
-      sar.spec.resourceAttributes.namespace = namespace()
-      sar.spec.resourceAttributes.group = resource.group
-      sar.spec.resourceAttributes.resource = resource.resource
-      sar.spec.resourceAttributes.subresource = resource.subresource
-      asyncs.push(
-        k8sAuthorizationV1Api.createSelfSubjectAccessReview({ body: sar })
-      )
+      sar.spec.resourceAttributes.verb = attrs.verb
+      sar.spec.resourceAttributes.namespace = attrs.namespace
+      sar.spec.resourceAttributes.group = attrs.group
+      sar.spec.resourceAttributes.resource = attrs.resource
+      sar.spec.resourceAttributes.subresource = attrs.subresource
+      return k8sAuthorizationV1Api.createSelfSubjectAccessReview({ body: sar })
     }
-  }
-  const responses = await Promise.all(asyncs)
-  return responses.every(resp => resp.status?.allowed)
+  })
 }
 
 export async function isPodContainerAlpine(
