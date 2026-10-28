@@ -40,6 +40,8 @@ rules:
     - `GITHUB_WORKSPACE` is expected to be set to the workspace of the job
 - `ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS` optionally sets the startup timeout for both job pods and container-step pods (default: 600 seconds). Container-step pod discovery and the subsequent phase wait each use this timeout.
 
+Shell `entryPointArgs` such as `["-c", "echo hello world"]` preserve the script as one argument. Shell-quoted arguments split on spaces by the runner are also supported and decoded before creating the container.
+
 ## Storage Guidance
 The K8s hooks require a shared volume between the runner pod and the job pods to share the workspace and other internal directories.
 

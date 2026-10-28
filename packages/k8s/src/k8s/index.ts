@@ -1,6 +1,7 @@
 import * as core from '@actions/core'
 import * as k8s from '@kubernetes/client-node'
 import * as stream from 'stream'
+import { finished } from 'stream/promises'
 import type { ContainerInfo, Registry } from 'hooklib'
 import {
   getJobPodName,
@@ -634,16 +635,28 @@ export async function getPodLogs(
     process.stdout.write(chunk)
   })
 
-  logStream.on('error', err => {
-    process.stderr.write(err.message)
-  })
-
-  await log.log(namespace(), podName, containerName, logStream, {
-    follow: true,
-    pretty: false,
-    timestamps: false
-  })
-  await new Promise(resolve => logStream.on('end', () => resolve(null)))
+  const completion = finished(logStream, { cleanup: true })
+  let request: AbortController | undefined
+  try {
+    await Promise.all([
+      completion,
+      log
+        .log(namespace(), podName, containerName, logStream, {
+          follow: true,
+          pretty: false,
+          timestamps: false
+        })
+        .then(controller => {
+          request = controller
+          if (logStream.destroyed) {
+            controller.abort()
+          }
+        })
+    ])
+  } finally {
+    logStream.destroy()
+    request?.abort()
+  }
 }
 
 export async function prunePods(): Promise<void> {

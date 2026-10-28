@@ -4,6 +4,7 @@ import { spawn } from 'child_process'
 import * as k8s from '@kubernetes/client-node'
 import tar from 'tar-fs'
 import * as stream from 'stream'
+import { finished } from 'stream/promises'
 import { WritableStreamBuffer } from 'stream-buffers'
 import { createHash } from 'crypto'
 import type { ContainerInfo, Registry } from 'hooklib'
@@ -584,31 +585,46 @@ export async function execCpFromPod(
       ]
       const writerStream = tar.extract(parentRunnerPath)
       const errStream = new WritableStreamBuffer()
-
-      await new Promise((resolve, reject) => {
-        exec
-          .exec(
-            namespace(),
-            podName,
-            JOB_CONTAINER_NAME,
-            command,
-            writerStream,
-            errStream,
-            null,
-            false,
-            async status => {
-              if (errStream.size()) {
-                reject(
-                  new Error(
-                    `Error from cpFromPod - details: \n ${errStream.getContentsAsString()}`
-                  )
-                )
-              }
-              resolve(status)
-            }
-          )
-          .catch(e => reject(e))
-      })
+      let socket: Awaited<ReturnType<k8s.Exec['exec']>> | undefined
+      try {
+        await Promise.all([
+          finished(writerStream, { readable: false, cleanup: true }),
+          new Promise<void>((resolve, reject) => {
+            exec
+              .exec(
+                namespace(),
+                podName,
+                JOB_CONTAINER_NAME,
+                command,
+                writerStream,
+                errStream,
+                null,
+                false,
+                status => {
+                  if (status.status !== 'Success' || errStream.size()) {
+                    reject(
+                      new Error(
+                        `Error from cpFromPod: ${status.message || status.status}; ${errStream.getContentsAsString() || ''}`
+                      )
+                    )
+                  } else {
+                    resolve()
+                  }
+                }
+              )
+              .then(ws => {
+                socket = ws
+                if (writerStream.destroyed) {
+                  socket?.close()
+                }
+              })
+              .catch(reject)
+          })
+        ])
+      } finally {
+        writerStream.destroy()
+        socket?.close()
+      }
       break
     } catch (error) {
       core.debug(`Attempt ${attempt + 1} failed: ${error}`)
@@ -619,37 +635,6 @@ export async function execCpFromPod(
         )
       }
       await sleep(1000)
-    }
-  }
-
-  let attempts = 15
-  const delay = 1000
-  for (let i = 0; i < attempts; i++) {
-    try {
-      const want = await execCalculateOutputHashSorted(
-        podName,
-        JOB_CONTAINER_NAME,
-        ['sh', '-c', listDirAllCommand(containerPath)]
-      )
-
-      const got = await localCalculateOutputHashSorted([
-        'sh',
-        '-c',
-        listDirAllCommand(targetRunnerPath)
-      ])
-
-      if (got !== want) {
-        core.debug(
-          `The hash of the directory does not match the expected value; want='${want}' got='${got}'`
-        )
-        await sleep(delay)
-        continue
-      }
-
-      break
-    } catch (error) {
-      core.debug(`Attempt ${i + 1} failed: ${error}`)
-      await sleep(delay)
     }
   }
 }

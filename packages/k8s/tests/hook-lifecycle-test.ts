@@ -2,6 +2,7 @@ import * as core from '@actions/core'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
+import { spawnSync } from 'child_process'
 import { PrepareJobArgs, RunContainerStepArgs } from 'hooklib'
 import { prepareJob } from '../src/hooks/prepare-job'
 import { runContainerStep } from '../src/hooks/run-container-step'
@@ -389,6 +390,37 @@ describe('container step lifecycle', () => {
     jest.mocked(k8s.deleteJob).mockResolvedValue(undefined)
     jest.mocked(k8s.deletePod).mockResolvedValue(undefined)
   })
+
+  it.each([
+    ['sh', false],
+    ['/bin/sh', false],
+    ['bash', false],
+    ['/bin/bash', false],
+    ['sh', true],
+    ['bash', true]
+  ] as const)(
+    'preserves the script and positional arguments for %s (runner-quoted: %s)',
+    async (entryPoint, runnerQuoted) => {
+      const entryPointArgs = ['-c', 'printf "%s" "$1"', 'label', 'hello world']
+      await runContainerStep({
+        ...args,
+        entryPoint,
+        entryPointArgs: runnerQuoted
+          ? entryPointArgs
+              .map(arg => `"${arg.replace(/"/g, '\\"')}"`)
+              .join(' ')
+              .split(' ')
+          : entryPointArgs
+      })
+
+      const container = jest.mocked(k8s.createJob).mock.calls[0][0]
+      expect(container.command).toEqual([entryPoint])
+      expect(container.args).toEqual(entryPointArgs)
+      const result = spawnSync(entryPoint, container.args, { encoding: 'utf8' })
+      expect(result.status).toBe(0)
+      expect(result.stdout).toBe('hello world')
+    }
+  )
 
   it.each([
     [undefined, 600],
