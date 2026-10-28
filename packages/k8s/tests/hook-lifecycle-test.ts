@@ -406,10 +406,9 @@ describe('container step lifecycle', () => {
         ...args,
         entryPoint,
         entryPointArgs: runnerQuoted
-          ? entryPointArgs
-              .map(arg => `"${arg.replace(/"/g, '\\"')}"`)
-              .join(' ')
-              .split(' ')
+          ? String.raw`"-c" "printf \"%s\" \"$1\"" "label" "hello world"`.split(
+              ' '
+            )
           : entryPointArgs
       })
 

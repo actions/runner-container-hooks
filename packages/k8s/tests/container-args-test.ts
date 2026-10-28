@@ -27,10 +27,9 @@ describe('job and service container arguments', () => {
         image: 'ubuntu',
         contextName: 'service',
         entryPoint: 'echo',
-        entryPointArgs: args
-          .map(arg => `"${arg.replace(/"/g, '\\"')}"`)
-          .join(' ')
-          .split(' ')
+        entryPointArgs: String.raw`"hello world" "\"literal quotes\"" ""`.split(
+          ' '
+        )
       },
       'service'
     )
