@@ -43,9 +43,9 @@ rules:
 ## Storage Guidance
 The K8s hooks require a shared volume between the runner pod and the job pods to share the workspace and other internal directories.
 
-The hook copies runner externals from the `/__e` system mount's `sourceVolumePath` into `externals` under the shared work root, dereferencing symlinks so the copy is self-contained. The runner installation does not need to be adjacent to the workspace.
+The hook copies runner externals from the `/__e` system mount's `sourceVolumePath` into `_temp/_runner_externals` under the shared work root, and mounts that directory at `/__e`. This runner-internal location avoids repository workspace collisions, including repositories named `externals`. Source symlinks are dereferenced so the copy is self-contained; the runner installation does not need to be adjacent to the workspace.
 
-Before copying, preparation waits for previous Jobs and pods to be deleted. It then copies into a fresh private staging directory on the shared filesystem, removes the old externals tree without following destination symlinks, and renames the completed copy into place before starting any new workflow pods. Staging failures leave the old tree untouched.
+Before copying, preparation waits for previous Jobs and pods to be deleted and verifies that the runner-created `_temp` directory is not a symlink. It then copies into a fresh private staging directory under `_temp`, removes the old internal externals tree without following destination symlinks, and renames the completed copy into place before starting any new workflow pods. Staging failures leave the old tree untouched. The legacy top-level `externals` directory is left untouched because it may contain a repository checkout.
 
 The work root must be dedicated to this runner and its hook-managed pods; unrelated workloads must not have write access. Do not force-delete workload pods and immediately reuse the work root: force deletion can remove the API object while its containers are still running. If workloads were force-deleted, ensure their containers have stopped before reusing the volume.
 
@@ -55,9 +55,10 @@ If shared storage is not an option for your cluster, use the [k8s-novolume hooks
 The preferred way to configure storage is using a `ReadWriteMany` (RWX) Persistent Volume Claim. RWX allows the Kubernetes scheduler to place job pods on any node in the cluster, maximizing resource availability and flexibility.
 
 To migrate from RWO to RWX:
-1. Provision a new `ReadWriteMany` StorageClass if one is not available.
-2. Update your PVC definition to use `accessModes: [ReadWriteMany]`.
-3. No additional environment variables are needed - preferred same-node affinity is the default.
+1. Use a StorageClass backed by storage that supports `ReadWriteMany`, and create a new PVC with `accessModes: [ReadWriteMany]`. A bound PVC's `accessModes` cannot be changed in place.
+2. Stop the runner and its workflow pods, then migrate any required workspace data from the old claim to the new claim.
+3. Update the runner pod's volume reference for `_work` to the new claim and set `ACTIONS_RUNNER_CLAIM_NAME` to the same claim name.
+4. Restart the runner. Remove `ACTIONS_RUNNER_HOOK_RWO=true` if previously set so job pods can use the default preferred, rather than required, same-node affinity.
 
 ### RWO Fallback (Affinity-based)
 If `ReadWriteMany` storage is not available, you can use `ReadWriteOnce` (RWO) storage. In this mode, all job pods must be scheduled on the same node as the runner pod that owns the PVC.

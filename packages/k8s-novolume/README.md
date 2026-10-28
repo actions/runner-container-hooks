@@ -3,7 +3,9 @@
 ## Description
 This implementation provides a way to dynamically spin up pods to run container workflows, rather than relying on the default docker implementation. It is meant to be used when the runner itself is running in k8s, for example when using the [Actions Runner Controller](https://github.com/actions-runner-controller/actions-runner-controller)
 
-Unlike the [k8s hooks](../k8s/README.md), the job pods do not mount the runner's workspace volume. Instead, the workspace and the internal directories are copied into the job pod using the Kubernetes `exec` API, and copied back once the step completes. This removes the need for a `ReadWriteMany` volume (or for pinning every job pod to the runner's node), at the cost of the time it takes to copy the assets for every step.
+Unlike the [k8s hooks](../k8s/README.md), the job pods do not mount the runner's workspace volume. During job preparation, the workspace is copied into the job pod using the Kubernetes `exec` API. Script steps reuse that pod, so workspace changes persist there between script steps. Each script step copies runner temporary files into the pod and returns only `_runner_file_commands` to the runner, not the full workspace.
+
+Container actions run in separate pods initialized with a snapshot of the job pod's workspace. Their workspace changes are not copied back to the job pod or runner and are discarded when the action pod is deleted. This implementation avoids shared storage and same-node placement requirements, at the cost of copying files between pods and the runner.
 
 Use these hooks when shared storage is not available in your cluster. Otherwise, prefer the [k8s hooks](../k8s/README.md), which are significantly faster.
 
@@ -42,6 +44,7 @@ rules:
 - A [job containers](https://docs.github.com/en/actions/using-jobs/running-jobs-in-a-container) will be required for all jobs
 - Building container actions from a dockerfile is not supported at this time
 - Container actions will not have access to the services network or job container network
+- Workspace changes made by container actions are not available to later steps.
 - Docker [create options](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idcontaineroptions) are not supported
 - Container actions will have to specify the entrypoint, since the default entrypoint will be overridden to run the commands from the workflow.
 - Container actions need to have the following binaries in their container image: `sh`, `env`, `tail`.

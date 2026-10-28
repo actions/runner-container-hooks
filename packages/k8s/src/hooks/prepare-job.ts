@@ -29,7 +29,11 @@ import {
   PodPhase,
   fixArgs
 } from '../k8s/utils'
-import { CONTAINER_EXTENSION_PREFIX, JOB_CONTAINER_NAME } from './constants'
+import {
+  CONTAINER_EXTENSION_PREFIX,
+  EXTERNALS_VOLUME_SUBPATH,
+  JOB_CONTAINER_NAME
+} from './constants'
 
 export async function prepareJob(
   args: PrepareJobArgs,
@@ -219,10 +223,16 @@ async function copyExternalsToRoot(sourcePath: string): Promise<void> {
     throw new Error('RUNNER_WORKSPACE is not set')
   }
   const workRoot = path.dirname(workspace)
+  const destination = path.join(workRoot, EXTERNALS_VOLUME_SUBPATH)
+  const tempRoot = path.dirname(destination)
+  // The runner creates _temp; reject a substituted parent instead of following it.
+  if (!(await fs.promises.lstat(tempRoot)).isDirectory()) {
+    throw new Error('Runner _temp must be a directory, not a symlink or file')
+  }
   // No workflow pods may be running while this same-filesystem staging tree
   // exists. mkdtemp creates a new, private directory, not a workflow-owned one.
   const stagingRoot = await fs.promises.mkdtemp(
-    path.join(workRoot, '.externals-')
+    path.join(tempRoot, '.externals-')
   )
   try {
     const stagedExternals = path.join(stagingRoot, 'externals')
@@ -233,7 +243,6 @@ async function copyExternalsToRoot(sourcePath: string): Promise<void> {
       errorOnExist: true
     })
 
-    const destination = path.join(workRoot, 'externals')
     // rm unlinks symlinks rather than following them; never copy into the old tree.
     await fs.promises.rm(destination, { recursive: true, force: true })
     await fs.promises.rename(stagedExternals, destination)

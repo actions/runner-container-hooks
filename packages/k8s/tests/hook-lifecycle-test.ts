@@ -11,6 +11,7 @@ import * as utils from '../src/k8s/utils'
 
 jest.mock('../src/k8s', () => ({
   ...jest.requireActual('../src/k8s'),
+  POD_VOLUME_NAME: 'work',
   createPod: jest.fn(),
   isPodContainerAlpine: jest.fn(),
   pruneJobs: jest.fn(),
@@ -55,8 +56,13 @@ describe('prepare job externals', () => {
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hook-externals-'))
     sourcePath = path.join(tempDir, 'runner', 'externals')
-    destinationPath = path.join(tempDir, 'mounted-work', 'externals')
-    fs.mkdirSync(path.dirname(destinationPath))
+    destinationPath = path.join(
+      tempDir,
+      'mounted-work',
+      '_temp',
+      '_runner_externals'
+    )
+    fs.mkdirSync(path.dirname(destinationPath), { recursive: true })
     responsePath = path.join(tempDir, 'response.json')
     fs.writeFileSync(responsePath, '')
     process.env.RUNNER_WORKSPACE = path.join(tempDir, 'mounted-work', 'repo')
@@ -90,7 +96,7 @@ describe('prepare job externals', () => {
     fs.rmSync(tempDir, { recursive: true, force: true })
   })
 
-  it('copies configured externals into the shared work root before creating the pod', async () => {
+  it('copies configured externals into the runner-internal directory mounted at /__e', async () => {
     jest.mocked(k8s.createPod).mockImplementation(async () => {
       expect(
         fs.readFileSync(
@@ -104,9 +110,41 @@ describe('prepare job externals', () => {
     await prepareJob(args, responsePath)
 
     expect(k8s.createPod).toHaveBeenCalledTimes(1)
+    const [jobContainer] = jest.mocked(k8s.createPod).mock.calls[0]
+    expect(jobContainer?.volumeMounts).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'work',
+          mountPath: '/__e',
+          subPath: '_temp/_runner_externals'
+        }
+      ])
+    )
     expect(JSON.parse(fs.readFileSync(responsePath, 'utf8')).state.jobPod).toBe(
       'workflow-pod'
     )
+  })
+
+  it('preserves an existing checkout for a repository named externals', async () => {
+    const workspace = path.join(tempDir, 'mounted-work', 'externals')
+    const checkout = path.join(workspace, 'externals')
+    fs.mkdirSync(checkout, { recursive: true })
+    fs.writeFileSync(path.join(checkout, 'README.md'), 'repository contents')
+    process.env.RUNNER_WORKSPACE = workspace
+    process.env.GITHUB_WORKSPACE = checkout
+    args.container!.workingDirectory = '/__w/externals/externals'
+
+    await prepareJob(args, responsePath)
+
+    expect(fs.readFileSync(path.join(checkout, 'README.md'), 'utf8')).toBe(
+      'repository contents'
+    )
+    expect(
+      fs.readFileSync(
+        path.join(destinationPath, 'node24', 'bin', 'node'),
+        'utf8'
+      )
+    ).toBe('runtime')
   })
 
   it('overwrites previously copied externals', async () => {
@@ -147,7 +185,9 @@ describe('prepare job externals', () => {
     expect(fs.existsSync(path.join(destinationPath, 'stale-runtime'))).toBe(
       false
     )
-    expect(fs.readdirSync(path.dirname(destinationPath))).toEqual(['externals'])
+    expect(fs.readdirSync(path.dirname(destinationPath))).toEqual([
+      '_runner_externals'
+    ])
   })
 
   it('waits for previous pods to stop before staging externals', async () => {
@@ -219,6 +259,32 @@ describe('prepare job externals', () => {
     }
   )
 
+  it.each(['symlink', 'file'])(
+    'rejects a substituted _temp parent of type %s without modifying runner files',
+    async parentType => {
+      const tempRoot = path.dirname(destinationPath)
+      const outsidePath = path.join(tempDir, 'outside-work')
+      fs.mkdirSync(outsidePath)
+      fs.writeFileSync(path.join(outsidePath, 'sentinel'), 'runner-file')
+      fs.rmdirSync(tempRoot)
+      if (parentType === 'symlink') {
+        fs.symlinkSync(outsidePath, tempRoot, 'dir')
+      } else {
+        fs.writeFileSync(tempRoot, 'not a directory')
+      }
+
+      await expect(prepareJob(args, responsePath)).rejects.toThrow(
+        'Runner _temp must be a directory, not a symlink or file'
+      )
+
+      expect(fs.readFileSync(path.join(outsidePath, 'sentinel'), 'utf8')).toBe(
+        'runner-file'
+      )
+      expect(fs.readdirSync(outsidePath)).toEqual(['sentinel'])
+      expect(k8s.createPod).not.toHaveBeenCalled()
+    }
+  )
+
   it.each(['relative', 'absolute'])(
     'copies a runtime with a %s symlink without depending on the source',
     async linkType => {
@@ -284,7 +350,9 @@ describe('prepare job externals', () => {
     expect(
       fs.readFileSync(path.join(destinationPath, 'old-runtime'), 'utf8')
     ).toBe('old')
-    expect(fs.readdirSync(path.dirname(destinationPath))).toEqual(['externals'])
+    expect(fs.readdirSync(path.dirname(destinationPath))).toEqual([
+      '_runner_externals'
+    ])
   })
 
   it('removes the staging directory if publishing the copy fails', async () => {
