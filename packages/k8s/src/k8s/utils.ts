@@ -3,58 +3,147 @@ import * as fs from 'fs'
 import * as yaml from 'js-yaml'
 import * as core from '@actions/core'
 import { v1 as uuidv4 } from 'uuid'
-import { CONTAINER_EXTENSION_PREFIX } from '../hooks/constants'
+import {
+  CONTAINER_EXTENSION_PREFIX,
+  EXTERNALS_VOLUME_SUBPATH
+} from '../hooks/constants'
 import * as shlex from 'shlex'
 import { Mount } from 'hooklib'
+import * as path from 'path'
+import { POD_VOLUME_NAME } from './index'
 
 export const DEFAULT_CONTAINER_ENTRY_POINT_ARGS = [`-f`, `/dev/null`]
 export const DEFAULT_CONTAINER_ENTRY_POINT = 'tail'
 
 export const ENV_HOOK_TEMPLATE_PATH = 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE'
-export const ENV_USE_KUBE_SCHEDULER = 'ACTIONS_RUNNER_USE_KUBE_SCHEDULER'
+export const ENV_HOOK_RWO = 'ACTIONS_RUNNER_HOOK_RWO'
 
-export const EXTERNALS_VOLUME_NAME = 'externals'
-export const GITHUB_VOLUME_NAME = 'github'
-export const WORK_VOLUME = 'work'
-
-export const CONTAINER_VOLUMES: k8s.V1VolumeMount[] = [
-  {
-    name: EXTERNALS_VOLUME_NAME,
-    mountPath: '/__e'
-  },
-  {
-    name: WORK_VOLUME,
-    mountPath: '/__w'
-  },
-  {
-    name: GITHUB_VOLUME_NAME,
-    mountPath: '/github'
+// Path of the runner's work directory, which is what the shared volume is
+// mounted from. RUNNER_WORKSPACE is `<work>/<repo>`, so its parent is the
+// work root. Searching GITHUB_WORKSPACE for the last `_work/` instead is
+// wrong for repositories whose name contains `_work`: with
+// GITHUB_WORKSPACE=/home/runner/_work/my_work/my_work the last occurrence
+// is inside the repository name and the lookup yields `my_work` rather
+// than `my_work/my_work`, mounting the checkout's parent.
+function workRoot(): string {
+  const runnerWorkspace = process.env.RUNNER_WORKSPACE
+  if (!runnerWorkspace) {
+    throw new Error('RUNNER_WORKSPACE is not set')
   }
-]
-
-export function prepareJobScript(userVolumeMounts: Mount[]): {
-  containerPath: string
-  runnerPath: string
-} {
-  let mountDirs = userVolumeMounts.map(m => m.targetVolumePath).join(' ')
-
-  const content = `#!/bin/sh -l
-set -e
-cp -R /__w/_temp/_github_home /github/home
-cp -R /__w/_temp/_github_workflow /github/workflow
-mkdir -p ${mountDirs}
-`
-
-  const filename = `${uuidv4()}.sh`
-  const entryPointPath = `${process.env.RUNNER_TEMP}/${filename}`
-  fs.writeFileSync(entryPointPath, content)
-  return {
-    containerPath: `/__w/_temp/${filename}`,
-    runnerPath: entryPointPath
-  }
+  return path.dirname(runnerWorkspace)
 }
 
-export function writeRunScript(
+// GITHUB_WORKSPACE expressed relative to the work root, which is the subPath
+// of the checkout inside the shared volume.
+export function workspaceRelativePath(workspacePath: string): string {
+  return path.posix.relative(workRoot(), workspacePath)
+}
+
+export function containerVolumes(
+  userMountVolumes: Mount[] = [],
+  jobContainer = true,
+  containerAction = false
+): k8s.V1VolumeMount[] {
+  const mounts: k8s.V1VolumeMount[] = [
+    {
+      name: POD_VOLUME_NAME,
+      mountPath: '/__w'
+    }
+  ]
+
+  const workspacePath = process.env.GITHUB_WORKSPACE as string
+  if (containerAction) {
+    mounts.push(
+      {
+        name: POD_VOLUME_NAME,
+        mountPath: '/github/workspace',
+        subPath: workspaceRelativePath(workspacePath)
+      },
+      {
+        name: POD_VOLUME_NAME,
+        mountPath: '/github/file_commands',
+        subPath: '_temp/_runner_file_commands'
+      },
+      {
+        name: POD_VOLUME_NAME,
+        mountPath: '/github/home',
+        subPath: '_temp/_github_home'
+      },
+      {
+        name: POD_VOLUME_NAME,
+        mountPath: '/github/workflow',
+        subPath: '_temp/_github_workflow'
+      }
+    )
+    return mounts
+  }
+
+  if (!jobContainer) {
+    return mounts
+  }
+
+  mounts.push(
+    {
+      name: POD_VOLUME_NAME,
+      mountPath: '/__e',
+      subPath: EXTERNALS_VOLUME_SUBPATH
+    },
+    {
+      name: POD_VOLUME_NAME,
+      mountPath: '/github/home',
+      subPath: '_temp/_github_home'
+    },
+    {
+      name: POD_VOLUME_NAME,
+      mountPath: '/github/workflow',
+      subPath: '_temp/_github_workflow'
+    }
+  )
+
+  if (!userMountVolumes?.length) {
+    return mounts
+  }
+
+  for (const userVolume of userMountVolumes) {
+    let sourceVolumePath = ''
+    if (path.isAbsolute(userVolume.sourceVolumePath)) {
+      // Resolve the path relative to the workspace to decide containment.
+      // A plain startsWith() is not path containment: it accepts sibling
+      // directories that merely share a prefix (repo-evil vs repo) and then
+      // silently mounts the wrong directory.
+      const sourceRelativePath = path.posix.relative(
+        workspacePath,
+        userVolume.sourceVolumePath
+      )
+      if (
+        sourceRelativePath === '..' ||
+        sourceRelativePath.startsWith('../') ||
+        path.posix.isAbsolute(sourceRelativePath)
+      ) {
+        throw new Error(
+          'Volume mounts outside of the work folder are not supported'
+        )
+      }
+      const relativeWorkspace = workspaceRelativePath(workspacePath)
+      sourceVolumePath = sourceRelativePath
+        ? path.posix.join(relativeWorkspace, sourceRelativePath)
+        : relativeWorkspace
+    } else {
+      sourceVolumePath = userVolume.sourceVolumePath
+    }
+
+    mounts.push({
+      name: POD_VOLUME_NAME,
+      mountPath: userVolume.targetVolumePath,
+      subPath: sourceVolumePath,
+      readOnly: userVolume.readOnly
+    })
+  }
+
+  return mounts
+}
+
+export function writeEntryPointScript(
   workingDirectory: string,
   entryPoint: string,
   entryPointArgs?: string[],
@@ -63,19 +152,16 @@ export function writeRunScript(
 ): { containerPath: string; runnerPath: string } {
   let exportPath = ''
   if (prependPath?.length) {
-    // TODO: remove compatibility with typeof prependPath === 'string' as we bump to next major version, the hooks will lose PrependPath compat with runners 2.293.0 and older
     const prepend =
       typeof prependPath === 'string' ? prependPath : prependPath.join(':')
     exportPath = `export PATH=${prepend}:$PATH`
   }
 
-  let environmentPrefix = scriptEnv(environmentVariables)
+  const environmentPrefix = scriptEnv(environmentVariables)
 
   const content = `#!/bin/sh -l
-set -e
-rm "$0" # remove script after running
 ${exportPath}
-cd ${workingDirectory} && \
+cd ${workingDirectory} && \\
 exec ${environmentPrefix} ${entryPoint} ${
     entryPointArgs?.length ? entryPointArgs.join(' ') : ''
   }
@@ -265,8 +351,73 @@ export function readExtensionFromFile(): k8s.V1PodTemplateSpec | undefined {
   return doc as k8s.V1PodTemplateSpec
 }
 
-export function useKubeScheduler(): boolean {
-  return process.env[ENV_USE_KUBE_SCHEDULER] === 'true'
+export function useRwoRequiredAffinity(): boolean {
+  return process.env[ENV_HOOK_RWO] === 'true'
+}
+
+// `nodeName` is a Node's `metadata.name`. Matching it against the
+// `kubernetes.io/hostname` label is an indirection that is not guaranteed to
+// hold: kubelet seeds that label from the machine's hostname while the node
+// name can come from `--hostname-override` or a cloud provider, and the label
+// is mutable afterwards. Where the two differ the required affinity never
+// matches and the pod stays Pending forever, so select on the field instead.
+export function nodeNameRequirement(
+  nodeName: string
+): k8s.V1NodeSelectorRequirement {
+  return {
+    key: 'metadata.name',
+    operator: 'In',
+    values: [nodeName]
+  }
+}
+
+// The pod template extension is merged last and replaces whole pod spec
+// fields, so a template that sets `affinity` would silently drop the node
+// affinity that pins job pods to the runner's node. That is only a
+// preference in RWX mode, but with a ReadWriteOnce volume it is the
+// guarantee that keeps the pod schedulable at all, so re-assert it after
+// the merge instead of letting the extension win.
+export function ensureRequiredNodeAffinity(
+  spec: k8s.V1PodSpec,
+  nodeName: string
+): void {
+  const requirement = nodeNameRequirement(nodeName)
+
+  spec.affinity = spec.affinity ?? {}
+  spec.affinity.nodeAffinity = spec.affinity.nodeAffinity ?? {}
+  const nodeAffinity = spec.affinity.nodeAffinity
+
+  const terms =
+    nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution
+      ?.nodeSelectorTerms
+  if (!terms?.length) {
+    nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution = {
+      nodeSelectorTerms: [{ matchFields: [requirement] }]
+    }
+    return
+  }
+
+  // nodeSelectorTerms are OR'ed while matchFields/matchExpressions inside a
+  // term are AND'ed, so the node requirement has to be added to every term
+  // for the constraint to hold no matter which term the scheduler matches.
+  for (const term of terms) {
+    term.matchFields = [
+      ...(term.matchFields ?? []).filter(e => e.key !== requirement.key),
+      requirement
+    ]
+
+    // An extension pinning the node by hostname label would be AND'ed with
+    // the requirement above and could make the pod unschedulable, so the
+    // runner's node wins in RWO mode.
+    const expressions = (term.matchExpressions ?? []).filter(
+      e => e.key !== 'kubernetes.io/hostname'
+    )
+    if (expressions.length) {
+      term.matchExpressions = expressions
+    } else {
+      delete term.matchExpressions
+    }
+  }
 }
 
 export enum PodPhase {
@@ -288,20 +439,22 @@ function mergeLists<T>(base?: T[], from?: T[]): T[] {
 }
 
 export function fixArgs(args: string[]): string[] {
-  // Preserve shell command strings passed via `sh -c` without re-tokenizing.
+  // Preserve unquoted -c scripts, including args supplied without an entrypoint.
   // Retokenizing would split the script into multiple args, breaking `sh -c`.
-  if (args.length >= 2 && args[0] === 'sh' && args[1] === '-c') {
+  // Everything after the script is $0 and the positional parameters, so it
+  // must stay in its own argv slot rather than being folded into the script.
+  if (
+    args[0] === '-c' ||
+    (args.length >= 2 && args[0] === 'sh' && args[1] === '-c')
+  ) {
     return args
   }
+  // The runner also sends shell-quoted arguments split on spaces.
   return shlex.split(args.join(' '))
 }
 
 export async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-export function listDirAllCommand(dir: string): string {
-  return `cd ${shlex.quote(dir)} && find . -type f -not -path '*/_runner_hook_responses*' -exec stat -c '%s %n' {} \\;`
 }
 
 // Safely turn an unknown thrown value into a diagnostic string without
