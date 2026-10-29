@@ -84,5 +84,5 @@ The hooks remove Job controllers with orphan propagation, then explicitly delete
 - Building container actions from a dockerfile is not supported at this time
 - Container actions will not have access to the services network or job container network
 - Docker [create options](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idcontaineroptions) are not supported
-- Container actions will have to specify the entrypoint, since the default entrypoint will be overridden to run the commands from the workflow.
+- Container actions must specify a nonempty entrypoint. Requests without one fail before any Kubernetes resources are created.
 - Container actions need to have the following binaries in their container image: `sh`, `env`, `tail`.

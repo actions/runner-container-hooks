@@ -29,6 +29,10 @@ export async function runContainerStep(
     throw new Error('Building container actions is not currently supported')
   }
 
+  if (!stepContainer.entryPoint) {
+    throw new Error('Container actions must specify an entrypoint')
+  }
+
   let secretName: string | undefined = undefined
   try {
     const envs = JSON.parse(

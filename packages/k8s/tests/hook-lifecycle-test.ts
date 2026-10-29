@@ -373,6 +373,8 @@ describe('prepare job externals', () => {
 describe('container step lifecycle', () => {
   const args: RunContainerStepArgs = {
     image: 'ubuntu:latest',
+    entryPoint: 'sh',
+    entryPointArgs: ['-c', 'true'],
     workingDirectory: '/github/workspace',
     systemMountVolumes: []
   }
@@ -390,6 +392,22 @@ describe('container step lifecycle', () => {
     jest.mocked(k8s.deleteJob).mockResolvedValue(undefined)
     jest.mocked(k8s.deletePod).mockResolvedValue(undefined)
   })
+
+  it.each([undefined, ''])(
+    'rejects an absent entrypoint (%p) before creating resources',
+    async entryPoint => {
+      await expect(runContainerStep({ ...args, entryPoint })).rejects.toThrow(
+        'Container actions must specify an entrypoint'
+      )
+
+      expect(k8s.createSecretForEnvs).not.toHaveBeenCalled()
+      expect(utils.readExtensionFromFile).not.toHaveBeenCalled()
+      expect(k8s.createJob).not.toHaveBeenCalled()
+      expect(k8s.getContainerJobPodName).not.toHaveBeenCalled()
+      expect(k8s.deleteJob).not.toHaveBeenCalled()
+      expect(k8s.deletePod).not.toHaveBeenCalled()
+    }
+  )
 
   it.each([
     ['sh', false],
