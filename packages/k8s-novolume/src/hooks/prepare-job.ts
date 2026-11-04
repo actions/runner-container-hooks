@@ -196,8 +196,10 @@ function generateResponseFile(
     const mainContainerContextPorts: ContextPorts = {}
     if (mainContainer?.ports) {
       for (const port of mainContainer.ports) {
-        mainContainerContextPorts[port.containerPort] =
-          mainContainerContextPorts.hostPort
+        if (port.containerPort && port.hostPort) {
+          mainContainerContextPorts[port.containerPort.toString()] =
+            port.hostPort.toString()
+        }
       }
     }
 

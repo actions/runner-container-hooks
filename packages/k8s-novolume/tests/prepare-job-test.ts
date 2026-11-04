@@ -210,6 +210,7 @@ describe('Prepare job', () => {
 
     expect(content.state.jobPod).toBeTruthy()
     expect(content.context.container).toBeTruthy()
+    expect(content.context.container.ports).toEqual({ '8080': '31080' })
     expect(content.context.services).toBeTruthy()
     expect(content.context.services.length).toBe(1)
   })
