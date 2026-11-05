@@ -439,15 +439,20 @@ function mergeLists<T>(base?: T[], from?: T[]): T[] {
 }
 
 export function fixArgs(args: string[]): string[] {
-  // Preserve unquoted -c scripts, including args supplied without an entrypoint.
-  // Retokenizing would split the script into multiple args, breaking `sh -c`.
-  // Everything after the script is $0 and the positional parameters, so it
-  // must stay in its own argv slot rather than being folded into the script.
   if (
     args[0] === '-c' ||
     (args.length >= 2 && args[0] === 'sh' && args[1] === '-c')
   ) {
-    return args
+    const scriptIndex = args[0] === '-c' ? 1 : 2
+    const script = args[scriptIndex] ?? ''
+    const quotedScript = args
+      .slice(scriptIndex)
+      .join(' ')
+      .match(/^(?:"(?:[^"\\]|\\[\s\S])*"|'[^']*')(?=\s|$)/)
+    // Preserve raw argv, including scripts starting with a quoted executable.
+    if (!quotedScript || quotedScript[0].length < script.length) {
+      return args
+    }
   }
   // The runner also sends shell-quoted arguments split on spaces.
   return shlex.split(args.join(' '))

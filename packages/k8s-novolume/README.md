@@ -41,7 +41,7 @@ rules:
 
 
 ## Limitations
-Job and service container shell `entryPointArgs` such as `["-c", "echo hello world"]` preserve the script as one argument. Shell-quoted arguments split on spaces by the runner are also supported and decoded before creating the container.
+Job and service container shell `entryPointArgs` such as `["-c", "echo hello world"]` preserve the script as one argument. Shell-quoted arguments split on spaces by the runner are also supported and decoded before creating the container, including when `-c` is unquoted but the script is quoted (for example, `["-c", "'echo", "hello", "world'"]`).
 
 - A [job containers](https://docs.github.com/en/actions/using-jobs/running-jobs-in-a-container) will be required for all jobs
 - Building container actions from a dockerfile is not supported at this time

@@ -40,7 +40,7 @@ rules:
     - `GITHUB_WORKSPACE` is expected to be set to the workspace of the job
 - `ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS` optionally sets the startup timeout for both job pods and container-step pods (default: 600 seconds). Container-step pod discovery and the subsequent phase wait each use this timeout.
 
-Shell `entryPointArgs` such as `["-c", "echo hello world"]` preserve the script as one argument. Shell-quoted arguments split on spaces by the runner are also supported and decoded before creating the container.
+Shell `entryPointArgs` such as `["-c", "echo hello world"]` preserve the script as one argument. Shell-quoted arguments split on spaces by the runner are also supported and decoded before creating the container, including when `-c` is unquoted but the script is quoted (for example, `["-c", "'echo", "hello", "world'"]`).
 
 ## Storage Guidance
 The K8s hooks require a shared volume between the runner pod and the job pods to share the workspace and other internal directories.
@@ -77,7 +77,7 @@ To enable this safely:
 ## Container-step cleanup
 Each container step deletes its Kubernetes Job and pod after the job container exits, including any sidecars added by a pod template extension. Cleanup also runs if the step fails. Workflow cleanup and the next job's preparation prune leftover Jobs and pods as a fallback for interrupted hooks.
 
-The hooks remove Job controllers with orphan propagation, then explicitly delete their pods with a nonzero grace period and wait for deletion. This avoids force-deleting the API objects while containers may still be running. Deletion waits use `ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS`; preparation fails on cleanup errors or timeouts rather than copying externals while previous workloads may still be writing.
+The hooks remove Job controllers with orphan propagation, then explicitly delete their pods with a nonzero grace period and wait for deletion. Pods are not deleted if removing the Job controller fails, because the active controller could restart the action. Cleanup errors or timeouts fail the container-step hook, even if the action exited successfully; an earlier step error is included in the diagnostic when both fail. This avoids force-deleting the API objects while containers may still be running. Deletion waits use `ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS`; preparation also fails on cleanup errors or timeouts rather than copying externals while previous workloads may still be writing.
 
 ## Limitations
 - A [job containers](https://docs.github.com/en/actions/using-jobs/running-jobs-in-a-container) will be required for all jobs

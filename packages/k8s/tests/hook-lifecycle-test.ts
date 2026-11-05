@@ -488,16 +488,12 @@ describe('container step lifecycle', () => {
       )
       expect(k8s.deleteJob).toHaveBeenCalledTimes(1)
       expect(k8s.deleteJob).toHaveBeenCalledWith('step-job')
-      expect(k8s.deletePod).toHaveBeenCalledTimes(1)
-      expect(k8s.deletePod).toHaveBeenCalledWith('step-pod')
+      expect(k8s.deletePod).not.toHaveBeenCalled()
       expect(
         jest.mocked(k8s.deleteJob).mock.invocationCallOrder[0]
       ).toBeGreaterThan(
         jest.mocked(k8s.waitForContainerToTerminate).mock.invocationCallOrder[0]
       )
-      expect(
-        jest.mocked(k8s.deletePod).mock.invocationCallOrder[0]
-      ).toBeGreaterThan(jest.mocked(k8s.deleteJob).mock.invocationCallOrder[0])
     }
   )
 
@@ -513,8 +509,7 @@ describe('container step lifecycle', () => {
 
     expect(k8s.deleteJob).toHaveBeenCalledTimes(1)
     expect(k8s.deleteJob).toHaveBeenCalledWith('step-job')
-    expect(k8s.deletePod).toHaveBeenCalledTimes(1)
-    expect(k8s.deletePod).toHaveBeenCalledWith('step-pod')
+    expect(k8s.deletePod).not.toHaveBeenCalled()
   })
 
   it('deletes the job if pod discovery fails', async () => {
@@ -542,27 +537,80 @@ describe('container step lifecycle', () => {
     expect(k8s.deletePod).not.toHaveBeenCalled()
   })
 
-  it('still deletes the pod and preserves the step failure if deleting the job fails', async () => {
+  it('reports both step and cleanup failures without independently deleting the pod', async () => {
     const error = new Error('step failed')
     jest.mocked(k8s.getPodLogs).mockRejectedValue(error)
     jest.mocked(k8s.deleteJob).mockRejectedValue(new Error('delete failed'))
 
-    await expect(runContainerStep(args)).rejects.toBe(error)
-
-    expect(k8s.deletePod).toHaveBeenCalledTimes(1)
-    expect(k8s.deletePod).toHaveBeenCalledWith('step-pod')
-    expect(core.error).toHaveBeenCalledWith(
-      'Failed to delete step job step-job: delete failed'
+    await expect(runContainerStep(args)).rejects.toThrow(
+      'step failed; Failed to delete step job step-job: delete failed'
     )
+
+    expect(k8s.deletePod).not.toHaveBeenCalled()
   })
 
-  it('reports pod deletion failures without masking the exit code', async () => {
-    jest.mocked(k8s.deletePod).mockRejectedValue(new Error('delete failed'))
+  it.each([0, 3])(
+    'rejects cleanup failure instead of returning exit code %p',
+    async exitCode => {
+      jest
+        .mocked(k8s.waitForContainerToTerminate)
+        .mockResolvedValue({ exitCode })
+      jest.mocked(k8s.deleteJob).mockRejectedValue(new Error('Forbidden'))
 
-    await expect(runContainerStep(args)).resolves.toBe(0)
+      await expect(runContainerStep(args)).rejects.toThrow(
+        exitCode === 0
+          ? 'Failed to delete step job step-job: Forbidden'
+          : 'Container step exited with code 3; Failed to delete step job step-job: Forbidden'
+      )
+      expect(k8s.deletePod).not.toHaveBeenCalled()
+    }
+  )
 
-    expect(core.error).toHaveBeenCalledWith(
-      'Failed to delete step pod step-pod: delete failed'
-    )
+  it('fails the hook when Job deletion times out instead of deleting a live controller pod', async () => {
+    jest
+      .mocked(k8s.deleteJob)
+      .mockRejectedValue(
+        new Error(
+          'Failed to wait for deletion of job step-job: backoff timeout'
+        )
+      )
+
+    await expect(runContainerStep(args)).rejects.toThrow('backoff timeout')
+    expect(k8s.deletePod).not.toHaveBeenCalled()
   })
+
+  it('fails the hook if deleting the orphaned pods fails', async () => {
+    jest
+      .mocked(k8s.deleteJob)
+      .mockRejectedValue(
+        new Error('Failed to wait for deletion of pod step-pod: Forbidden')
+      )
+
+    await expect(runContainerStep(args)).rejects.toThrow(
+      'Failed to wait for deletion of pod step-pod: Forbidden'
+    )
+    expect(k8s.deletePod).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['-c', '\'printf "%s" "$1"\'', 'label', "'hello world'"],
+    String.raw`-c "printf \"%s\" \"$1\"" label "hello world"`.split(' '),
+    `-c 'printf "%s" "$1"' label 'hello world'`.split(' ')
+  ])(
+    'decodes runner-quoted scripts and positional arguments (case %#)',
+    async (...entryPointArgs) => {
+      await runContainerStep({ ...args, entryPointArgs })
+
+      const container = jest.mocked(k8s.createJob).mock.calls[0][0]
+      expect(container.args).toEqual([
+        '-c',
+        'printf "%s" "$1"',
+        'label',
+        'hello world'
+      ])
+      const result = spawnSync('sh', container.args, { encoding: 'utf8' })
+      expect(result.status).toBe(0)
+      expect(result.stdout).toBe('hello world')
+    }
+  )
 })

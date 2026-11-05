@@ -5,7 +5,6 @@ import {
   createJob,
   createSecretForEnvs,
   deleteJob,
-  deletePod,
   getContainerJobPodName,
   getPodLogs,
   getPrepareJobTimeoutSeconds,
@@ -73,6 +72,8 @@ export async function runContainerStep(
   core.debug(`Job created, waiting for pod to start: ${job.metadata?.name}`)
 
   let podName: string | undefined
+  let exitCode: number | undefined
+  let stepError: unknown
   try {
     try {
       podName = await getContainerJobPodName(job.metadata.name)
@@ -106,20 +107,28 @@ export async function runContainerStep(
     // Read the exit code from the job container by name. Indexing into
     // containerStatuses picked up a sidecar's exit code whenever a pod
     // template extension contributed extra containers.
-    return typeof terminated.exitCode === 'number' ? terminated.exitCode : 1
-  } finally {
-    // Delete the owner first so it cannot replace the pod during cleanup.
-    await deleteJob(job.metadata.name).catch(err => {
-      core.error(
-        `Failed to delete step job ${job.metadata?.name}: ${formatError(err)}`
-      )
-    })
-    if (podName) {
-      await deletePod(podName).catch(err => {
-        core.error(`Failed to delete step pod ${podName}: ${formatError(err)}`)
-      })
-    }
+    exitCode = typeof terminated.exitCode === 'number' ? terminated.exitCode : 1
+  } catch (err) {
+    stepError = err
   }
+
+  try {
+    // deleteJob waits for the controller to disappear before deleting its pods.
+    await deleteJob(job.metadata.name)
+  } catch (err) {
+    let message = `Failed to delete step job ${job.metadata.name}: ${formatError(err)}`
+    if (exitCode === undefined) {
+      message = `${formatError(stepError)}; ${message}`
+    } else if (exitCode !== 0) {
+      message = `Container step exited with code ${exitCode}; ${message}`
+    }
+    throw new Error(message)
+  }
+
+  if (exitCode === undefined) {
+    throw stepError
+  }
+  return exitCode
 }
 
 function createContainerSpec(
