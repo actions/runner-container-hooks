@@ -42,6 +42,8 @@ rules:
 
 Shell `entryPointArgs` such as `["-c", "echo hello world"]` preserve the script as one argument. Shell-quoted arguments split on spaces by the runner are also supported and decoded before creating the container, including when `-c` is unquoted but the script is quoted (for example, `["-c", "'echo", "hello", "world'"]`).
 
+With an unquoted `-c`, a complete script in one array entry is treated as raw argv: quotes in `["-c", "\"$TOOL\""]` must be preserved so an executable path containing spaces remains intact. Decoding applies when the script's outer quotes span multiple entries or `-c` itself is runner-quoted. Ambiguous single-entry scripts take raw-argv precedence.
+
 ## Storage Guidance
 The K8s hooks require a shared volume between the runner pod and the job pods to share the workspace and other internal directories.
 

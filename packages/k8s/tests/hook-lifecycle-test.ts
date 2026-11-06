@@ -593,7 +593,7 @@ describe('container step lifecycle', () => {
   })
 
   it.each([
-    ['-c', '\'printf "%s" "$1"\'', 'label', "'hello world'"],
+    String.raw`"-c" "printf \"%s\" \"$1\"" "label" "hello world"`.split(' '),
     String.raw`-c "printf \"%s\" \"$1\"" label "hello world"`.split(' '),
     `-c 'printf "%s" "$1"' label 'hello world'`.split(' ')
   ])(
@@ -613,4 +613,12 @@ describe('container step lifecycle', () => {
       expect(result.stdout).toBe('hello world')
     }
   )
+
+  it('preserves a container-step script consisting entirely of a quoted expression', async () => {
+    const entryPointArgs = ['-c', '"$TOOL"', 'label', 'hello world', '']
+    await runContainerStep({ ...args, entryPointArgs })
+
+    const container = jest.mocked(k8s.createJob).mock.calls[0][0]
+    expect(container.args).toEqual(entryPointArgs)
+  })
 })

@@ -449,8 +449,8 @@ export function fixArgs(args: string[]): string[] {
       .slice(scriptIndex)
       .join(' ')
       .match(/^(?:"(?:[^"\\]|\\[\s\S])*"|'[^']*')(?=\s|$)/)
-    // Preserve raw argv, including scripts starting with a quoted executable.
-    if (!quotedScript || quotedScript[0].length < script.length) {
+    // Only decode a quoted script that spans argv entries, not a complete raw script.
+    if (!quotedScript || quotedScript[0].length <= script.length) {
       return args
     }
   }
