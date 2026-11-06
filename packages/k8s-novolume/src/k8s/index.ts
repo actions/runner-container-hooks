@@ -835,16 +835,35 @@ export async function getPodLogs(
     process.stdout.write(chunk)
   })
 
-  logStream.on('error', err => {
-    process.stderr.write(err.message)
+  // The client's pipe does not forward errors from the HTTP response.
+  logStream.once('pipe', (source: stream.Readable) => {
+    void finished(source, { cleanup: true }).catch((err: Error) => {
+      logStream.destroy(err)
+    })
   })
 
-  await log.log(namespace(), podName, containerName, logStream, {
-    follow: true,
-    pretty: false,
-    timestamps: false
-  })
-  await new Promise(resolve => logStream.on('end', () => resolve(null)))
+  const completion = finished(logStream, { cleanup: true })
+  let request: AbortController | undefined
+  try {
+    await Promise.all([
+      completion,
+      log
+        .log(namespace(), podName, containerName, logStream, {
+          follow: true,
+          pretty: false,
+          timestamps: false
+        })
+        .then(controller => {
+          request = controller
+          if (logStream.destroyed) {
+            controller.abort()
+          }
+        })
+    ])
+  } finally {
+    logStream.destroy()
+    request?.abort()
+  }
 }
 
 export async function prunePods(): Promise<void> {

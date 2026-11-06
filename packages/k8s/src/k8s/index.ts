@@ -634,6 +634,12 @@ export async function getPodLogs(
     // use write rather than console.log to prevent double line feed
     process.stdout.write(chunk)
   })
+  // The client's pipe does not forward errors from the HTTP response.
+  logStream.once('pipe', (source: stream.Readable) => {
+    void finished(source, { cleanup: true }).catch((err: Error) => {
+      logStream.destroy(err)
+    })
+  })
 
   const completion = finished(logStream, { cleanup: true })
   let request: AbortController | undefined

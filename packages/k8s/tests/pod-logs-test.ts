@@ -81,6 +81,26 @@ describe('pod log completion', () => {
     expect(controller.signal.aborted).toBe(true)
   })
 
+  it.each([new Error('upstream connection lost'), undefined])(
+    'rejects when the source stream closes with %p',
+    async error => {
+      mockLog.mockImplementation(
+        async (_ns, _pod, _container, output: PassThrough) => {
+          const source = new PassThrough()
+          source.on('error', jest.fn())
+          source.pipe(output)
+          setImmediate(() => source.destroy(error))
+          return controller
+        }
+      )
+
+      expect(await resultWithinDeadline()).toMatch(
+        error ? /upstream connection lost/ : /premature close/i
+      )
+      expect(controller.signal.aborted).toBe(true)
+    }
+  )
+
   it('destroys the stream when the request fails', async () => {
     let output: PassThrough | undefined
     mockLog.mockImplementation(

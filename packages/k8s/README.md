@@ -79,6 +79,8 @@ To enable this safely:
 ## Container-step cleanup
 Each container step deletes its Kubernetes Job and pod after the job container exits, including any sidecars added by a pod template extension. Cleanup also runs if the step fails. Workflow cleanup and the next job's preparation prune leftover Jobs and pods as a fallback for interrupted hooks.
 
+Errors and premature closure of the Kubernetes HTTP log response fail the container step and still trigger cleanup, rather than leaving the hook waiting for logs that cannot arrive.
+
 The hooks remove Job controllers with orphan propagation, then explicitly delete their pods with a nonzero grace period and wait for deletion. Pods are not deleted if removing the Job controller fails, because the active controller could restart the action. Cleanup errors or timeouts fail the container-step hook, even if the action exited successfully; an earlier step error is included in the diagnostic when both fail. This avoids force-deleting the API objects while containers may still be running. Deletion waits use `ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS`; preparation also fails on cleanup errors or timeouts rather than copying externals while previous workloads may still be writing.
 
 ## Limitations

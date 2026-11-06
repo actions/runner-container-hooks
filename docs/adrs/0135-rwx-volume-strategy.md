@@ -24,7 +24,7 @@ The previous volume-less implementation, which copied the workspace into the job
 
 1. **Preferred Model (RWX):** Operators should configure the runner with a PVC supporting `ReadWriteMany`.
 2. **Fallback Model (RWO):** If using `ReadWriteOnce`, set `ACTIONS_RUNNER_HOOK_RWO=true` to enforce same-node scheduling.
-3. **Node Selection:** By default, the hook applies a `preferredDuringSchedulingIgnoredDuringExecution` node affinity targeting the runner's current node (`kubernetes.io/hostname`). With `ACTIONS_RUNNER_HOOK_RWO=true`, this becomes `requiredDuringSchedulingIgnoredDuringExecution`.
+3. **Node Selection:** By default, the hook applies a `preferredDuringSchedulingIgnoredDuringExecution` node affinity targeting the runner's current node via `matchFields` on `metadata.name`, not the `kubernetes.io/hostname` label. With `ACTIONS_RUNNER_HOOK_RWO=true`, this becomes `requiredDuringSchedulingIgnoredDuringExecution`.
 4. **Implementation Details:** 
    - The hook determines the node name via `getCurrentNodeName()` and applies affinity in `packages/k8s/src/k8s/index.ts` (lines 101, 165).
    - `ACTIONS_RUNNER_HOOK_RWO=true` enables required same-node affinity, as defined in `packages/k8s/src/k8s/utils.ts`.
