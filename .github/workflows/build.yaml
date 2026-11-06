@@ -30,7 +30,7 @@ jobs:
       - name: Check linter
         run: |
           npm run lint
-          git diff --exit-code -- . ':!packages/k8s/tests/test-kind.yaml'
+          git diff --exit-code -- . ':!packages/k8s/tests/test-kind.yaml' ':!packages/k8s-novolume/tests/test-kind.yaml'
 
   docker-tests:
     name: Docker Hook Tests
@@ -51,7 +51,7 @@ jobs:
       - run: npm run build-all
         name: Build packages
       - name: Run Docker tests
-        run: npm run test --prefix packages/docker
+        run: npm run test:docker
 
   k8s-tests:
     name: Kubernetes Hook Tests
@@ -77,4 +77,30 @@ jobs:
       - run: npm run build-all
         name: Build packages
       - name: Run Kubernetes tests
-        run: npm run test --prefix packages/k8s
+        run: npm run test:k8s
+
+  k8s-novolume-tests:
+    name: Kubernetes Novolume Hook Tests
+    runs-on: ubuntu-latest
+    needs: format-and-lint
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: sed -i "s|{{PATHTOREPO}}|$(pwd)|" packages/k8s-novolume/tests/test-kind.yaml
+        name: Setup kind cluster yaml config
+      - uses: helm/kind-action@v1.12.0
+        with:
+          config: packages/k8s-novolume/tests/test-kind.yaml
+      - run: node --version && npm --version
+        name: Log Node and npm versions
+      - run: npm ci
+        name: Install dependencies
+      - run: npm run bootstrap
+        name: Bootstrap the packages
+      - run: npm run build-all
+        name: Build packages
+      - name: Run Kubernetes novolume tests
+        run: npm run test:k8s-novolume

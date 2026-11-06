@@ -44,6 +44,7 @@ export const STEP_POD_NAME_SUFFIX_LENGTH = 8
 export const CONTAINER_EXTENSION_PREFIX = '$'
 export const JOB_CONTAINER_NAME = 'job'
 export const JOB_CONTAINER_EXTENSION_NAME = '$job'
+export const EXTERNALS_VOLUME_SUBPATH = '_temp/_runner_externals'
 
 export class RunnerInstanceLabel {
   private podName: string
