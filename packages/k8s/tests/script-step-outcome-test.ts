@@ -35,7 +35,8 @@ test('nonzero workload still copies file commands and preserves actual exit', as
     'pod',
     expect.any(String),
     undefined,
-    true
+    true,
+    expect.stringMatching(/^HOOK_WORKLOAD_START_/)
   )
   expect(execCpFromPod).toHaveBeenCalled()
 })
@@ -61,6 +62,7 @@ test('legacy call does not opt into exit-code return', async () => {
     'pod',
     expect.any(String),
     undefined,
-    false
+    false,
+    undefined
   )
 })

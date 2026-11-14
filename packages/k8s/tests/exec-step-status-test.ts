@@ -67,3 +67,55 @@ test('successful status resolves zero', async () => {
     execPodStep(['true'], 'pod', 'container', undefined, true)
   ).resolves.toBe(0)
 })
+
+test.each([status, { status: 'Success' }])(
+  'wrapper without launch evidence rejects even valid status %j',
+  async value => {
+    respond(value)
+    await expect(
+      execPodStep(
+        ['sh', 'wrapper.sh'],
+        'pod',
+        'container',
+        undefined,
+        true,
+        'marker'
+      )
+    ).rejects.toThrow('before workload launch')
+  }
+)
+test('wrapper launch evidence permits actual workload exit', async () => {
+  mockExec.mockImplementation(async (...args) => {
+    args[5].write(Buffer.from('mar'))
+    args[5].write(Buffer.from('ker\n'))
+    args[8](status)
+    return {}
+  })
+  await expect(
+    execPodStep(
+      ['sh', 'wrapper.sh'],
+      'pod',
+      'container',
+      undefined,
+      true,
+      'marker'
+    )
+  ).resolves.toBe(17)
+})
+
+test('launch evidence cannot turn transport failure into workload result', async () => {
+  mockExec.mockImplementation(async (...args) => {
+    args[5].write(Buffer.from('marker\n'))
+    throw new Error('transport lost')
+  })
+  await expect(
+    execPodStep(
+      ['sh', 'wrapper.sh'],
+      'pod',
+      'container',
+      undefined,
+      true,
+      'marker'
+    )
+  ).rejects.toThrow('transport lost')
+})

@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import * as fs from 'fs'
 import * as core from '@actions/core'
@@ -18,6 +19,10 @@ export async function runScriptStep(
   state,
   returnCommandExitCode = false
 ): Promise<number> {
+  const workloadStartMarker = returnCommandExitCode
+    ? `HOOK_WORKLOAD_START_${randomUUID()}`
+    : undefined
+
   // Write the entrypoint first. This will be later coppied to the workflow pod
   const { entryPoint, entryPointArgs, environmentVariables } = args
   const { containerPath, runnerPath } = writeRunScript(
@@ -25,7 +30,8 @@ export async function runScriptStep(
     entryPoint,
     entryPointArgs,
     args.prependPath,
-    environmentVariables
+    environmentVariables,
+    workloadStartMarker
   )
 
   const workdir = dirname(process.env.RUNNER_WORKSPACE as string)
@@ -87,7 +93,8 @@ export async function runScriptStep(
       state.jobPod,
       JOB_CONTAINER_NAME,
       undefined,
-      returnCommandExitCode
+      returnCommandExitCode,
+      workloadStartMarker
     )
   } catch (err) {
     const message = formatError(err)

@@ -60,7 +60,8 @@ test.each([0, 1, 17, 255])(
       'step-pod',
       expect.any(String),
       undefined,
-      true
+      true,
+      expect.stringMatching(/^HOOK_WORKLOAD_START_/)
     )
     expect(deletePod).toHaveBeenCalledWith('step-pod')
   }
@@ -88,6 +89,7 @@ test('legacy container invocation does not opt into status response', async () =
     'step-pod',
     expect.any(String),
     undefined,
-    false
+    false,
+    undefined
   )
 })

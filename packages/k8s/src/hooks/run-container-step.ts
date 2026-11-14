@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import * as core from '@actions/core'
 import * as fs from 'fs'
 import * as k8s from '@kubernetes/client-node'
@@ -32,6 +33,10 @@ export async function runContainerStep(
   stepContainer: RunContainerStepArgs,
   returnCommandExitCode = false
 ): Promise<number> {
+  const workloadStartMarker = returnCommandExitCode
+    ? `HOOK_WORKLOAD_START_${randomUUID()}`
+    : undefined
+
   if (stepContainer.dockerfile) {
     throw new Error('Building container actions is not currently supported')
   }
@@ -96,7 +101,8 @@ export async function runContainerStep(
       githubWorkspace,
       stepContainer.entryPoint,
       stepContainer.entryPointArgs,
-      envs
+      envs,
+      workloadStartMarker
     )
 
     await execCpToPod(podName, `${runnerWorkspace}/__w`, '/__w')
@@ -110,7 +116,8 @@ export async function runContainerStep(
         pod.metadata.name,
         JOB_CONTAINER_NAME,
         undefined,
-        returnCommandExitCode
+        returnCommandExitCode,
+        workloadStartMarker
       )
     } catch (err) {
       const message = formatError(err)

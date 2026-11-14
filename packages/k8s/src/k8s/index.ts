@@ -1,3 +1,4 @@
+import { WorkloadStart } from './workload-start'
 import { commandExitCode } from './step-exit-code'
 import * as core from '@actions/core'
 import * as path from 'path'
@@ -252,12 +253,17 @@ export async function execPodStep(
   podName: string,
   containerName: string,
   stdin?: stream.Readable,
-  returnCommandExitCode = false
+  returnCommandExitCode = false,
+  workloadStartMarker?: string
 ): Promise<number> {
   const exec = new k8s.Exec(kc)
   core.debug(
     `[execPodStep] Starting: cmd="${command[0]}" (${command.length} args), pod=${podName}, container=${containerName}`
   )
+
+  const workloadStart = workloadStartMarker
+    ? new WorkloadStart(workloadStartMarker, process.stderr)
+    : undefined
 
   command = fixArgs(command)
 
@@ -287,7 +293,7 @@ export async function execPodStep(
         containerName,
         command,
         process.stdout,
-        process.stderr,
+        workloadStart ?? process.stderr,
         stdin ?? null,
         false /* tty */,
         async resp => {
@@ -322,10 +328,13 @@ export async function execPodStep(
             }
           }
 
+          workloadStart?.flush()
+          const wrapperReady = !workloadStart || workloadStart.started
           const exitCode = commandExitCode(resp)
           if (
-            exitCode === 0 ||
-            (returnCommandExitCode && exitCode !== undefined)
+            wrapperReady &&
+            (exitCode === 0 ||
+              (returnCommandExitCode && exitCode !== undefined))
           ) {
             core.debug(
               `[execPodStep] Workload completed, exit code: ${exitCode}`
@@ -337,7 +346,13 @@ export async function execPodStep(
               `[execPodStep] Failure: ${JSON.stringify({ message: resp?.message, details: resp?.details })}`
             )
             await closeWebSocket()
-            reject(new Error(resp?.message || 'execPodStep failed'))
+            reject(
+              new Error(
+                !wrapperReady && exitCode !== undefined
+                  ? 'Hook wrapper failed before workload launch'
+                  : resp?.message || 'execPodStep failed'
+              )
+            )
           }
         }
       )
@@ -352,6 +367,7 @@ export async function execPodStep(
       })
       .catch(async e => {
         heartbeat.stop()
+        workloadStart?.flush()
         core.error(`[execPodStep] exec.exec threw error: ${e}`)
 
         // Close WebSocket before rejecting with timeout protection
