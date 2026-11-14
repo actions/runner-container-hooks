@@ -6,6 +6,8 @@ export enum Command {
 }
 
 export interface HookData {
+  // Opt-in: workload status can be returned independently of hook process status.
+  supportsStepExitCode?: boolean
   command: Command
   responseFile: string
   args?: PrepareJobArgs | RunContainerStepArgs | RunScriptStepArgs

@@ -59,7 +59,8 @@ export function writeRunScript(
   entryPoint: string,
   entryPointArgs?: string[],
   prependPath?: string[],
-  environmentVariables?: { [key: string]: string }
+  environmentVariables?: { [key: string]: string },
+  workloadStartMarker?: string
 ): { containerPath: string; runnerPath: string } {
   let exportPath = ''
   if (prependPath?.length) {
@@ -76,7 +77,7 @@ set -e
 rm "$0" # remove script after running
 ${exportPath}
 cd ${workingDirectory} && \
-exec ${environmentPrefix} ${entryPoint} ${
+${workloadStartMarker ? `printf '%s\\n' ${shlex.quote(workloadStartMarker)} >&2 && ` : ''}exec ${environmentPrefix} ${entryPoint} ${
     entryPointArgs?.length ? entryPointArgs.join(' ') : ''
   }
 `
@@ -94,7 +95,8 @@ export function writeContainerStepScript(
   workingDirectory: string,
   entryPoint: string,
   entryPointArgs?: string[],
-  environmentVariables?: { [key: string]: string }
+  environmentVariables?: { [key: string]: string },
+  workloadStartMarker?: string
 ): { containerPath: string; runnerPath: string } {
   let environmentPrefix = scriptEnv(environmentVariables)
 
@@ -110,7 +112,7 @@ mv /__w/_temp/_github_workflow /github/workflow && \
 mv /__w/_temp/_runner_file_commands /github/file_commands || true && \
 mv /__w/${parts.join('/')}/ /github/workspace && \
 cd /github/workspace && \
-exec ${environmentPrefix} ${entryPoint} ${
+${workloadStartMarker ? `printf '%s\\n' ${shlex.quote(workloadStartMarker)} >&2 && ` : ''}exec ${environmentPrefix} ${entryPoint} ${
     entryPointArgs?.length ? entryPointArgs.join(' ') : ''
   }
 `

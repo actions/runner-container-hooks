@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import * as fs from 'fs'
 import * as core from '@actions/core'
@@ -15,8 +16,13 @@ import * as shlex from 'shlex'
 
 export async function runScriptStep(
   args: RunScriptStepArgs,
-  state
-): Promise<void> {
+  state,
+  returnCommandExitCode = false
+): Promise<number> {
+  const workloadStartMarker = returnCommandExitCode
+    ? `HOOK_WORKLOAD_START_${randomUUID()}`
+    : undefined
+
   // Write the entrypoint first. This will be later coppied to the workflow pod
   const { entryPoint, entryPointArgs, environmentVariables } = args
   const { containerPath, runnerPath } = writeRunScript(
@@ -24,7 +30,8 @@ export async function runScriptStep(
     entryPoint,
     entryPointArgs,
     args.prependPath,
-    environmentVariables
+    environmentVariables,
+    workloadStartMarker
   )
 
   const workdir = dirname(process.env.RUNNER_WORKSPACE as string)
@@ -76,14 +83,18 @@ export async function runScriptStep(
     throw new Error(`failed to merge temp dirs: ${message}`)
   }
 
+  let exitCode = 0
   // Execute the entrypoint script
   args.entryPoint = 'sh'
   args.entryPointArgs = ['-e', containerPath]
   try {
-    await execPodStep(
+    exitCode = await execPodStep(
       [args.entryPoint, ...args.entryPointArgs],
       state.jobPod,
-      JOB_CONTAINER_NAME
+      JOB_CONTAINER_NAME,
+      undefined,
+      returnCommandExitCode,
+      workloadStartMarker
     )
   } catch (err) {
     const message = formatError(err)
@@ -109,4 +120,5 @@ export async function runScriptStep(
   } catch (error) {
     core.warning('Failed to copy _temp from pod')
   }
+  return exitCode
 }
