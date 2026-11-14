@@ -29,7 +29,8 @@ import {
 } from './constants'
 
 export async function runContainerStep(
-  stepContainer: RunContainerStepArgs
+  stepContainer: RunContainerStepArgs,
+  returnCommandExitCode = false
 ): Promise<number> {
   if (stepContainer.dockerfile) {
     throw new Error('Building container actions is not currently supported')
@@ -107,7 +108,9 @@ export async function runContainerStep(
       return await execPodStep(
         ['sh', '-e', containerPath],
         pod.metadata.name,
-        JOB_CONTAINER_NAME
+        JOB_CONTAINER_NAME,
+        undefined,
+        returnCommandExitCode
       )
     } catch (err) {
       const message = formatError(err)

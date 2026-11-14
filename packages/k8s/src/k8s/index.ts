@@ -1,3 +1,4 @@
+import { commandExitCode } from './step-exit-code'
 import * as core from '@actions/core'
 import * as path from 'path'
 import { spawn } from 'child_process'
@@ -250,7 +251,8 @@ export async function execPodStep(
   command: string[],
   podName: string,
   containerName: string,
-  stdin?: stream.Readable
+  stdin?: stream.Readable,
+  returnCommandExitCode = false
 ): Promise<number> {
   const exec = new k8s.Exec(kc)
   core.debug(
@@ -320,10 +322,16 @@ export async function execPodStep(
             }
           }
 
-          if (resp.status === 'Success') {
-            core.debug(`[execPodStep] Success, code: ${resp.code}`)
+          const exitCode = commandExitCode(resp)
+          if (
+            exitCode === 0 ||
+            (returnCommandExitCode && exitCode !== undefined)
+          ) {
+            core.debug(
+              `[execPodStep] Workload completed, exit code: ${exitCode}`
+            )
             await closeWebSocket()
-            resolve(resp.code || 0)
+            resolve(exitCode)
           } else {
             core.debug(
               `[execPodStep] Failure: ${JSON.stringify({ message: resp?.message, details: resp?.details })}`

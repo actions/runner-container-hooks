@@ -1,3 +1,4 @@
+import { finishStep } from './step-result'
 import * as core from '@actions/core'
 import {
   Command,
@@ -22,6 +23,7 @@ async function run(): Promise<void> {
     const command = input['command']
     const responseFile = input['responseFile']
     const state = input['state']
+    const supportsStepExitCode = input.supportsStepExitCode === true
     if (!(await isAuthPermissionsOK())) {
       throw new Error(
         `The Service account needs the following permissions ${JSON.stringify(
@@ -39,11 +41,18 @@ async function run(): Promise<void> {
         await cleanupJob()
         return process.exit(0)
       case Command.RunScriptStep:
-        await runScriptStep(args as RunScriptStepArgs, state)
-        return process.exit(0)
+        exitCode = await runScriptStep(
+          args as RunScriptStepArgs,
+          state,
+          supportsStepExitCode
+        )
+        return process.exit(finishStep(input, exitCode))
       case Command.RunContainerStep:
-        exitCode = await runContainerStep(args as RunContainerStepArgs)
-        return process.exit(exitCode)
+        exitCode = await runContainerStep(
+          args as RunContainerStepArgs,
+          supportsStepExitCode
+        )
+        return process.exit(finishStep(input, exitCode))
       default:
         throw new Error(`Command not recognized: ${command}`)
     }
