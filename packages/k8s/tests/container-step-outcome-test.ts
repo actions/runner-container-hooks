@@ -12,6 +12,7 @@ jest.mock('../src/k8s', () => ({
   waitForPodPhases: jest.fn()
 }))
 jest.mock('../src/k8s/utils', () => ({
+  formatError: (error: unknown) => String(error),
   CONTAINER_VOLUMES: [],
   PodPhase: { RUNNING: 'Running', PENDING: 'Pending', UNKNOWN: 'Unknown' },
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS: ['-f', '/dev/null'],

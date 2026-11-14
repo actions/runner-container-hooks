@@ -4,6 +4,7 @@ jest.mock('../src/k8s', () => ({
   execPodStep: jest.fn()
 }))
 jest.mock('../src/k8s/utils', () => ({
+  formatError: (error: unknown) => String(error),
   writeRunScript: jest.fn(() => ({
     containerPath: '/__w/_temp/step.sh',
     runnerPath: '/tmp/nonexistent-hook-unit-script'

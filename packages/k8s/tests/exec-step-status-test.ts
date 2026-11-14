@@ -1,3 +1,11 @@
+jest.mock('../src/k8s/heartbeat', () => ({
+  parsePositiveMsEnv: (_value: string | undefined, fallback: number) =>
+    fallback,
+  WebSocketHeartbeat: class {
+    start() {}
+    stop() {}
+  }
+}))
 const mockExec = jest.fn()
 jest.mock('@kubernetes/client-node', () => ({
   KubeConfig: class {
