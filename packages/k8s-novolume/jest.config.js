@@ -20,7 +20,7 @@ module.exports = {
   },
   transformIgnorePatterns: [
     // Transform these ESM packages
-    'node_modules/(?!(shlex|@kubernetes/client-node|openid-client|oauth4webapi|jose|uuid)/)'
+    'node_modules/(?!(shlex|@kubernetes/client-node|openid-client|oauth4webapi|jose|uuid|socks-proxy-agent|agent-base)/)'
   ],
   setupFilesAfterEnv: ['./jest.setup.js']
 }

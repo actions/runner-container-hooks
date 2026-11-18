@@ -348,7 +348,7 @@ export function readExtensionFromFile(): k8s.V1PodTemplateSpec | undefined {
   if (!doc || typeof doc !== 'object') {
     throw new Error(`Failed to parse ${filePath}`)
   }
-  return doc as k8s.V1PodTemplateSpec
+  return doc
 }
 
 export function useRwoRequiredAffinity(): boolean {

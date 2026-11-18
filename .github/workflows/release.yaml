@@ -10,9 +10,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -25,7 +25,7 @@ jobs:
       - name: Build packages
         run: npm run build-all
 
-      - uses: actions/github-script@v8
+      - uses: actions/github-script@v9
         id: releaseVersion
         with:
           result-encoding: string
@@ -55,7 +55,7 @@ jobs:
 
       - name: Create release notes
         id: releaseNotes
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');

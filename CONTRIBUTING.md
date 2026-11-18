@@ -4,6 +4,7 @@ You'll need a runner compatible with hooks, a repository with container workflow
 
 
 ## Getting Started
+- Use Node.js 24 and npm. The TypeScript configuration explicitly loads Node and Jest types and targets ES2015 for compatibility with TypeScript 6.
 - Run ` npm install && npm run bootstrap` to setup your environment and install all the needed packages
 - Run `npm run lint` and `npm run format` to ensure your charges will pass CI
 - Run `npm run build-all` to build and test end to end.

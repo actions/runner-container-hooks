@@ -116,7 +116,7 @@ export class TestHelper {
           fsGroup: 1001
         }
       }
-    } as k8s.V1Pod
+    }
     await k8sApi.createNamespacedPod({ namespace: 'default', body: pod })
   }
 

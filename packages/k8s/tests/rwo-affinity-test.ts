@@ -136,7 +136,7 @@ describe('RWO Affinity Behavior', () => {
 
     const jobPod = await getPodByName(content.state.jobPod)
 
-    const runnerPod = await getPodByName(runnerPodName!)
+    const runnerPod = await getPodByName(runnerPodName)
 
     const affinityValues =
       jobPod.spec?.affinity?.nodeAffinity

@@ -11,10 +11,8 @@ updates:
         patterns:
           - "*"
     ignore:
-      # ts-jest 29 declares a peer range of >=7.0.0-beta.0 <8 on @babel/core, so
-      # bumping Babel to 8 makes the dependency tree unresolvable (ERESOLVE) and
-      # breaks `npm install` in the release workflow. Remove these once ts-jest
-      # widens its peer range to accept Babel 8.
+      # Jest's babel-preset-current-node-syntax still pulls syntax plugins that
+      # require Babel 7. Remove these once the complete Jest preset supports Babel 8.
       - dependency-name: "@babel/core"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@babel/preset-env"
@@ -27,15 +25,6 @@ updates:
       all-dependencies:
         patterns:
           - "*"
-    ignore:
-      # ts-jest 29 declares a peer range of >=7.0.0-beta.0 <8 on @babel/core, so
-      # bumping Babel to 8 makes the dependency tree unresolvable (ERESOLVE) and
-      # breaks `npm install` in the release workflow. Remove these once ts-jest
-      # widens its peer range to accept Babel 8.
-      - dependency-name: "@babel/core"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@babel/preset-env"
-        update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: "/packages/k8s"
     schedule:
@@ -45,10 +34,8 @@ updates:
         patterns:
           - "*"
     ignore:
-      # ts-jest 29 declares a peer range of >=7.0.0-beta.0 <8 on @babel/core, so
-      # bumping Babel to 8 makes the dependency tree unresolvable (ERESOLVE) and
-      # breaks `npm install` in the release workflow. Remove these once ts-jest
-      # widens its peer range to accept Babel 8.
+      # Jest's babel-preset-current-node-syntax still pulls syntax plugins that
+      # require Babel 7. Remove these once the complete Jest preset supports Babel 8.
       - dependency-name: "@babel/core"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@babel/preset-env"
@@ -62,10 +49,8 @@ updates:
         patterns:
           - "*"
     ignore:
-      # ts-jest 29 declares a peer range of >=7.0.0-beta.0 <8 on @babel/core, so
-      # bumping Babel to 8 makes the dependency tree unresolvable (ERESOLVE) and
-      # breaks `npm install` in the release workflow. Remove these once ts-jest
-      # widens its peer range to accept Babel 8.
+      # Jest's babel-preset-current-node-syntax still pulls syntax plugins that
+      # require Babel 7. Remove these once the complete Jest preset supports Babel 8.
       - dependency-name: "@babel/core"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@babel/preset-env"
