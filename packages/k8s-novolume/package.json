@@ -1,0 +1,35 @@
+{
+  "name": "kubehooks-novolume",
+  "version": "0.1.0",
+  "description": "",
+  "main": "lib/index.js",
+  "scripts": {
+    "test": "jest --runInBand",
+    "build": "tsc && npx ncc build",
+    "format": "prettier --write '**/*.ts'",
+    "format-check": "prettier --check '**/*.ts'",
+    "lint": "eslint src/**/*.ts"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^2.0.2",
+    "@kubernetes/client-node": "^1.3.0",
+    "hooklib": "file:../hooklib",
+    "js-yaml": "^5.0.0",
+    "shlex": "^3.0.0",
+    "tar-fs": "^3.1.2",
+    "uuid": "^14.0.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@babel/preset-env": "^7.29.7",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.3.0",
+    "@vercel/ncc": "^0.44.0",
+    "babel-jest": "^30.4.1",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
+    "typescript": "^5.9.2"
+  }
+}

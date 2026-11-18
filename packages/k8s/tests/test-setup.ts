@@ -9,6 +9,7 @@ const kc = new k8s.KubeConfig()
 kc.loadFromDefault()
 
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api)
+const k8sStorageApi = kc.makeApiClient(k8s.StorageV1Api)
 
 export class TestHelper {
   private tempDirPath: string
@@ -46,6 +47,7 @@ export class TestHelper {
 
     await this.cleanupK8sResources()
     try {
+      await this.createTestVolume()
       await this.createTestJobPod()
     } catch (e) {
       console.log(e)
@@ -63,6 +65,24 @@ export class TestHelper {
 
   async cleanupK8sResources(): Promise<void> {
     await k8sApi
+      .deleteNamespacedPersistentVolumeClaim({
+        name: `${this.podName}-work`,
+        namespace: 'default',
+        gracePeriodSeconds: 0
+      })
+      .catch((e: k8s.ApiException<any>) => {
+        if (e.code !== 404) {
+          console.error(JSON.stringify(e))
+        }
+      })
+    await k8sApi
+      .deletePersistentVolume({ name: `${this.podName}-pv` })
+      .catch((e: k8s.ApiException<any>) => {
+        if (e.code !== 404) {
+          console.error(JSON.stringify(e))
+        }
+      })
+    await k8sApi
       .deleteNamespacedPod({
         name: this.podName,
         namespace: 'default',
@@ -79,6 +99,14 @@ export class TestHelper {
         namespace: 'default',
         gracePeriodSeconds: 0
       })
+      .catch((e: k8s.ApiException<any>) => {
+        if (e.code !== 404) {
+          console.error(JSON.stringify(e))
+        }
+      })
+
+    await k8sStorageApi
+      .deleteStorageClass({ name: `${this.podName}-storage` })
       .catch((e: k8s.ApiException<any>) => {
         if (e.code !== 404) {
           console.error(JSON.stringify(e))
@@ -118,6 +146,80 @@ export class TestHelper {
       }
     } as k8s.V1Pod
     await k8sApi.createNamespacedPod({ namespace: 'default', body: pod })
+    await this.waitForPodToBeScheduled()
+  }
+
+  // The hooks read the node of the runner pod to set the affinity of the pods
+  // they create. A real runner pod is always scheduled by the time it invokes a
+  // hook, so wait for the scheduler to assign the node before running the tests.
+  private async waitForPodToBeScheduled(): Promise<void> {
+    const timeoutMs = 60 * 1000
+    const start = Date.now()
+
+    while (Date.now() - start < timeoutMs) {
+      const pod = await k8sApi.readNamespacedPod({
+        name: this.podName,
+        namespace: 'default'
+      })
+      if (pod.spec?.nodeName) {
+        return
+      }
+      await new Promise(resolve => setTimeout(resolve, 200))
+    }
+
+    throw new Error(`Pod ${this.podName} was not scheduled in time`)
+  }
+
+  async createTestVolume(): Promise<void> {
+    const storageClassName = `${this.podName}-storage`
+
+    const sc: k8s.V1StorageClass = {
+      metadata: {
+        name: storageClassName
+      },
+      provisioner: 'kubernetes.io/no-provisioner',
+      volumeBindingMode: 'Immediate'
+    }
+    await k8sStorageApi.createStorageClass({ body: sc })
+
+    const volume: k8s.V1PersistentVolume = {
+      metadata: {
+        name: `${this.podName}-pv`
+      },
+      spec: {
+        storageClassName,
+        capacity: {
+          storage: '2Gi'
+        },
+        volumeMode: 'Filesystem',
+        accessModes: ['ReadWriteOnce'],
+        hostPath: {
+          path: `${this.tempDirPath}/_work`
+        }
+      }
+    }
+    await k8sApi.createPersistentVolume({ body: volume })
+
+    const volumeClaim: k8s.V1PersistentVolumeClaim = {
+      metadata: {
+        name: `${this.podName}-work`
+      },
+      spec: {
+        accessModes: ['ReadWriteOnce'],
+        volumeMode: 'Filesystem',
+        storageClassName,
+        volumeName: `${this.podName}-pv`,
+        resources: {
+          requests: {
+            storage: '1Gi'
+          }
+        }
+      }
+    }
+    await k8sApi.createNamespacedPersistentVolumeClaim({
+      namespace: 'default',
+      body: volumeClaim
+    })
   }
 
   getPrepareJobDefinition(): HookData {
@@ -130,6 +232,10 @@ export class TestHelper {
 
     prepareJob.args.container.userMountVolumes = undefined
     prepareJob.args.container.registry = null
+    const externals = prepareJob.args.container.systemMountVolumes.find(
+      volume => volume.targetVolumePath === '/__e'
+    )
+    externals.sourceVolumePath = `${this.tempDirPath}/externals`
     prepareJob.args.services.forEach(s => {
       s.registry = null
     })

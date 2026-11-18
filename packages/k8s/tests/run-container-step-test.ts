@@ -1,9 +1,14 @@
-import { prepareJob, runContainerStep } from '../src/hooks'
+import { cleanupJob, prepareJob, runContainerStep } from '../src/hooks'
 import { TestHelper } from './test-setup'
 import { ENV_HOOK_TEMPLATE_PATH } from '../src/k8s/utils'
 import * as fs from 'fs'
 import * as yaml from 'js-yaml'
-import { JOB_CONTAINER_EXTENSION_NAME } from '../src/hooks/constants'
+import * as k8s from '@kubernetes/client-node'
+import {
+  JOB_CONTAINER_EXTENSION_NAME,
+  RunnerInstanceLabel
+} from '../src/hooks/constants'
+import { namespace } from '../src/k8s'
 
 jest.useRealTimers()
 
@@ -24,6 +29,8 @@ describe('Run container step', () => {
   })
 
   afterEach(async () => {
+    delete process.env[ENV_HOOK_TEMPLATE_PATH]
+    await cleanupJob()
     await testHelper.cleanup()
   })
 
@@ -42,7 +49,7 @@ describe('Run container step', () => {
           {
             name: JOB_CONTAINER_EXTENSION_NAME,
             command: ['sh'],
-            args: ['-c', 'sleep 10000']
+            args: ['-c', 'echo test']
           },
           {
             name: 'side-container',
@@ -68,7 +75,7 @@ describe('Run container step', () => {
     runContainerStepData.args.entryPoint = 'bash'
     runContainerStepData.args.entryPointArgs = [
       '-c',
-      "'if [[ -z $NODE_ENV ]]; then exit 1; fi'"
+      'if [[ -z $NODE_ENV ]]; then exit 1; fi'
     ]
     await expect(
       runContainerStep(runContainerStepData.args)
@@ -79,10 +86,101 @@ describe('Run container step', () => {
     runContainerStepData.args.entryPoint = 'bash'
     runContainerStepData.args.entryPointArgs = [
       '-c',
-      "'if [[ -z $GITHUB_ACTIONS  ]] || [[ -z $CI ]]; then exit 1; fi'"
+      'if [[ -z $GITHUB_ACTIONS  ]] || [[ -z $CI ]]; then exit 1; fi'
     ]
     await expect(
       runContainerStep(runContainerStepData.args)
     ).resolves.not.toThrow()
   })
+
+  it(
+    'should delete the step job and long-lived sidecar once the job container exits',
+    async () => {
+      // Waiting on the Job itself never returns here: a Job only succeeds
+      // once every container has exited, so a sidecar that outlives the step
+      // used to hang the hook indefinitely.
+      const extension = {
+        spec: {
+          containers: [
+            {
+              name: 'side-container',
+              image: 'ubuntu:latest',
+              command: ['sh'],
+              args: ['-c', 'sleep 600']
+            }
+          ],
+          restartPolicy: 'Never'
+        }
+      }
+
+      const filePath = testHelper.createFile()
+      fs.writeFileSync(filePath, yaml.dump(extension))
+      process.env[ENV_HOOK_TEMPLATE_PATH] = filePath
+
+      runContainerStepData.args.entryPoint = 'bash'
+      runContainerStepData.args.entryPointArgs = ['-c', 'exit 0']
+
+      await expect(runContainerStep(runContainerStepData.args)).resolves.toBe(0)
+
+      const kc = new k8s.KubeConfig()
+      kc.loadFromDefault()
+      const selector = {
+        namespace: namespace(),
+        labelSelector: new RunnerInstanceLabel().toString()
+      }
+      const [jobs, pods] = await Promise.all([
+        kc.makeApiClient(k8s.BatchV1Api).listNamespacedJob(selector),
+        kc.makeApiClient(k8s.CoreV1Api).listNamespacedPod(selector)
+      ])
+      expect(
+        jobs.items.filter(job => !job.metadata?.deletionTimestamp)
+      ).toHaveLength(0)
+      expect(
+        pods.items.filter(
+          pod =>
+            !pod.metadata?.deletionTimestamp &&
+            pod.metadata?.ownerReferences?.some(owner => owner.kind === 'Job')
+        )
+      ).toHaveLength(0)
+      const { state } = JSON.parse(
+        fs.readFileSync(prepareJobOutputFilePath, 'utf8')
+      )
+      expect(pods.items.some(pod => pod.metadata?.name === state.jobPod)).toBe(
+        true
+      )
+    },
+    150 * 1000
+  )
+
+  it(
+    'should report the job container exit code, not a sidecar one',
+    async () => {
+      // The exit code used to be read from the last entry of
+      // containerStatuses, which is a sidecar as soon as an extension adds
+      // containers.
+      const extension = {
+        spec: {
+          containers: [
+            {
+              name: 'side-container',
+              image: 'ubuntu:latest',
+              command: ['sh'],
+              args: ['-c', 'exit 0']
+            }
+          ],
+          restartPolicy: 'Never'
+        }
+      }
+
+      const filePath = testHelper.createFile()
+      fs.writeFileSync(filePath, yaml.dump(extension))
+      process.env[ENV_HOOK_TEMPLATE_PATH] = filePath
+
+      runContainerStepData.args.entryPoint = 'bash'
+      runContainerStepData.args.entryPointArgs = ['-c', 'exit 3']
+
+      await expect(runContainerStep(runContainerStepData.args)).resolves.toBe(3)
+    },
+    150 * 1000
+  )
 })

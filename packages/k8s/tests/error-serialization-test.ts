@@ -1,6 +1,7 @@
 const mockExec = jest.fn()
 const mockReadNamespacedPod = jest.fn()
 const mockReadNamespacedJob = jest.fn()
+const mockListNamespacedPod = jest.fn()
 
 jest.mock('@kubernetes/client-node', () => {
   return {
@@ -14,7 +15,10 @@ jest.mock('@kubernetes/client-node', () => {
         if (name.includes('Authorization')) {
           return { createSelfSubjectAccessReview: jest.fn() }
         }
-        return { readNamespacedPod: mockReadNamespacedPod }
+        return {
+          readNamespacedPod: mockReadNamespacedPod,
+          listNamespacedPod: mockListNamespacedPod
+        }
       }),
       getContexts: jest.fn().mockReturnValue([{ namespace: 'test-namespace' }])
     })),
@@ -29,17 +33,6 @@ jest.mock('@kubernetes/client-node', () => {
   }
 })
 
-jest.mock('tar-fs', () => ({
-  default: {
-    pack: jest.fn().mockReturnValue({ pipe: jest.fn() }),
-    extract: jest.fn().mockReturnValue({
-      on: jest.fn(),
-      pipe: jest.fn()
-    })
-  },
-  __esModule: true
-}))
-
 jest.mock('../src/k8s/utils', () => {
   const actual = jest.requireActual('../src/k8s/utils')
   return {
@@ -49,8 +42,7 @@ jest.mock('../src/k8s/utils', () => {
 })
 
 import {
-  execCpToPod,
-  execCpFromPod,
+  getContainerJobPodName,
   waitForJobToComplete,
   waitForPodPhases
 } from '../src/k8s'
@@ -66,52 +58,77 @@ describe('error serialization', () => {
     delete process.env['ACTIONS_RUNNER_KUBERNETES_NAMESPACE']
   })
 
-  describe('execCpToPod', () => {
-    it('should include Error.message in thrown error after retries', async () => {
-      mockExec.mockRejectedValue(new Error('connection refused'))
+  describe('getContainerJobPodName', () => {
+    const originalTimeout =
+      process.env.ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS
 
-      await expect(
-        execCpToPod('test-pod', '/tmp/src', '/workspace')
-      ).rejects.toThrow('cpToPod failed after 30 attempts: connection refused')
+    beforeEach(() => {
+      jest.useFakeTimers({ now: 0 })
+      delete process.env.ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS
     })
 
-    it('should use String() for non-Error throwables', async () => {
-      mockExec.mockRejectedValue('raw string error')
-
-      await expect(
-        execCpToPod('test-pod', '/tmp/src', '/workspace')
-      ).rejects.toThrow('cpToPod failed after 30 attempts: raw string error')
+    afterEach(() => {
+      jest.useRealTimers()
+      if (originalTimeout === undefined) {
+        delete process.env.ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS
+      } else {
+        process.env.ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS = originalTimeout
+      }
     })
 
-    it('should not produce empty braces in error message', async () => {
-      mockExec.mockRejectedValue(new Error('ETIMEOUT'))
+    it.each([
+      [undefined, 120],
+      ['1800', 1200]
+    ])(
+      'allows pod discovery after %p timeout configuration and %p seconds of delay',
+      async (configured, delaySeconds) => {
+        if (configured !== undefined) {
+          process.env.ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS = configured
+        }
+        mockListNamespacedPod.mockImplementation(async () => ({
+          items:
+            Date.now() >= delaySeconds * 1000
+              ? [{ metadata: { name: 'step-pod' } }]
+              : []
+        }))
 
-      await expect(
-        execCpToPod('test-pod', '/tmp/src', '/workspace')
-      ).rejects.toMatchObject({
-        message: expect.not.stringContaining('{}')
-      })
-    })
-  })
+        const result = expect(getContainerJobPodName('step-job')).resolves.toBe(
+          'step-pod'
+        )
+        await jest.runAllTimersAsync()
+        await result
 
-  describe('execCpFromPod', () => {
-    it('should include Error.message in thrown error after retries', async () => {
-      mockExec.mockRejectedValue(new Error('container not found'))
+        expect(Date.now()).toBeGreaterThanOrEqual(delaySeconds * 1000)
+        expect(mockListNamespacedPod).toHaveBeenCalledWith({
+          namespace: 'test-namespace',
+          labelSelector: 'job-name=step-job',
+          limit: 1
+        })
+      }
+    )
 
-      await expect(
-        execCpFromPod('test-pod', '/workspace/output', '/tmp/dst')
-      ).rejects.toThrow(
-        'execCpFromPod failed after 30 attempts: container not found'
-      )
-    })
+    it.each([
+      [undefined, 600],
+      ['1800', 1800],
+      ['1', 1]
+    ])(
+      'times out pod discovery with configuration %p after %p seconds',
+      async (configured, timeoutSeconds) => {
+        if (configured !== undefined) {
+          process.env.ACTIONS_RUNNER_PREPARE_JOB_TIMEOUT_SECONDS = configured
+        }
+        mockListNamespacedPod.mockResolvedValue({ items: [] })
 
-    it('should use String() for non-Error throwables', async () => {
-      mockExec.mockRejectedValue(42)
+        const result = expect(
+          getContainerJobPodName('step-job')
+        ).rejects.toThrow('backoff timeout')
+        await jest.runAllTimersAsync()
+        await result
 
-      await expect(
-        execCpFromPod('test-pod', '/workspace/output', '/tmp/dst')
-      ).rejects.toThrow('execCpFromPod failed after 30 attempts: 42')
-    })
+        expect(Date.now()).toBeGreaterThan(timeoutSeconds * 1000)
+        expect(Date.now()).toBeLessThanOrEqual((timeoutSeconds + 20) * 1000)
+      }
+    )
   })
 
   describe('waitForJobToComplete', () => {
