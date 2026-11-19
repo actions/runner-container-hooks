@@ -24,7 +24,8 @@ export async function runScriptStep(
     await execPodStep(
       [args.entryPoint, ...args.entryPointArgs],
       state.jobPod,
-      JOB_CONTAINER_NAME
+      JOB_CONTAINER_NAME,
+      process.stdin
     )
   } catch (err) {
     const message = formatError(err)
