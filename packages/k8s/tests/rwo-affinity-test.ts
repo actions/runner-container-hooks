@@ -3,6 +3,7 @@ import { cleanupJob } from '../src/hooks'
 import { prepareJob } from '../src/hooks/prepare-job'
 import { TestHelper } from './test-setup'
 import { getPodByName } from '../src/k8s'
+import { getRunnerPodName } from '../src/hooks/constants'
 import { ENV_HOOK_RWO, ENV_HOOK_TEMPLATE_PATH } from '../src/k8s/utils'
 
 jest.useRealTimers()
@@ -126,7 +127,7 @@ describe('RWO Affinity Behavior', () => {
   })
 
   it('should use correct runner node name in preferred affinity values by default', async () => {
-    const runnerPodName = process.env.ACTIONS_RUNNER_POD_NAME
+    const runnerPodName = getRunnerPodName()
 
     await prepareJob(prepareJobData.args, prepareJobOutputFilePath)
 
@@ -136,7 +137,7 @@ describe('RWO Affinity Behavior', () => {
 
     const jobPod = await getPodByName(content.state.jobPod)
 
-    const runnerPod = await getPodByName(runnerPodName!)
+    const runnerPod = await getPodByName(runnerPodName)
 
     const affinityValues =
       jobPod.spec?.affinity?.nodeAffinity
